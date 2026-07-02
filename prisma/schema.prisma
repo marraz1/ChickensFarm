@@ -1,0 +1,313 @@
+// ChickensFarm — full data model (all phases), see project plan for rationale.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum FarmRole {
+  OWNER
+  WORKER
+}
+
+enum BirdType {
+  HEN
+  GOOSE
+  DUCK
+  TURKEY
+  OTHER
+}
+
+enum Sex {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum LossReasonType {
+  DISEASE
+  PREDATOR
+  OTHER
+}
+
+enum ExpenseCategory {
+  FEED
+  VITAMINS
+  MEDICINE
+  PRODUCTIVITY
+  OTHER
+}
+
+enum EggQuality {
+  HEALTHY
+  BROKEN
+}
+
+enum BirdGroupEventType {
+  INITIAL
+  MANUAL_ADJUSTMENT
+  LOSS
+  INCUBATION_HATCH
+}
+
+model User {
+  id              String               @id @default(cuid())
+  email           String               @unique
+  passwordHash    String
+  name            String?
+  createdAt       DateTime             @default(now())
+  farmsOwned      Farm[]               @relation("FarmOwner")
+  farmMemberships FarmUser[]
+  resetTokens     PasswordResetToken[]
+  birdGroupEvents BirdGroupEvent[]     @relation("EventCreatedBy")
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model Farm {
+  id        String    @id @default(cuid())
+  ownerId   String
+  owner     User      @relation("FarmOwner", fields: [ownerId], references: [id])
+  name      String
+  location  String?
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  farmUsers        FarmUser[]
+  breeds           Breed[]
+  birdGroups       BirdGroup[]
+  motherHens       MotherHen[]
+  eggCollections   EggCollection[]
+  eggSales         EggSale[]
+  losses           Loss[]
+  expenses         Expense[]
+  incubationCycles IncubationCycle[]
+  birdGroupEvents  BirdGroupEvent[]
+
+  @@index([ownerId])
+  @@map("farms")
+}
+
+model FarmUser {
+  id        String   @id @default(cuid())
+  farmId    String
+  farm      Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      FarmRole @default(OWNER)
+  createdAt DateTime @default(now())
+
+  @@unique([farmId, userId])
+  @@index([userId])
+  @@map("farm_users")
+}
+
+model Breed {
+  id          String   @id @default(cuid())
+  farmId      String
+  farm        Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  name        String
+  birdType    BirdType
+  description String?
+  createdAt   DateTime @default(now())
+
+  birdGroups BirdGroup[]
+
+  @@index([farmId])
+  @@map("breeds")
+}
+
+model BirdGroup {
+  id                  String   @id @default(cuid())
+  farmId              String
+  farm                Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  breedId             String
+  breed               Breed    @relation(fields: [breedId], references: [id], onDelete: Restrict)
+  sex                 Sex      @default(UNKNOWN)
+  quantity            Int
+  birthOrAcquiredDate DateTime @db.Date
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  motherHens        MotherHen[]
+  losses            Loss[]
+  eggCollections    EggCollection[]
+  events            BirdGroupEvent[]
+  hatchedFromCycles IncubationCycle[] @relation("EggSourceGroup")
+  hatchedIntoCycles IncubationCycle[] @relation("ResultingGroup")
+
+  @@index([farmId])
+  @@index([farmId, breedId])
+  @@map("bird_groups")
+}
+
+// F4.3 — historical audit log of every quantity change
+model BirdGroupEvent {
+  id             String             @id @default(cuid())
+  birdGroupId    String
+  birdGroup      BirdGroup          @relation(fields: [birdGroupId], references: [id], onDelete: Cascade)
+  farmId         String
+  farm           Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  eventType      BirdGroupEventType
+  quantityDelta  Int
+  quantityBefore Int
+  quantityAfter  Int
+  sourceType     String?
+  sourceId       String?
+  note           String?
+  createdAt      DateTime           @default(now())
+  createdById    String
+  createdBy      User               @relation("EventCreatedBy", fields: [createdById], references: [id])
+
+  @@index([birdGroupId, createdAt])
+  @@index([farmId])
+  @@map("bird_group_events")
+}
+
+model MotherHen {
+  id          String     @id @default(cuid())
+  farmId      String
+  farm        Farm       @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  birdGroupId String?
+  birdGroup   BirdGroup? @relation(fields: [birdGroupId], references: [id], onDelete: SetNull)
+  name        String
+  photoUrl    String?
+  description String?
+  createdAt   DateTime   @default(now())
+
+  logs MotherHenLog[]
+
+  @@index([farmId])
+  @@map("mother_hens")
+}
+
+model MotherHenLog {
+  id          String    @id @default(cuid())
+  motherHenId String
+  motherHen   MotherHen @relation(fields: [motherHenId], references: [id], onDelete: Cascade)
+  entryDate   DateTime  @db.Date
+  note        String?
+  photoUrl    String?
+  createdAt   DateTime  @default(now())
+
+  @@index([motherHenId, entryDate])
+  @@map("mother_hen_logs")
+}
+
+model EggCollection {
+  id             String      @id @default(cuid())
+  farmId         String
+  farm           Farm        @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  birdGroupId    String?
+  birdGroup      BirdGroup?  @relation(fields: [birdGroupId], references: [id], onDelete: SetNull)
+  collectionDate DateTime    @db.Date
+  quantity       Int
+  quality        EggQuality?
+  createdAt      DateTime    @default(now())
+
+  @@index([farmId, collectionDate])
+  @@map("egg_collections")
+}
+
+model EggSale {
+  id          String   @id @default(cuid())
+  farmId      String
+  farm        Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  saleDate    DateTime @db.Date
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalAmount Decimal  @db.Decimal(10, 2)
+  buyer       String?
+  createdAt   DateTime @default(now())
+
+  @@index([farmId, saleDate])
+  @@map("egg_sales")
+}
+
+model Loss {
+  id          String         @id @default(cuid())
+  farmId      String
+  farm        Farm           @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  birdGroupId String?
+  birdGroup   BirdGroup?     @relation(fields: [birdGroupId], references: [id], onDelete: SetNull)
+  lossDate    DateTime       @db.Date
+  quantity    Int
+  reasonType  LossReasonType
+  comment     String?
+  createdAt   DateTime       @default(now())
+
+  @@index([farmId, lossDate])
+  @@index([farmId, reasonType])
+  @@map("losses")
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  farmId      String
+  farm        Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  expenseDate DateTime        @db.Date
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(10, 2)
+  description String?
+  createdAt   DateTime        @default(now())
+
+  @@index([farmId, expenseDate])
+  @@index([farmId, category])
+  @@map("expenses")
+}
+
+model IncubationCycle {
+  id                String     @id @default(cuid())
+  farmId            String
+  farm              Farm       @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  sourceDescription String?
+  eggSourceGroupId  String?
+  eggSourceGroup    BirdGroup? @relation("EggSourceGroup", fields: [eggSourceGroupId], references: [id], onDelete: SetNull)
+  startDate         DateTime   @db.Date
+  eggsTotal         Int?
+  eggsFertile       Int?
+  eggsInfertile     Int?
+  hatchDate         DateTime?  @db.Date
+  hatchedCount      Int?
+  resultingGroupId  String?
+  resultingGroup    BirdGroup? @relation("ResultingGroup", fields: [resultingGroupId], references: [id], onDelete: SetNull)
+  notes             String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  growthLogs IncubationGrowthLog[]
+
+  @@index([farmId, startDate])
+  @@map("incubation_cycles")
+}
+
+model IncubationGrowthLog {
+  id                String          @id @default(cuid())
+  incubationCycleId String
+  incubationCycle   IncubationCycle @relation(fields: [incubationCycleId], references: [id], onDelete: Cascade)
+  logDate           DateTime        @db.Date
+  aliveCount        Int
+  note              String?
+  createdAt         DateTime        @default(now())
+
+  @@index([incubationCycleId, logDate])
+  @@map("incubation_growth_logs")
+}
