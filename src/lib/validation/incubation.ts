@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { birdCategoryEnum, sexEnum } from "@/lib/validation/bird-groups";
 
 // Start a new incubation cycle (F10.1)
 export const createIncubationCycleSchema = z.object({
@@ -41,10 +42,20 @@ export type UpdateIncubationCycleInput = z.infer<typeof updateIncubationCycleSch
 export type CandlingInput = z.infer<typeof candlingSchema>;
 export type HatchInput = z.infer<typeof hatchSchema>;
 
-// Periodic survival tracking of the hatched chicks (F10.4)
+// Periodic survival tracking of the hatched chicks (F10.4). Category/sex optionally
+// reclassify the resulting cohort as the chicks mature.
 export const createGrowthLogSchema = z.object({
   logDate: z.string().min(1, "Įveskite datą"),
   aliveCount: z.number().int().min(0),
+  category: birdCategoryEnum.optional(),
+  sex: sexEnum.optional(),
   note: z.string().trim().max(1000).optional().or(z.literal("")),
 });
 export type CreateGrowthLogInput = z.infer<typeof createGrowthLogSchema>;
+
+// Finish the growth tracking / raising. Optionally move the current cohort birds
+// into an existing group; otherwise the cohort is kept as its own group.
+export const finishGrowthTrackingSchema = z.object({
+  transferToGroupId: z.string().optional().or(z.literal("")),
+});
+export type FinishGrowthTrackingInput = z.infer<typeof finishGrowthTrackingSchema>;
