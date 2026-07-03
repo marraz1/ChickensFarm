@@ -1,10 +1,17 @@
 import type {
   BirdType,
   Sex,
+  BirdCategory,
   LossReasonType,
   ExpenseCategory,
   EggQuality,
 } from "@/generated/prisma/client";
+
+export const birdCategoryLabels: Record<BirdCategory, string> = {
+  LAYER: "Dedeklės",
+  ROOSTER: "Gaidukai",
+  OTHER: "Kita",
+};
 
 export const birdTypeLabels: Record<BirdType, string> = {
   HEN: "Višta",

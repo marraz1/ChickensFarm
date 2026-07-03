@@ -47,6 +47,12 @@ enum EggQuality {
   BROKEN
 }
 
+enum BirdCategory {
+  LAYER // dedeklės
+  ROOSTER // gaidukai
+  OTHER // kita
+}
+
 enum BirdGroupEventType {
   INITIAL
   MANUAL_ADJUSTMENT
@@ -140,8 +146,9 @@ model BirdGroup {
   farmId              String
   farm                Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
   breedId             String
-  breed               Breed    @relation(fields: [breedId], references: [id], onDelete: Restrict)
-  sex                 Sex      @default(UNKNOWN)
+  breed               Breed        @relation(fields: [breedId], references: [id], onDelete: Restrict)
+  sex                 Sex          @default(UNKNOWN)
+  category            BirdCategory @default(OTHER)
   quantity            Int
   birthOrAcquiredDate DateTime @db.Date
   notes               String?

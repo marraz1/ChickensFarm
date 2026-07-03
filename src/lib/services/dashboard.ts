@@ -15,6 +15,8 @@ export async function getDashboardData(farmId: string) {
 
   const [
     totalBirdsAgg,
+    layersAgg,
+    roostersAgg,
     activeIncubationCount,
     eggsThisMonthAgg,
     eggsThisYearAgg,
@@ -29,6 +31,8 @@ export async function getDashboardData(farmId: string) {
     recentHenLogs,
   ] = await Promise.all([
     prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
+    prisma.birdGroup.aggregate({ where: { farmId, category: "LAYER" }, _sum: { quantity: true } }),
+    prisma.birdGroup.aggregate({ where: { farmId, category: "ROOSTER" }, _sum: { quantity: true } }),
     prisma.incubationCycle.count({ where: { farmId, hatchDate: null } }),
     prisma.eggCollection.aggregate({
       where: { farmId, collectionDate: { gte: monthStart } },
@@ -103,6 +107,8 @@ export async function getDashboardData(farmId: string) {
 
   return {
     totalBirds: totalBirdsAgg._sum.quantity ?? 0,
+    layerBirds: layersAgg._sum.quantity ?? 0,
+    roosterBirds: roostersAgg._sum.quantity ?? 0,
     activeIncubationCount,
     eggsThisMonth: eggsThisMonthAgg._sum.quantity ?? 0,
     eggsThisYear: eggsThisYearAgg._sum.quantity ?? 0,

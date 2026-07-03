@@ -94,6 +94,7 @@ export async function createBirdGroup(farmId: string, userId: string, input: Cre
         farmId,
         breedId: input.breedId,
         sex: input.sex,
+        category: input.category,
         quantity: input.quantity,
         birthOrAcquiredDate: new Date(input.birthOrAcquiredDate),
         notes: input.notes || null,
