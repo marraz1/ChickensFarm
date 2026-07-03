@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createBirdGroupSchema, type CreateBirdGroupInput } from "@/lib/validation/bird-groups";
-import { sexLabels } from "@/lib/labels";
+import { sexLabels, birdCategoryLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
 
 type Breed = { id: string; name: string };
@@ -33,7 +33,9 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
   } = useForm<CreateBirdGroupInput>({
     resolver: zodResolver(createBirdGroupSchema),
     defaultValues: {
+      breedId: "",
       sex: "UNKNOWN",
+      category: "LAYER",
       quantity: 0,
       birthOrAcquiredDate: todayInputValue(),
     },
@@ -41,6 +43,8 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
 
   const breedId = watch("breedId");
   const sex = watch("sex");
+  const category = watch("category");
+  const breedItems = Object.fromEntries(breeds.map((b) => [b.id, b.name]));
 
   async function onSubmit(data: CreateBirdGroupInput) {
     setServerError(null);
@@ -72,7 +76,7 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="breedId">Veislė</Label>
-        <Select value={breedId} onValueChange={(v) => v && setValue("breedId", v, { shouldValidate: true })}>
+        <Select items={breedItems} value={breedId ?? ""} onValueChange={(v) => v && setValue("breedId", v, { shouldValidate: true })}>
           <SelectTrigger id="breedId" className="h-11 w-full">
             <SelectValue placeholder="Pasirinkite veislę" />
           </SelectTrigger>
@@ -88,8 +92,24 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
       </div>
 
       <div className="flex flex-col gap-1.5">
+        <Label htmlFor="category">Kategorija</Label>
+        <Select items={birdCategoryLabels} value={category} onValueChange={(v) => v && setValue("category", v as CreateBirdGroupInput["category"])}>
+          <SelectTrigger id="category" className="h-11 w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(birdCategoryLabels).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="sex">Lytis</Label>
-        <Select value={sex} onValueChange={(v) => v && setValue("sex", v as CreateBirdGroupInput["sex"])}>
+        <Select items={sexLabels} value={sex} onValueChange={(v) => v && setValue("sex", v as CreateBirdGroupInput["sex"])}>
           <SelectTrigger id="sex" className="h-11 w-full">
             <SelectValue />
           </SelectTrigger>

@@ -41,6 +41,8 @@ export function HatchForm({
   const [mode, setMode] = useState<TargetMode>("new");
   const [breedId, setBreedId] = useState("");
   const [birdGroupId, setBirdGroupId] = useState("");
+  const breedItems = Object.fromEntries(breeds.map((b) => [b.id, b.label]));
+  const groupItems = Object.fromEntries(birdGroups.map((g) => [g.id, g.label]));
 
   const {
     register,
@@ -126,7 +128,7 @@ export function HatchForm({
       {mode === "new" && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="breedId">Naujos grupės veislė</Label>
-          <Select value={breedId} onValueChange={(v) => v && setBreedId(v)}>
+          <Select items={breedItems} value={breedId} onValueChange={(v) => v && setBreedId(v)}>
             <SelectTrigger id="breedId" className="h-11 w-full">
               <SelectValue placeholder="Pasirinkite veislę" />
             </SelectTrigger>
@@ -138,13 +140,17 @@ export function HatchForm({
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">
+            Grupė bus sukurta kaip „Viščiukai". Paaugus galėsite atskirti į jauniklės vištas ir
+            gaidukus grupės kortelėje.
+          </p>
         </div>
       )}
 
       {mode === "existing" && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="existingGroup">Esama grupė</Label>
-          <Select value={birdGroupId} onValueChange={(v) => v && setBirdGroupId(v)}>
+          <Select items={groupItems} value={birdGroupId} onValueChange={(v) => v && setBirdGroupId(v)}>
             <SelectTrigger id="existingGroup" className="h-11 w-full">
               <SelectValue placeholder="Pasirinkite grupę" />
             </SelectTrigger>

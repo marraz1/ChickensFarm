@@ -90,6 +90,7 @@ export async function finalizeHatch(
             farmId,
             breedId: input.target.breedId,
             sex: "UNKNOWN",
+            category: "CHICK", // išperinti jaunikliai → Viščiukai (atskiriami paaugus)
             quantity: 0,
             birthOrAcquiredDate: new Date(input.hatchDate),
             notes: "Išsiritę jaunikliai (perinimas)",

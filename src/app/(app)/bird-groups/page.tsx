@@ -3,7 +3,7 @@ import { requireActiveFarm } from "@/lib/session";
 import { listBirdGroups } from "@/lib/services/bird-groups";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
-import { birdTypeLabels, sexLabels } from "@/lib/labels";
+import { birdTypeLabels, sexLabels, birdCategoryLabels } from "@/lib/labels";
 import { formatDateLT } from "@/lib/format";
 import { Plus } from "lucide-react";
 
@@ -51,6 +51,7 @@ export default async function BirdGroupsPage() {
                 <span className="text-lg font-semibold">{group.quantity}</span>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
+                {group.category !== "OTHER" ? `${birdCategoryLabels[group.category]} · ` : ""}
                 {sexLabels[group.sex]} · {computeAge(group.birthOrAcquiredDate)} · nuo{" "}
                 {formatDateLT(group.birthOrAcquiredDate)}
               </p>

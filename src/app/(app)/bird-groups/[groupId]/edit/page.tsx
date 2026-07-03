@@ -16,9 +16,13 @@ export default async function EditBirdGroupPage({
 
   return (
     <div>
-      <PageHeader title="Koreguoti kiekį" backHref={`/bird-groups/${group.id}`} />
+      <PageHeader title="Koreguoti grupę" backHref={`/bird-groups/${group.id}`} />
       <div className="px-4">
-        <AdjustBirdGroupForm groupId={group.id} currentQuantity={group.quantity} />
+        <AdjustBirdGroupForm
+          groupId={group.id}
+          currentQuantity={group.quantity}
+          currentCategory={group.category}
+        />
       </div>
     </div>
   );
