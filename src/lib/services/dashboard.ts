@@ -1,4 +1,15 @@
 import { prisma } from "@/lib/prisma";
+import type { BirdCategory } from "@/generated/prisma/client";
+
+// Order the total-birds breakdown follows on the dashboard.
+const CATEGORY_ORDER: BirdCategory[] = [
+  "LAYER",
+  "ROOSTER",
+  "PULLET",
+  "COCKEREL",
+  "CHICK",
+  "OTHER",
+];
 
 export type ActivityItem = {
   id: string;
@@ -15,9 +26,7 @@ export async function getDashboardData(farmId: string) {
 
   const [
     totalBirdsAgg,
-    layersAgg,
-    roostersAgg,
-    hatchedChicksAgg,
+    birdsByCategoryRows,
     activeIncubationCount,
     eggsThisMonthAgg,
     eggsThisYearAgg,
@@ -32,10 +41,14 @@ export async function getDashboardData(farmId: string) {
     recentHenLogs,
   ] = await Promise.all([
     prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    prisma.birdGroup.aggregate({ where: { farmId, category: "LAYER" }, _sum: { quantity: true } }),
-    prisma.birdGroup.aggregate({ where: { farmId, category: "ROOSTER" }, _sum: { quantity: true } }),
-    // Total chicks ever hatched from incubation cycles.
-    prisma.incubationCycle.aggregate({ where: { farmId }, _sum: { hatchedCount: true } }),
+    // Current live headcount per bird category (sums the quantities of all
+    // groups sharing a category), so the dashboard breakdown always reflects
+    // exactly the categories the farm actually holds.
+    prisma.birdGroup.groupBy({
+      by: ["category"],
+      where: { farmId },
+      _sum: { quantity: true },
+    }),
     prisma.incubationCycle.count({ where: { farmId, hatchDate: null } }),
     prisma.eggCollection.aggregate({
       where: { farmId, collectionDate: { gte: monthStart } },
@@ -108,11 +121,17 @@ export async function getDashboardData(farmId: string) {
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 10);
 
+  const quantityByCategory = new Map(
+    birdsByCategoryRows.map((row) => [row.category, row._sum.quantity ?? 0])
+  );
+  const birdsByCategory = CATEGORY_ORDER.map((category) => ({
+    category,
+    quantity: quantityByCategory.get(category) ?? 0,
+  })).filter((entry) => entry.quantity > 0);
+
   return {
     totalBirds: totalBirdsAgg._sum.quantity ?? 0,
-    layerBirds: layersAgg._sum.quantity ?? 0,
-    roosterBirds: roostersAgg._sum.quantity ?? 0,
-    hatchedChicks: hatchedChicksAgg._sum.hatchedCount ?? 0,
+    birdsByCategory,
     activeIncubationCount,
     eggsThisMonth: eggsThisMonthAgg._sum.quantity ?? 0,
     eggsThisYear: eggsThisYearAgg._sum.quantity ?? 0,
