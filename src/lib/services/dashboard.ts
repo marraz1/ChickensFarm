@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import type { BirdType } from "@/generated/prisma/client";
+import { birdTypeOrder } from "@/lib/labels";
 
 export type ActivityItem = {
   id: string;
@@ -15,9 +17,7 @@ export async function getDashboardData(farmId: string) {
 
   const [
     totalBirdsAgg,
-    layersAgg,
-    roostersAgg,
-    hatchedChicksAgg,
+    birdGroupsForTypes,
     activeIncubationCount,
     eggsThisMonthAgg,
     eggsThisYearAgg,
@@ -32,10 +32,13 @@ export async function getDashboardData(farmId: string) {
     recentHenLogs,
   ] = await Promise.all([
     prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    prisma.birdGroup.aggregate({ where: { farmId, category: "LAYER" }, _sum: { quantity: true } }),
-    prisma.birdGroup.aggregate({ where: { farmId, category: "ROOSTER" }, _sum: { quantity: true } }),
-    // Total chicks ever hatched from incubation cycles.
-    prisma.incubationCycle.aggregate({ where: { farmId }, _sum: { hatchedCount: true } }),
+    // Current live headcount per species (birdType lives on the breed, so we
+    // pull each group's breed type and sum in code). Lets the dashboard show a
+    // by-species summary that always reflects what the farm actually holds.
+    prisma.birdGroup.findMany({
+      where: { farmId },
+      select: { quantity: true, breed: { select: { birdType: true } } },
+    }),
     prisma.incubationCycle.count({ where: { farmId, hatchDate: null } }),
     prisma.eggCollection.aggregate({
       where: { farmId, collectionDate: { gte: monthStart } },
@@ -108,11 +111,18 @@ export async function getDashboardData(farmId: string) {
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 10);
 
+  const quantityByType = new Map<BirdType, number>();
+  for (const group of birdGroupsForTypes) {
+    const type = group.breed.birdType;
+    quantityByType.set(type, (quantityByType.get(type) ?? 0) + group.quantity);
+  }
+  const birdsByType = birdTypeOrder
+    .map((birdType) => ({ birdType, quantity: quantityByType.get(birdType) ?? 0 }))
+    .filter((entry) => entry.quantity > 0);
+
   return {
     totalBirds: totalBirdsAgg._sum.quantity ?? 0,
-    layerBirds: layersAgg._sum.quantity ?? 0,
-    roosterBirds: roostersAgg._sum.quantity ?? 0,
-    hatchedChicks: hatchedChicksAgg._sum.hatchedCount ?? 0,
+    birdsByType,
     activeIncubationCount,
     eggsThisMonth: eggsThisMonthAgg._sum.quantity ?? 0,
     eggsThisYear: eggsThisYearAgg._sum.quantity ?? 0,

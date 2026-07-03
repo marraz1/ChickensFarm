@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireActiveFarm } from "@/lib/session";
-import { listBirdGroups } from "@/lib/services/bird-groups";
+import { listBirdGroups, getFlockComposition } from "@/lib/services/bird-groups";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { birdTypeLabels, sexLabels, birdCategoryLabels } from "@/lib/labels";
@@ -19,7 +19,10 @@ function computeAge(birthOrAcquiredDate: Date): string {
 
 export default async function BirdGroupsPage() {
   const { farm } = await requireActiveFarm();
-  const groups = await listBirdGroups(farm.id);
+  const [groups, composition] = await Promise.all([
+    listBirdGroups(farm.id),
+    getFlockComposition(farm.id),
+  ]);
 
   return (
     <div>
@@ -35,7 +38,41 @@ export default async function BirdGroupsPage() {
           </Link>
         }
       />
+      {composition.length > 0 && (
+        <div className="px-4 pb-2">
+          <p className="mb-2 text-sm font-medium text-muted-foreground">Bandos sudėtis</p>
+          <div className="flex flex-col gap-2">
+            {composition.map((type) => (
+              <Card key={type.birdType} className="p-4">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">{birdTypeLabels[type.birdType]}</p>
+                  <span className="text-lg font-semibold">{type.total}</span>
+                </div>
+                <div className="mt-2 flex flex-col gap-1.5">
+                  {type.breeds.map((breed) => (
+                    <div key={breed.breedId} className="flex items-baseline justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm">{breed.breedName}</p>
+                        <p className="text-[11px] leading-tight text-muted-foreground">
+                          {breed.categories
+                            .map((c) => `${birdCategoryLabels[c.category]} ${c.quantity}`)
+                            .join(" · ")}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-medium tabular-nums">{breed.total}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 px-4">
+        {composition.length > 0 && (
+          <p className="pt-2 text-sm font-medium text-muted-foreground">Visos grupės</p>
+        )}
         {groups.length === 0 && (
           <p className="py-8 text-center text-sm text-muted-foreground">
             Dar nepridėta nė viena paukščių grupė.

@@ -16,6 +16,17 @@ export const birdCategoryLabels: Record<BirdCategory, string> = {
   OTHER: "Kita",
 };
 
+// Display order for flock breakdowns (dashboard + Paukščių grupės apžvalga).
+export const birdTypeOrder: BirdType[] = ["HEN", "GOOSE", "DUCK", "TURKEY", "OTHER"];
+export const birdCategoryOrder: BirdCategory[] = [
+  "LAYER",
+  "ROOSTER",
+  "PULLET",
+  "COCKEREL",
+  "CHICK",
+  "OTHER",
+];
+
 export const birdTypeLabels: Record<BirdType, string> = {
   HEN: "Višta",
   GOOSE: "Žąsis",
