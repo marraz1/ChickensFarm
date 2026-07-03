@@ -1,15 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import type { BirdCategory } from "@/generated/prisma/client";
-
-// Order the total-birds breakdown follows on the dashboard.
-const CATEGORY_ORDER: BirdCategory[] = [
-  "LAYER",
-  "ROOSTER",
-  "PULLET",
-  "COCKEREL",
-  "CHICK",
-  "OTHER",
-];
+import type { BirdType } from "@/generated/prisma/client";
+import { birdTypeOrder } from "@/lib/labels";
 
 export type ActivityItem = {
   id: string;
@@ -26,7 +17,7 @@ export async function getDashboardData(farmId: string) {
 
   const [
     totalBirdsAgg,
-    birdsByCategoryRows,
+    birdGroupsForTypes,
     activeIncubationCount,
     eggsThisMonthAgg,
     eggsThisYearAgg,
@@ -41,13 +32,12 @@ export async function getDashboardData(farmId: string) {
     recentHenLogs,
   ] = await Promise.all([
     prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    // Current live headcount per bird category (sums the quantities of all
-    // groups sharing a category), so the dashboard breakdown always reflects
-    // exactly the categories the farm actually holds.
-    prisma.birdGroup.groupBy({
-      by: ["category"],
+    // Current live headcount per species (birdType lives on the breed, so we
+    // pull each group's breed type and sum in code). Lets the dashboard show a
+    // by-species summary that always reflects what the farm actually holds.
+    prisma.birdGroup.findMany({
       where: { farmId },
-      _sum: { quantity: true },
+      select: { quantity: true, breed: { select: { birdType: true } } },
     }),
     prisma.incubationCycle.count({ where: { farmId, hatchDate: null } }),
     prisma.eggCollection.aggregate({
@@ -121,17 +111,18 @@ export async function getDashboardData(farmId: string) {
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     .slice(0, 10);
 
-  const quantityByCategory = new Map(
-    birdsByCategoryRows.map((row) => [row.category, row._sum.quantity ?? 0])
-  );
-  const birdsByCategory = CATEGORY_ORDER.map((category) => ({
-    category,
-    quantity: quantityByCategory.get(category) ?? 0,
-  })).filter((entry) => entry.quantity > 0);
+  const quantityByType = new Map<BirdType, number>();
+  for (const group of birdGroupsForTypes) {
+    const type = group.breed.birdType;
+    quantityByType.set(type, (quantityByType.get(type) ?? 0) + group.quantity);
+  }
+  const birdsByType = birdTypeOrder
+    .map((birdType) => ({ birdType, quantity: quantityByType.get(birdType) ?? 0 }))
+    .filter((entry) => entry.quantity > 0);
 
   return {
     totalBirds: totalBirdsAgg._sum.quantity ?? 0,
-    birdsByCategory,
+    birdsByType,
     activeIncubationCount,
     eggsThisMonth: eggsThisMonthAgg._sum.quantity ?? 0,
     eggsThisYear: eggsThisYearAgg._sum.quantity ?? 0,

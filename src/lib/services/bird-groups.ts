@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma, BirdGroupEventType } from "@/generated/prisma/client";
 import type { CreateBirdGroupInput, UpdateBirdGroupInput } from "@/lib/validation/bird-groups";
 import { ValidationError, ConcurrentModificationError } from "@/lib/errors";
+import { birdTypeOrder, birdCategoryOrder } from "@/lib/labels";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -70,6 +71,61 @@ export async function adjustBirdGroupQuantityTx(
   });
 
   return quantityAfter;
+}
+
+// Aggregated flock overview for the Paukščių grupės page: grouped by species
+// (rūšis / birdType) → breed (veislė) → category (kategorija), summing live
+// quantities. Answers "how many birds of each kind do I have" at a glance,
+// independent of how many individual groups back each figure.
+export async function getFlockComposition(farmId: string) {
+  const groups = await prisma.birdGroup.findMany({
+    where: { farmId },
+    select: {
+      quantity: true,
+      category: true,
+      breedId: true,
+      breed: { select: { name: true, birdType: true } },
+    },
+  });
+
+  type CategoryEntry = { category: (typeof birdCategoryOrder)[number]; quantity: number };
+  type BreedEntry = { breedId: string; breedName: string; total: number; categories: CategoryEntry[] };
+  type TypeEntry = { birdType: (typeof birdTypeOrder)[number]; total: number; breeds: BreedEntry[] };
+
+  const byType = new Map<string, { total: number; breeds: Map<string, { name: string; total: number; categories: Map<string, number> }> }>();
+
+  for (const g of groups) {
+    const type = g.breed.birdType;
+    if (!byType.has(type)) byType.set(type, { total: 0, breeds: new Map() });
+    const typeBucket = byType.get(type)!;
+    typeBucket.total += g.quantity;
+
+    if (!typeBucket.breeds.has(g.breedId)) {
+      typeBucket.breeds.set(g.breedId, { name: g.breed.name, total: 0, categories: new Map() });
+    }
+    const breedBucket = typeBucket.breeds.get(g.breedId)!;
+    breedBucket.total += g.quantity;
+    breedBucket.categories.set(g.category, (breedBucket.categories.get(g.category) ?? 0) + g.quantity);
+  }
+
+  const composition: TypeEntry[] = birdTypeOrder
+    .filter((type) => byType.has(type))
+    .map((type) => {
+      const typeBucket = byType.get(type)!;
+      const breeds: BreedEntry[] = [...typeBucket.breeds.entries()]
+        .map(([breedId, b]) => ({
+          breedId,
+          breedName: b.name,
+          total: b.total,
+          categories: birdCategoryOrder
+            .filter((c) => (b.categories.get(c) ?? 0) > 0)
+            .map((category) => ({ category, quantity: b.categories.get(category)! })),
+        }))
+        .sort((a, b) => a.breedName.localeCompare(b.breedName, "lt"));
+      return { birdType: type, total: typeBucket.total, breeds };
+    });
+
+  return composition;
 }
 
 export function listBirdGroups(farmId: string) {

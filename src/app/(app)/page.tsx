@@ -2,7 +2,7 @@ import { requireActiveFarm } from "@/lib/session";
 import { getDashboardData } from "@/lib/services/dashboard";
 import { Card } from "@/components/ui/card";
 import { formatEUR, formatRelativeLT } from "@/lib/format";
-import { birdCategoryLabels } from "@/lib/labels";
+import { birdTypeLabels } from "@/lib/labels";
 import { Egg, AlertTriangle, Heart } from "lucide-react";
 
 const ACTIVITY_ICONS = {
@@ -23,9 +23,9 @@ export default async function DashboardPage() {
           <p className="mb-1 text-xs text-muted-foreground">Paukščių iš viso</p>
           <p className="text-xl font-medium">{data.totalBirds}</p>
           <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
-            {data.birdsByCategory.length > 0
-              ? data.birdsByCategory
-                  .map((entry) => `${birdCategoryLabels[entry.category]} ${entry.quantity}`)
+            {data.birdsByType.length > 0
+              ? data.birdsByType
+                  .map((entry) => `${birdTypeLabels[entry.birdType]} ${entry.quantity}`)
                   .join(" · ")
               : "Nėra paukščių"}
           </p>
