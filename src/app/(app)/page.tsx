@@ -23,8 +23,11 @@ export default async function DashboardPage() {
           <p className="text-xl font-medium">{data.totalBirds}</p>
         </Card>
         <Card className="p-3">
-          <p className="mb-1 text-xs text-muted-foreground">Kiaušiniai (7 d.)</p>
-          <p className="text-xl font-medium">{data.eggsLast7d}</p>
+          <p className="mb-1 text-xs text-muted-foreground">Kiaušinių likutis</p>
+          <p className="text-xl font-medium">{data.eggsRemaining}</p>
+          <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
+            Šį mėn. {data.eggsThisMonth} · Metais {data.eggsThisYear}
+          </p>
         </Card>
         <Card className="p-3">
           <p className="mb-1 text-xs text-muted-foreground">Balansas (mėn.)</p>

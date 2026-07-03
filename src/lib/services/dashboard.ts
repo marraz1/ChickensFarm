@@ -9,13 +9,18 @@ export type ActivityItem = {
 
 export async function getDashboardData(farmId: string) {
   const now = new Date();
-  const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const yearStart = new Date(now.getFullYear(), 0, 1);
+  const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
 
   const [
     totalBirdsAgg,
     activeIncubationCount,
-    eggsLast7dAgg,
+    eggsThisMonthAgg,
+    eggsThisYearAgg,
+    eggsCollectedTotalAgg,
+    eggsSoldTotalAgg,
+    eggsIncubatedTotalAgg,
     incomeThisMonthAgg,
     expensesThisMonthAgg,
     lossesLast30dAgg,
@@ -26,9 +31,17 @@ export async function getDashboardData(farmId: string) {
     prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
     prisma.incubationCycle.count({ where: { farmId, hatchDate: null } }),
     prisma.eggCollection.aggregate({
-      where: { farmId, collectionDate: { gte: sevenDaysAgo } },
+      where: { farmId, collectionDate: { gte: monthStart } },
       _sum: { quantity: true },
     }),
+    prisma.eggCollection.aggregate({
+      where: { farmId, collectionDate: { gte: yearStart } },
+      _sum: { quantity: true },
+    }),
+    // Remaining stock = all eggs ever collected minus those sold and those set for incubation.
+    prisma.eggCollection.aggregate({ where: { farmId }, _sum: { quantity: true } }),
+    prisma.eggSale.aggregate({ where: { farmId }, _sum: { quantity: true } }),
+    prisma.incubationCycle.aggregate({ where: { farmId }, _sum: { eggsTotal: true } }),
     prisma.eggSale.aggregate({
       where: { farmId, saleDate: { gte: monthStart } },
       _sum: { totalAmount: true },
@@ -38,7 +51,7 @@ export async function getDashboardData(farmId: string) {
       _sum: { amount: true },
     }),
     prisma.loss.aggregate({
-      where: { farmId, lossDate: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29) } },
+      where: { farmId, lossDate: { gte: thirtyDaysAgo } },
       _sum: { quantity: true },
     }),
     prisma.eggCollection.findMany({
@@ -59,6 +72,11 @@ export async function getDashboardData(farmId: string) {
       include: { motherHen: { select: { name: true } } },
     }),
   ]);
+
+  const eggsRemaining =
+    (eggsCollectedTotalAgg._sum.quantity ?? 0) -
+    (eggsSoldTotalAgg._sum.quantity ?? 0) -
+    (eggsIncubatedTotalAgg._sum.eggsTotal ?? 0);
 
   const activity: ActivityItem[] = [
     ...recentCollections.map((c) => ({
@@ -86,7 +104,9 @@ export async function getDashboardData(farmId: string) {
   return {
     totalBirds: totalBirdsAgg._sum.quantity ?? 0,
     activeIncubationCount,
-    eggsLast7d: eggsLast7dAgg._sum.quantity ?? 0,
+    eggsThisMonth: eggsThisMonthAgg._sum.quantity ?? 0,
+    eggsThisYear: eggsThisYearAgg._sum.quantity ?? 0,
+    eggsRemaining,
     incomeThisMonth: Number(incomeThisMonthAgg._sum.totalAmount ?? 0),
     expensesThisMonth: Number(expensesThisMonthAgg._sum.amount ?? 0),
     lossesLast30d: lossesLast30dAgg._sum.quantity ?? 0,
