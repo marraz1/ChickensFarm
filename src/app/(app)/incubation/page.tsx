@@ -67,14 +67,15 @@ export default async function IncubationListPage() {
           return (
             <Link key={cycle.id} href={`/incubation/${cycle.id}`}>
               <Card className="p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <p className="font-medium">
-                    Pradėta {formatDateLT(cycle.startDate)}
+                    {cycle.name ?? `Pradėta ${formatDateLT(cycle.startDate)}`}
                   </p>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}>
                     {status.text}
                   </span>
                 </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">Pradėta {formatDateLT(cycle.startDate)}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {cycle.eggSourceGroup
                     ? `Šaltinis: ${cycle.eggSourceGroup.breed.name}`

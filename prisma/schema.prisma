@@ -278,6 +278,7 @@ model IncubationCycle {
   id                String     @id @default(cuid())
   farmId            String
   farm              Farm       @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  name              String? // nullable in DB for pre-existing rows; required on create via validation
   sourceDescription String?
   eggSourceGroupId  String?
   eggSourceGroup    BirdGroup? @relation("EggSourceGroup", fields: [eggSourceGroupId], references: [id], onDelete: SetNull)

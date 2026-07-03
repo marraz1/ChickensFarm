@@ -30,7 +30,7 @@ export default async function IncubationCycleDetailPage({
 
   return (
     <div>
-      <PageHeader title="Perinimo ciklas" backHref="/incubation" />
+      <PageHeader title={cycle.name ?? "Perinimo ciklas"} backHref="/incubation" />
       <div className="flex flex-col gap-4 px-4">
         {/* Summary */}
         <Card className="p-4">

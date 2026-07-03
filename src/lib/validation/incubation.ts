@@ -2,6 +2,7 @@ import { z } from "zod";
 
 // Start a new incubation cycle (F10.1)
 export const createIncubationCycleSchema = z.object({
+  name: z.string().trim().min(1, "Įveskite ciklo pavadinimą").max(150),
   startDate: z.string().min(1, "Įveskite pradžios datą"),
   sourceDescription: z.string().trim().max(300).optional().or(z.literal("")),
   eggSourceGroupId: z.string().optional().or(z.literal("")),

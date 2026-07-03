@@ -41,6 +41,7 @@ export async function createIncubationCycle(farmId: string, input: CreateIncubat
   return prisma.incubationCycle.create({
     data: {
       farmId,
+      name: input.name,
       startDate: new Date(input.startDate),
       sourceDescription: input.sourceDescription || null,
       eggSourceGroupId,

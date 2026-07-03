@@ -34,7 +34,7 @@ export function IncubationCycleForm({ birdGroups }: { birdGroups: BirdGroupOptio
     formState: { errors, isSubmitting },
   } = useForm<CreateIncubationCycleInput>({
     resolver: zodResolver(createIncubationCycleSchema),
-    defaultValues: { startDate: todayInputValue(), sourceDescription: "", eggSourceGroupId: "", notes: "" },
+    defaultValues: { name: "", startDate: todayInputValue(), sourceDescription: "", eggSourceGroupId: "", notes: "" },
   });
 
   const eggSourceGroupId = watch("eggSourceGroupId");
@@ -59,6 +59,12 @@ export function IncubationCycleForm({ birdGroups }: { birdGroups: BirdGroupOptio
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="name">Pavadinimas</Label>
+        <Input id="name" className="h-11" placeholder="pvz. Liepos partija" {...register("name")} />
+        {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="startDate">Perinimo pradžios data</Label>
         <Input id="startDate" type="date" className="h-11" {...register("startDate")} />
