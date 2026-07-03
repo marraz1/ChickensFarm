@@ -33,3 +33,8 @@ export function formatRelativeLT(date: Date | string): string {
 export function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+export function formatPercent(ratio: number | null | undefined): string {
+  if (ratio == null) return "—";
+  return `${Math.round(ratio * 100)}%`;
+}

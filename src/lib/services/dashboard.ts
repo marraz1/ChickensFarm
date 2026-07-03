@@ -21,6 +21,7 @@ export async function getDashboardData(farmId: string) {
     lossesLast30dAgg,
     recentCollections,
     recentLosses,
+    recentHenLogs,
   ] = await Promise.all([
     prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
     prisma.incubationCycle.count({ where: { farmId, hatchDate: null } }),
@@ -51,6 +52,12 @@ export async function getDashboardData(farmId: string) {
       take: 5,
       include: { birdGroup: { include: { breed: true } } },
     }),
+    prisma.motherHenLog.findMany({
+      where: { motherHen: { farmId } },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      include: { motherHen: { select: { name: true } } },
+    }),
   ]);
 
   const activity: ActivityItem[] = [
@@ -65,6 +72,12 @@ export async function getDashboardData(farmId: string) {
       type: "LOSS" as const,
       summary: `Nuostolis: ${l.reasonType === "PREDATOR" ? "plėšrūnas" : l.reasonType === "DISEASE" ? "liga" : "kita"}, ${l.quantity} vnt.`,
       createdAt: l.createdAt,
+    })),
+    ...recentHenLogs.map((log) => ({
+      id: log.id,
+      type: "MOTHER_HEN_LOG" as const,
+      summary: `Perekšlė ${log.motherHen.name} – naujas įrašas`,
+      createdAt: log.createdAt,
     })),
   ]
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())

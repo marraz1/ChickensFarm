@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
-import { Users, Tag, Egg, AlertTriangle, ChevronRight } from "lucide-react";
+import { Users, Tag, Egg, AlertTriangle, Heart, ChevronRight } from "lucide-react";
 
 const LINKS = [
   { href: "/bird-groups", label: "Paukščių grupės", icon: Users },
   { href: "/breeds", label: "Veislės", icon: Tag },
+  { href: "/mother-hens", label: "Perekšlės", icon: Heart },
   { href: "/eggs/collections", label: "Kiaušinių surinkimas", icon: Egg },
   { href: "/losses", label: "Nuostoliai", icon: AlertTriangle },
 ];
