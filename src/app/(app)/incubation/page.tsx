@@ -6,10 +6,15 @@ import { Card } from "@/components/ui/card";
 import { formatDateLT, formatPercent } from "@/lib/format";
 import { Plus, Egg } from "lucide-react";
 
-function statusLabel(cycle: { hatchDate: Date | null; eggsFertile: number | null }): {
+function statusLabel(cycle: {
+  hatchDate: Date | null;
+  eggsFertile: number | null;
+  growthCompletedAt: Date | null;
+}): {
   text: string;
   className: string;
 } {
+  if (cycle.growthCompletedAt) return { text: "Užbaigta", className: "bg-emerald-100 text-emerald-700" };
   if (cycle.hatchDate) return { text: "Išsiritę", className: "bg-emerald-100 text-emerald-700" };
   if (cycle.eggsFertile != null) return { text: "Apšviesta", className: "bg-amber-100 text-amber-700" };
   return { text: "Pradėta", className: "bg-muted text-muted-foreground" };
@@ -86,6 +91,11 @@ export default async function IncubationListPage() {
                   <p className="mt-1 text-sm text-emerald-600">
                     Išsirito {cycle.hatchedCount}
                     {cycle.growthLogs[0] ? ` · dabar gyvų ${cycle.growthLogs[0].aliveCount}` : ""}
+                  </p>
+                )}
+                {cycle.growthCompletedAt && (
+                  <p className="mt-1 text-sm text-emerald-700">
+                    Auginimas baigtas {formatDateLT(cycle.growthCompletedAt)}
                   </p>
                 )}
               </Card>
