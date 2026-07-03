@@ -5,7 +5,7 @@ import { getMotherHenWithLogs } from "@/lib/services/mother-hens";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { formatDateLT } from "@/lib/format";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 
 export default async function MotherHenDetailPage({
   params,
@@ -23,12 +23,21 @@ export default async function MotherHenDetailPage({
         title={hen.name}
         backHref="/mother-hens"
         action={
-          <Link
-            href={`/mother-hens/${hen.id}/logs/new`}
-            className="flex h-11 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
-          >
-            <Plus size={16} aria-hidden /> Įrašas
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/mother-hens/${hen.id}/edit`}
+              aria-label="Koreguoti"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border text-sm font-medium"
+            >
+              <Pencil size={16} aria-hidden />
+            </Link>
+            <Link
+              href={`/mother-hens/${hen.id}/logs/new`}
+              className="flex h-11 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
+            >
+              <Plus size={16} aria-hidden /> Įrašas
+            </Link>
+          </div>
         }
       />
       <div className="flex flex-col gap-4 px-4">

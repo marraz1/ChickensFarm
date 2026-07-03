@@ -19,7 +19,17 @@ import { createMotherHenSchema, type CreateMotherHenInput } from "@/lib/validati
 
 type BirdGroupOption = { id: string; label: string };
 
-export function MotherHenForm({ birdGroups }: { birdGroups: BirdGroupOption[] }) {
+export function MotherHenForm({
+  birdGroups,
+  henId,
+  defaultValues,
+  onSuccessPath = "/mother-hens",
+}: {
+  birdGroups: BirdGroupOption[];
+  henId?: string;
+  defaultValues?: Partial<CreateMotherHenInput>;
+  onSuccessPath?: string;
+}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -31,7 +41,7 @@ export function MotherHenForm({ birdGroups }: { birdGroups: BirdGroupOption[] })
     formState: { errors, isSubmitting },
   } = useForm<CreateMotherHenInput>({
     resolver: zodResolver(createMotherHenSchema),
-    defaultValues: { name: "", birdGroupId: "", photoUrl: "", description: "" },
+    defaultValues: { name: "", birdGroupId: "", photoUrl: "", description: "", ...defaultValues },
   });
 
   const birdGroupId = watch("birdGroupId");
@@ -40,8 +50,8 @@ export function MotherHenForm({ birdGroups }: { birdGroups: BirdGroupOption[] })
 
   async function onSubmit(data: CreateMotherHenInput) {
     setServerError(null);
-    const res = await fetch("/api/mother-hens", {
-      method: "POST",
+    const res = await fetch(henId ? `/api/mother-hens/${henId}` : "/api/mother-hens", {
+      method: henId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
@@ -52,7 +62,7 @@ export function MotherHenForm({ birdGroups }: { birdGroups: BirdGroupOption[] })
       return;
     }
 
-    router.push("/mother-hens");
+    router.push(onSuccessPath);
     router.refresh();
   }
 

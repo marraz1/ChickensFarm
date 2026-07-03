@@ -29,13 +29,15 @@ export default async function EggConsumptionsPage() {
           <p className="py-8 text-center text-sm text-muted-foreground">Dar nėra įrašų.</p>
         )}
         {consumptions.map((c) => (
-          <Card key={c.id} className="flex flex-row items-center justify-between p-4">
-            <div>
-              <p className="font-medium">{formatDateLT(c.consumptionDate)}</p>
-              {c.note && <p className="text-sm text-muted-foreground">{c.note}</p>}
-            </div>
-            <p className="text-lg font-semibold">{c.quantity}</p>
-          </Card>
+          <Link key={c.id} href={`/eggs/consumptions/${c.id}/edit`}>
+            <Card className="flex flex-row items-center justify-between p-4">
+              <div>
+                <p className="font-medium">{formatDateLT(c.consumptionDate)}</p>
+                {c.note && <p className="text-sm text-muted-foreground">{c.note}</p>}
+              </div>
+              <p className="text-lg font-semibold">{c.quantity}</p>
+            </Card>
+          </Link>
         ))}
       </div>
     </div>

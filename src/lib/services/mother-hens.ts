@@ -46,6 +46,38 @@ export async function createMotherHen(farmId: string, input: CreateMotherHenInpu
   });
 }
 
+export async function updateMotherHen(
+  farmId: string,
+  motherHenId: string,
+  input: CreateMotherHenInput
+) {
+  const hen = await prisma.motherHen.findFirst({ where: { id: motherHenId, farmId } });
+  if (!hen) throw new ValidationError("Perekšlė nerasta");
+
+  const birdGroupId = input.birdGroupId || null;
+  if (birdGroupId) {
+    const group = await prisma.birdGroup.findFirst({ where: { id: birdGroupId, farmId } });
+    if (!group) throw new ValidationError("Pasirinkta paukščių grupė nerasta");
+  }
+
+  return prisma.motherHen.update({
+    where: { id: motherHenId },
+    data: {
+      name: input.name,
+      birdGroupId,
+      photoUrl: input.photoUrl || null,
+      description: input.description || null,
+    },
+  });
+}
+
+export async function deleteMotherHen(farmId: string, motherHenId: string) {
+  const hen = await prisma.motherHen.findFirst({ where: { id: motherHenId, farmId } });
+  if (!hen) throw new ValidationError("Perekšlė nerasta");
+  // Diary entries (MotherHenLog) cascade away with the hen.
+  await prisma.motherHen.delete({ where: { id: motherHenId } });
+}
+
 export async function addMotherHenLog(
   farmId: string,
   motherHenId: string,

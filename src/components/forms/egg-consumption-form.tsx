@@ -13,7 +13,15 @@ import {
 } from "@/lib/validation/egg-consumptions";
 import { todayInputValue } from "@/lib/format";
 
-export function EggConsumptionForm() {
+export function EggConsumptionForm({
+  consumptionId,
+  defaultValues,
+  onSuccessPath = "/eggs/consumptions",
+}: {
+  consumptionId?: string;
+  defaultValues?: Partial<CreateEggConsumptionInput>;
+  onSuccessPath?: string;
+} = {}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -23,13 +31,13 @@ export function EggConsumptionForm() {
     formState: { errors, isSubmitting },
   } = useForm<CreateEggConsumptionInput>({
     resolver: zodResolver(createEggConsumptionSchema),
-    defaultValues: { consumptionDate: todayInputValue(), quantity: 1, note: "" },
+    defaultValues: { consumptionDate: todayInputValue(), quantity: 1, note: "", ...defaultValues },
   });
 
   async function onSubmit(data: CreateEggConsumptionInput) {
     setServerError(null);
-    const res = await fetch("/api/egg-consumptions", {
-      method: "POST",
+    const res = await fetch(consumptionId ? `/api/egg-consumptions/${consumptionId}` : "/api/egg-consumptions", {
+      method: consumptionId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
@@ -40,7 +48,7 @@ export function EggConsumptionForm() {
       return;
     }
 
-    router.push("/eggs/consumptions");
+    router.push(onSuccessPath);
     router.refresh();
   }
 
