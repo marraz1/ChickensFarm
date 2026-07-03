@@ -150,6 +150,7 @@ model BirdGroup {
   farm                Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
   breedId             String
   breed               Breed        @relation(fields: [breedId], references: [id], onDelete: Restrict)
+  name                String? // optional free-text label (e.g. "Vištidė A"), shown alongside the breed
   sex                 Sex          @default(UNKNOWN)
   category            BirdCategory @default(OTHER)
   quantity            Int

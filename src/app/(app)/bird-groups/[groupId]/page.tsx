@@ -28,7 +28,7 @@ export default async function BirdGroupDetailPage({
   return (
     <div>
       <PageHeader
-        title={group.breed.name}
+        title={group.name || group.breed.name}
         backHref="/bird-groups"
         action={
           <Link
@@ -45,6 +45,9 @@ export default async function BirdGroupDetailPage({
             <p className="text-sm text-muted-foreground">Dabartinis kiekis</p>
             <p className="text-2xl font-semibold">{group.quantity}</p>
           </div>
+          {group.name && (
+            <p className="mt-2 text-sm font-medium">{group.breed.name}</p>
+          )}
           <p className="mt-2 text-sm text-muted-foreground">
             {birdCategoryLabels[group.category]} · {birdTypeLabels[group.breed.birdType]} ·{" "}
             {sexLabels[group.sex]}

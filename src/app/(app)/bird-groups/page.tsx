@@ -44,12 +44,13 @@ export default async function BirdGroupsPage() {
         {groups.map((group) => (
           <Link key={group.id} href={`/bird-groups/${group.id}`}>
             <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-medium">
-                  {group.breed.name} · {birdTypeLabels[group.breed.birdType]}
-                </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium">{group.name || group.breed.name}</p>
                 <span className="text-lg font-semibold">{group.quantity}</span>
               </div>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {group.breed.name} · {birdTypeLabels[group.breed.birdType]}
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {group.category !== "OTHER" ? `${birdCategoryLabels[group.category]} · ` : ""}
                 {sexLabels[group.sex]} · {computeAge(group.birthOrAcquiredDate)} · nuo{" "}

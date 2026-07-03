@@ -14,13 +14,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createBirdGroupSchema, type CreateBirdGroupInput } from "@/lib/validation/bird-groups";
+import { updateBirdGroupSchema, type UpdateBirdGroupInput } from "@/lib/validation/bird-groups";
 import { sexLabels, birdCategoryLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
+import type { Sex, BirdCategory } from "@/generated/prisma/client";
 
 type Breed = { id: string; name: string };
+type ExistingGroup = { id: string; breedId: string; sex: Sex; category: BirdCategory };
 
-export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
+export function BirdGroupForm({
+  breeds,
+  existingGroups,
+  groupId,
+  defaultValues,
+  onSuccessPath,
+}: {
+  breeds: Breed[];
+  existingGroups: ExistingGroup[];
+  groupId?: string;
+  defaultValues?: Partial<UpdateBirdGroupInput>;
+  onSuccessPath: string;
+}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -30,26 +44,33 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<CreateBirdGroupInput>({
-    resolver: zodResolver(createBirdGroupSchema),
+  } = useForm<UpdateBirdGroupInput>({
+    resolver: zodResolver(updateBirdGroupSchema),
     defaultValues: {
       breedId: "",
+      name: "",
       sex: "UNKNOWN",
       category: "LAYER",
       quantity: 0,
       birthOrAcquiredDate: todayInputValue(),
+      ...defaultValues,
     },
   });
 
   const breedId = watch("breedId");
   const sex = watch("sex");
   const category = watch("category");
-  const breedItems = Object.fromEntries(breeds.map((b) => [b.id, b.name]));
 
-  async function onSubmit(data: CreateBirdGroupInput) {
+  // F4 — warn (not block) when an identical breed+lytis+kategorija group already
+  // exists, so the user can decide to keep the duplicate or edit the existing one.
+  const duplicate = existingGroups.find(
+    (g) => g.id !== groupId && g.breedId === breedId && g.sex === sex && g.category === category
+  );
+
+  async function onSubmit(data: UpdateBirdGroupInput) {
     setServerError(null);
-    const res = await fetch("/api/bird-groups", {
-      method: "POST",
+    const res = await fetch(groupId ? `/api/bird-groups/${groupId}` : "/api/bird-groups", {
+      method: groupId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
@@ -60,7 +81,7 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
       return;
     }
 
-    router.push("/bird-groups");
+    router.push(onSuccessPath);
     router.refresh();
   }
 
@@ -76,7 +97,7 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="breedId">Veislė</Label>
-        <Select items={breedItems} value={breedId ?? ""} onValueChange={(v) => v && setValue("breedId", v, { shouldValidate: true })}>
+        <Select items={Object.fromEntries(breeds.map((b) => [b.id, b.name]))} value={breedId ?? ""} onValueChange={(v) => v && setValue("breedId", v, { shouldValidate: true })}>
           <SelectTrigger id="breedId" className="h-11 w-full">
             <SelectValue placeholder="Pasirinkite veislę" />
           </SelectTrigger>
@@ -92,8 +113,14 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
       </div>
 
       <div className="flex flex-col gap-1.5">
+        <Label htmlFor="name">Pavadinimas (neprivaloma)</Label>
+        <Input id="name" className="h-11" placeholder="pvz. Vištidė A" {...register("name")} />
+        {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="category">Kategorija</Label>
-        <Select items={birdCategoryLabels} value={category} onValueChange={(v) => v && setValue("category", v as CreateBirdGroupInput["category"])}>
+        <Select items={birdCategoryLabels} value={category} onValueChange={(v) => v && setValue("category", v as BirdCategory)}>
           <SelectTrigger id="category" className="h-11 w-full">
             <SelectValue />
           </SelectTrigger>
@@ -109,7 +136,7 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="sex">Lytis</Label>
-        <Select items={sexLabels} value={sex} onValueChange={(v) => v && setValue("sex", v as CreateBirdGroupInput["sex"])}>
+        <Select items={sexLabels} value={sex} onValueChange={(v) => v && setValue("sex", v as Sex)}>
           <SelectTrigger id="sex" className="h-11 w-full">
             <SelectValue />
           </SelectTrigger>
@@ -122,6 +149,13 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
           </SelectContent>
         </Select>
       </div>
+
+      {duplicate && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          Jau turite tos pačios veislės, lyties ir kategorijos grupę. Galite tęsti arba grįžti ir
+          koreguoti esamą grupę.
+        </p>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="quantity">Kiekis</Label>
@@ -142,9 +176,19 @@ export function BirdGroupForm({ breeds }: { breeds: Breed[] }) {
         <Input id="notes" className="h-11" {...register("notes")} />
       </div>
 
+      {groupId && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="adjustmentNote">Korekcijos priežastis (jei keičiate kiekį)</Label>
+          <Input id="adjustmentNote" className="h-11" {...register("adjustmentNote")} />
+          <p className="text-xs text-muted-foreground">
+            Pakeitus kiekį, skirtumas bus įrašytas į grupės istoriją kaip rankinė korekcija.
+          </p>
+        </div>
+      )}
+
       {serverError && <p className="text-sm text-destructive">{serverError}</p>}
       <Button type="submit" disabled={isSubmitting} className="h-11 mt-2">
-        {isSubmitting ? "Saugoma..." : "Sukurti grupę"}
+        {isSubmitting ? "Saugoma..." : groupId ? "Išsaugoti" : "Sukurti grupę"}
       </Button>
     </form>
   );
