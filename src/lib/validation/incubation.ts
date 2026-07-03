@@ -53,9 +53,18 @@ export const createGrowthLogSchema = z.object({
 });
 export type CreateGrowthLogInput = z.infer<typeof createGrowthLogSchema>;
 
-// Finish the growth tracking / raising. Optionally move the current cohort birds
-// into an existing group; otherwise the cohort is kept as its own group.
+// Finish the raising by distributing the chicks. Chicks are usually of different kinds
+// (future hens vs roosters), so several entries can be added — each moves a count into
+// an existing group, or into a new group of the chosen category (breedId below).
+export const finishTransferEntrySchema = z.object({
+  targetGroupId: z.string().optional().or(z.literal("")), // empty => create a new group
+  category: birdCategoryEnum.optional(), // used when creating a new group
+  count: z.number().int().min(1, "Kiekis turi būti bent 1"),
+});
+
 export const finishGrowthTrackingSchema = z.object({
-  transferToGroupId: z.string().optional().or(z.literal("")),
+  breedId: z.string().optional().or(z.literal("")), // breed for any new groups
+  entries: z.array(finishTransferEntrySchema).min(1, "Pridėkite bent vieną perkėlimą"),
 });
 export type FinishGrowthTrackingInput = z.infer<typeof finishGrowthTrackingSchema>;
+export type FinishTransferEntry = z.infer<typeof finishTransferEntrySchema>;

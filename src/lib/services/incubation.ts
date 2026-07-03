@@ -160,9 +160,11 @@ export async function addGrowthLog(farmId: string, cycleId: string, input: Creat
   });
 }
 
-// Finish the growth tracking. Optionally transfers the cohort's current birds into an
-// existing group (both moves recorded via the audited quantity writer), then marks the
-// cycle's growth tracking complete so no more logs can be added.
+// Finish the raising by distributing the chicks into groups. Supports several entries
+// (chicks of different kinds), each moving a count into an existing group or a new group
+// of a chosen category. If a cohort group exists, the moved birds are deducted from it
+// (a transfer); if not (hatch recorded without a group), the birds enter inventory now.
+// Everything runs through the audited quantity writer, then the cycle is marked complete.
 export async function finishGrowthTracking(
   farmId: string,
   cycleId: string,
@@ -176,34 +178,62 @@ export async function finishGrowthTracking(
     });
     if (!cycle) throw new ValidationError("Perinimo ciklas nerastas");
     if (cycle.growthCompletedAt) throw new ValidationError("Sekimas jau užbaigtas");
-    if (!cycle.resultingGroupId || !cycle.resultingGroup) {
-      throw new ValidationError("Nėra susietos jauniklių grupės");
+    if (!cycle.hatchDate) throw new ValidationError("Ciklas dar neužbaigtas išsiritimu");
+
+    const cohort = cycle.resultingGroup; // may be null (hatch recorded without a group)
+    const available = cohort ? cohort.quantity : cycle.hatchedCount ?? 0;
+    const totalDistributed = input.entries.reduce((sum, e) => sum + e.count, 0);
+    if (totalDistributed > available) {
+      throw new ValidationError(`Negalima perkelti daugiau nei turima (${available})`);
     }
 
-    const transferToGroupId = input.transferToGroupId || null;
-    if (transferToGroupId) {
-      if (transferToGroupId === cycle.resultingGroupId) {
-        throw new ValidationError("Pasirinkite kitą grupę");
-      }
-      const target = await tx.birdGroup.findFirst({ where: { id: transferToGroupId, farmId } });
-      if (!target) throw new ValidationError("Pasirinkta grupė nerasta");
+    for (const entry of input.entries) {
+      let targetId = entry.targetGroupId || null;
 
-      const qty = cycle.resultingGroup.quantity;
-      if (qty > 0) {
-        await adjustBirdGroupQuantityTx(tx, {
-          birdGroupId: cycle.resultingGroupId,
-          farmId,
-          delta: -qty,
-          eventType: "MANUAL_ADJUSTMENT",
-          note: "Perkelta į kitą grupę (auginimas baigtas)",
-          userId,
+      if (targetId) {
+        if (cohort && targetId === cohort.id) {
+          throw new ValidationError("Pasirinkite kitą grupę nei jauniklių grupė");
+        }
+        const target = await tx.birdGroup.findFirst({ where: { id: targetId, farmId } });
+        if (!target) throw new ValidationError("Pasirinkta grupė nerasta");
+      } else {
+        // Create a new group of the chosen category using the selected breed.
+        if (!input.breedId) throw new ValidationError("Pasirinkite naujų grupių veislę");
+        const breed = await tx.breed.findFirst({ where: { id: input.breedId, farmId } });
+        if (!breed) throw new ValidationError("Veislė nerasta");
+        const created = await tx.birdGroup.create({
+          data: {
+            farmId,
+            breedId: input.breedId,
+            sex: "UNKNOWN",
+            category: entry.category ?? "OTHER",
+            quantity: 0,
+            birthOrAcquiredDate: cycle.hatchDate,
+            notes: "Iš perinimo ciklo",
+          },
         });
+        targetId = created.id;
+      }
+
+      await adjustBirdGroupQuantityTx(tx, {
+        birdGroupId: targetId,
+        farmId,
+        delta: entry.count,
+        // Moving out of a cohort is an adjustment; entering fresh inventory is a hatch.
+        eventType: cohort ? "MANUAL_ADJUSTMENT" : "INCUBATION_HATCH",
+        sourceType: "incubation_cycle",
+        sourceId: cycleId,
+        note: "Paskirstyti jaunikliai (perinimas)",
+        userId,
+      });
+
+      if (cohort) {
         await adjustBirdGroupQuantityTx(tx, {
-          birdGroupId: transferToGroupId,
+          birdGroupId: cohort.id,
           farmId,
-          delta: qty,
+          delta: -entry.count,
           eventType: "MANUAL_ADJUSTMENT",
-          note: "Perkelti užauginti jaunikliai (perinimas)",
+          note: "Perkelta iš jauniklių grupės",
           userId,
         });
       }

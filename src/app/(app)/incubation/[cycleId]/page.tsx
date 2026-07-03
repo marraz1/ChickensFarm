@@ -26,11 +26,8 @@ export default async function IncubationCycleDetailPage({
   const hatched = cycle.hatchDate != null;
   const growthDone = cycle.growthCompletedAt != null;
   const cohort = cycle.resultingGroup;
-  const canFinish =
-    hatched &&
-    !growthDone &&
-    !!cohort &&
-    (["CHICK", "PULLET", "COCKEREL"] as const).some((c) => c === cohort.category);
+  const availableToDistribute = cohort ? cohort.quantity : cycle.hatchedCount ?? 0;
+  const canFinish = hatched && !growthDone && availableToDistribute > 0;
 
   const [groups, breeds] = hatched
     ? [[], []]
