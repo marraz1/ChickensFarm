@@ -96,6 +96,7 @@ model Farm {
   motherHens       MotherHen[]
   eggCollections   EggCollection[]
   eggSales         EggSale[]
+  eggConsumptions  EggConsumption[]
   losses           Loss[]
   expenses         Expense[]
   incubationCycles IncubationCycle[]
@@ -240,6 +241,20 @@ model EggSale {
 
   @@index([farmId, saleDate])
   @@map("egg_sales")
+}
+
+// Eggs consumed by the household (eaten) — reduces available stock, no revenue.
+model EggConsumption {
+  id              String   @id @default(cuid())
+  farmId          String
+  farm            Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  consumptionDate DateTime @db.Date
+  quantity        Int
+  note            String?
+  createdAt       DateTime @default(now())
+
+  @@index([farmId, consumptionDate])
+  @@map("egg_consumptions")
 }
 
 model Loss {

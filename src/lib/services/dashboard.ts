@@ -20,7 +20,7 @@ export async function getDashboardData(farmId: string) {
     eggsThisYearAgg,
     eggsCollectedTotalAgg,
     eggsSoldTotalAgg,
-    eggsIncubatedTotalAgg,
+    eggsConsumedTotalAgg,
     incomeThisMonthAgg,
     expensesThisMonthAgg,
     lossesLast30dAgg,
@@ -38,10 +38,10 @@ export async function getDashboardData(farmId: string) {
       where: { farmId, collectionDate: { gte: yearStart } },
       _sum: { quantity: true },
     }),
-    // Remaining stock = all eggs ever collected minus those sold and those set for incubation.
+    // Remaining stock = all eggs ever collected minus those sold and consumed (eaten).
     prisma.eggCollection.aggregate({ where: { farmId }, _sum: { quantity: true } }),
     prisma.eggSale.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    prisma.incubationCycle.aggregate({ where: { farmId }, _sum: { eggsTotal: true } }),
+    prisma.eggConsumption.aggregate({ where: { farmId }, _sum: { quantity: true } }),
     prisma.eggSale.aggregate({
       where: { farmId, saleDate: { gte: monthStart } },
       _sum: { totalAmount: true },
@@ -76,7 +76,7 @@ export async function getDashboardData(farmId: string) {
   const eggsRemaining =
     (eggsCollectedTotalAgg._sum.quantity ?? 0) -
     (eggsSoldTotalAgg._sum.quantity ?? 0) -
-    (eggsIncubatedTotalAgg._sum.eggsTotal ?? 0);
+    (eggsConsumedTotalAgg._sum.quantity ?? 0);
 
   const activity: ActivityItem[] = [
     ...recentCollections.map((c) => ({

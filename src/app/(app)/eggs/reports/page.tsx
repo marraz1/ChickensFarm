@@ -51,6 +51,10 @@ export default async function EggReportsPage({
           <p className="text-2xl font-semibold">{report.soldInPeriod}</p>
         </Card>
         <Card className="p-4">
+          <p className="text-sm text-muted-foreground">Suvartota laikotarpiu</p>
+          <p className="text-2xl font-semibold">{report.consumedInPeriod}</p>
+        </Card>
+        <Card className="p-4">
           <p className="text-sm text-muted-foreground">Pajamos laikotarpiu</p>
           <p className="text-2xl font-semibold text-emerald-600">{formatEUR(report.revenueInPeriod)}</p>
         </Card>
