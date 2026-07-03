@@ -21,7 +21,17 @@ import { cn } from "@/lib/utils";
 
 type BirdGroupOption = { id: string; label: string };
 
-export function LossForm({ birdGroups }: { birdGroups: BirdGroupOption[] }) {
+export function LossForm({
+  birdGroups,
+  lossId,
+  defaultValues,
+  onSuccessPath = "/losses",
+}: {
+  birdGroups: BirdGroupOption[];
+  lossId?: string;
+  defaultValues?: Partial<CreateLossInput>;
+  onSuccessPath?: string;
+}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -33,7 +43,7 @@ export function LossForm({ birdGroups }: { birdGroups: BirdGroupOption[] }) {
     formState: { errors, isSubmitting },
   } = useForm<CreateLossInput>({
     resolver: zodResolver(createLossSchema),
-    defaultValues: { lossDate: todayInputValue(), quantity: 1, reasonType: "OTHER", birdGroupId: "" },
+    defaultValues: { lossDate: todayInputValue(), quantity: 1, reasonType: "OTHER", birdGroupId: "", ...defaultValues },
   });
 
   const reasonType = watch("reasonType");
@@ -42,8 +52,8 @@ export function LossForm({ birdGroups }: { birdGroups: BirdGroupOption[] }) {
 
   async function onSubmit(data: CreateLossInput) {
     setServerError(null);
-    const res = await fetch("/api/losses", {
-      method: "POST",
+    const res = await fetch(lossId ? `/api/losses/${lossId}` : "/api/losses", {
+      method: lossId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
@@ -54,7 +64,7 @@ export function LossForm({ birdGroups }: { birdGroups: BirdGroupOption[] }) {
       return;
     }
 
-    router.push("/losses");
+    router.push(onSuccessPath);
     router.refresh();
   }
 

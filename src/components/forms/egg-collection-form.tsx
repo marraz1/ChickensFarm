@@ -22,7 +22,17 @@ import { todayInputValue } from "@/lib/format";
 
 type BirdGroupOption = { id: string; label: string };
 
-export function EggCollectionForm({ birdGroups }: { birdGroups: BirdGroupOption[] }) {
+export function EggCollectionForm({
+  birdGroups,
+  collectionId,
+  defaultValues,
+  onSuccessPath = "/eggs/collections",
+}: {
+  birdGroups: BirdGroupOption[];
+  collectionId?: string;
+  defaultValues?: Partial<CreateEggCollectionInput>;
+  onSuccessPath?: string;
+}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -34,7 +44,7 @@ export function EggCollectionForm({ birdGroups }: { birdGroups: BirdGroupOption[
     formState: { errors, isSubmitting },
   } = useForm<CreateEggCollectionInput>({
     resolver: zodResolver(createEggCollectionSchema),
-    defaultValues: { collectionDate: todayInputValue(), quantity: 1, birdGroupId: "" },
+    defaultValues: { collectionDate: todayInputValue(), quantity: 1, birdGroupId: "", ...defaultValues },
   });
 
   const birdGroupId = watch("birdGroupId");
@@ -42,8 +52,8 @@ export function EggCollectionForm({ birdGroups }: { birdGroups: BirdGroupOption[
 
   async function onSubmit(data: CreateEggCollectionInput) {
     setServerError(null);
-    const res = await fetch("/api/egg-collections", {
-      method: "POST",
+    const res = await fetch(collectionId ? `/api/egg-collections/${collectionId}` : "/api/egg-collections", {
+      method: collectionId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
@@ -54,7 +64,7 @@ export function EggCollectionForm({ birdGroups }: { birdGroups: BirdGroupOption[
       return;
     }
 
-    router.push("/eggs/collections");
+    router.push(onSuccessPath);
     router.refresh();
   }
 
