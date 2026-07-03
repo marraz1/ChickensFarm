@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, Users, Egg, AlertTriangle, ShoppingCart, Receipt } from "lucide-react";
+import { Plus, Users, Egg, AlertTriangle, ShoppingCart, Receipt, Heart } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ const BIRDS_ACTIONS: QuickAction[] = [
   { href: "/bird-groups/new", label: "Nauja paukščių grupė", icon: Users },
   { href: "/eggs/collections/new", label: "Surinkti kiaušinius", icon: Egg },
   { href: "/losses/new", label: "Registruoti nuostolį", icon: AlertTriangle },
+  { href: "/mother-hens/new", label: "Nauja perekšlė", icon: Heart },
 ];
 
 const FINANCE_ACTIONS: QuickAction[] = [
@@ -23,11 +24,16 @@ const FINANCE_ACTIONS: QuickAction[] = [
   { href: "/expenses/new", label: "Nauja išlaida", icon: Receipt },
 ];
 
+const INCUBATION_ACTIONS: QuickAction[] = [
+  { href: "/incubation/new", label: "Naujas perinimo ciklas", icon: Egg },
+];
+
 const DEFAULT_ACTIONS: QuickAction[] = [...BIRDS_ACTIONS, ...FINANCE_ACTIONS];
 
 function actionsForPath(pathname: string): QuickAction[] {
-  if (pathname.startsWith("/birds")) return BIRDS_ACTIONS;
+  if (pathname.startsWith("/birds") || pathname.startsWith("/mother-hens")) return BIRDS_ACTIONS;
   if (pathname.startsWith("/finance")) return FINANCE_ACTIONS;
+  if (pathname.startsWith("/incubation")) return INCUBATION_ACTIONS;
   return DEFAULT_ACTIONS;
 }
 
