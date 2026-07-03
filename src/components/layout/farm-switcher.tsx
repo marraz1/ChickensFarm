@@ -54,13 +54,13 @@ export function FarmSwitcher({
               <DropdownMenuItem
                 key={farm.id}
                 disabled={pendingId === farm.id}
-                onSelect={() => switchFarm(farm.id)}
+                onClick={() => switchFarm(farm.id)}
               >
                 {farm.name}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => router.push("/farms/new")}>
+            <DropdownMenuItem onClick={() => router.push("/farms/new")}>
               + Naujas ūkis
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -68,8 +68,8 @@ export function FarmSwitcher({
       </DropdownMenu>
       <button
         type="button"
-        onClick={() => router.push(`/farms/${activeFarm.id}/settings`)}
-        aria-label="Ūkio nustatymai"
+        onClick={() => router.push("/profile")}
+        aria-label="Profilis"
         className="flex h-9 w-9 items-center justify-center rounded-full bg-accent"
       >
         <User size={18} className="text-accent-foreground" aria-hidden />

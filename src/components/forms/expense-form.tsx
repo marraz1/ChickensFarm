@@ -14,11 +14,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { z } from "zod";
 import { createExpenseSchema, type CreateExpenseInput } from "@/lib/validation/expenses";
 import { expenseCategoryLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
 
-export function ExpenseForm() {
+export function ExpenseForm({
+  expenseId,
+  defaultValues,
+  onSuccessPath = "/expenses",
+}: {
+  expenseId?: string;
+  defaultValues?: Partial<CreateExpenseInput>;
+  onSuccessPath?: string;
+} = {}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -28,17 +37,17 @@ export function ExpenseForm() {
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<CreateExpenseInput>({
+  } = useForm<z.input<typeof createExpenseSchema>, unknown, CreateExpenseInput>({
     resolver: zodResolver(createExpenseSchema),
-    defaultValues: { expenseDate: todayInputValue(), category: "FEED" },
+    defaultValues: { expenseDate: todayInputValue(), category: "FEED", ...defaultValues },
   });
 
   const category = watch("category");
 
   async function onSubmit(data: CreateExpenseInput) {
     setServerError(null);
-    const res = await fetch("/api/expenses", {
-      method: "POST",
+    const res = await fetch(expenseId ? `/api/expenses/${expenseId}` : "/api/expenses", {
+      method: expenseId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
@@ -49,7 +58,7 @@ export function ExpenseForm() {
       return;
     }
 
-    router.push("/expenses");
+    router.push(onSuccessPath);
     router.refresh();
   }
 
@@ -79,7 +88,7 @@ export function ExpenseForm() {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="amount">Suma (€)</Label>
-        <Input id="amount" type="number" step="0.01" inputMode="decimal" min={0} className="h-11" {...register("amount", { valueAsNumber: true })} />
+        <Input id="amount" type="text" inputMode="decimal" placeholder="pvz. 12,50" className="h-11" {...register("amount")} />
         {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
       </div>
 

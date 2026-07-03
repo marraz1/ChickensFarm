@@ -1,5 +1,6 @@
 "use client";
 
+import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
@@ -7,13 +8,50 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createEggSaleSchema, type CreateEggSaleInput } from "@/lib/validation/egg-sales";
-import { todayInputValue, formatEUR } from "@/lib/format";
+import { todayInputValue, formatEUR, parseDecimalInput } from "@/lib/format";
 
-export function EggSaleForm() {
+// Eggs are sold by the ten (dešimtukas), so the form works in packs and a
+// price per 10, while the API/DB keep storing raw egg counts and a per-egg
+// price (eggs = packs × 10, unitPrice = pricePerTen / 10). That keeps stock and
+// finance reporting unchanged and backward-compatible with older sales.
+const toNumber = (v: unknown) => {
+  const n = parseDecimalInput(v);
+  return Number.isNaN(n) ? undefined : n;
+};
+
+const eggSaleFormSchema = z.object({
+  saleDate: z.string().min(1, "Įveskite datą"),
+  tens: z.preprocess(
+    toNumber,
+    z.number({ error: "Įveskite kiekį" }).int("Turi būti sveikas skaičius").min(1, "Bent 1 dešimtukas")
+  ),
+  pricePerTen: z.preprocess(
+    toNumber,
+    z.number({ error: "Įveskite kainą" }).min(0, "Kaina negali būti neigiama")
+  ),
+  totalAmount: z.preprocess(toNumber, z.number().min(0).optional()),
+  buyer: z.string().trim().max(150).optional().or(z.literal("")),
+});
+type EggSaleFormInput = z.input<typeof eggSaleFormSchema>;
+type EggSaleFormValues = z.output<typeof eggSaleFormSchema>;
+
+export function EggSaleForm({
+  saleId,
+  defaultValues,
+  onSuccessPath = "/eggs/sales",
+}: {
+  saleId?: string;
+  defaultValues?: Partial<EggSaleFormValues>;
+  onSuccessPath?: string;
+} = {}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [overrideTotal, setOverrideTotal] = useState(false);
+  // Treat a stored total that doesn't match packs × price as a manual override
+  // so it stays editable instead of being recomputed away.
+  const [overrideTotal, setOverrideTotal] = useState(
+    defaultValues?.totalAmount != null &&
+      Math.abs(defaultValues.totalAmount - (defaultValues.tens ?? 0) * (defaultValues.pricePerTen ?? 0)) > 0.005
+  );
 
   const {
     register,
@@ -21,30 +59,34 @@ export function EggSaleForm() {
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<CreateEggSaleInput>({
-    resolver: zodResolver(createEggSaleSchema),
-    defaultValues: { saleDate: todayInputValue(), quantity: 1, unitPrice: 0 },
+  } = useForm<EggSaleFormInput, unknown, EggSaleFormValues>({
+    resolver: zodResolver(eggSaleFormSchema),
+    defaultValues: { saleDate: todayInputValue(), tens: 1, pricePerTen: 0, ...defaultValues },
   });
 
-  const quantity = watch("quantity");
-  const unitPrice = watch("unitPrice");
+  const tens = watch("tens");
+  const pricePerTen = watch("pricePerTen");
   const totalAmount = watch("totalAmount");
-  const computedTotal = (Number(quantity) || 0) * (Number(unitPrice) || 0);
+  const eggCount = (parseDecimalInput(tens) || 0) * 10;
+  const computedTotal = (parseDecimalInput(tens) || 0) * (parseDecimalInput(pricePerTen) || 0);
 
   useEffect(() => {
-    if (!overrideTotal) {
-      setValue("totalAmount", undefined);
-    }
+    if (!overrideTotal) setValue("totalAmount", undefined);
   }, [overrideTotal, setValue]);
 
-  async function onSubmit(data: CreateEggSaleInput) {
+  async function onSubmit(data: EggSaleFormValues) {
     setServerError(null);
-    const res = await fetch("/api/egg-sales", {
-      method: "POST",
+    const eggs = data.tens * 10;
+    const total = overrideTotal && data.totalAmount != null ? data.totalAmount : data.tens * data.pricePerTen;
+    const res = await fetch(saleId ? `/api/egg-sales/${saleId}` : "/api/egg-sales", {
+      method: saleId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...data,
-        totalAmount: overrideTotal ? data.totalAmount : undefined,
+        saleDate: data.saleDate,
+        quantity: eggs,
+        unitPrice: data.pricePerTen / 10,
+        totalAmount: total,
+        buyer: data.buyer,
       }),
     });
 
@@ -54,7 +96,7 @@ export function EggSaleForm() {
       return;
     }
 
-    router.push("/eggs/sales");
+    router.push(onSuccessPath);
     router.refresh();
   }
 
@@ -67,15 +109,16 @@ export function EggSaleForm() {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="quantity">Kiekis</Label>
-        <Input id="quantity" type="number" inputMode="numeric" min={1} className="h-11" {...register("quantity", { valueAsNumber: true })} />
-        {errors.quantity && <p className="text-sm text-destructive">{errors.quantity.message}</p>}
+        <Label htmlFor="tens">Kiekis (dešimtukais, po 10 vnt.)</Label>
+        <Input id="tens" type="number" inputMode="numeric" step={1} min={1} className="h-11" {...register("tens")} />
+        <p className="text-xs text-muted-foreground">Iš viso: {eggCount} vnt.</p>
+        {errors.tens && <p className="text-sm text-destructive">{errors.tens.message}</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="unitPrice">Vieneto kaina (€)</Label>
-        <Input id="unitPrice" type="number" step="0.01" inputMode="decimal" min={0} className="h-11" {...register("unitPrice", { valueAsNumber: true })} />
-        {errors.unitPrice && <p className="text-sm text-destructive">{errors.unitPrice.message}</p>}
+        <Label htmlFor="pricePerTen">Kaina už 10 vnt. (€)</Label>
+        <Input id="pricePerTen" type="text" inputMode="decimal" className="h-11" placeholder="pvz. 2,00" {...register("pricePerTen")} />
+        {errors.pricePerTen && <p className="text-sm text-destructive">{errors.pricePerTen.message}</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -96,11 +139,11 @@ export function EggSaleForm() {
         </div>
         {overrideTotal ? (
           <Input
-            type="number"
-            step="0.01"
+            type="text"
             inputMode="decimal"
+            placeholder="pvz. 6,00"
             className="h-11 mt-2"
-            {...register("totalAmount", { valueAsNumber: true })}
+            {...register("totalAmount")}
           />
         ) : (
           <p className="mt-1 text-xl font-semibold">{formatEUR(totalAmount ?? computedTotal)}</p>

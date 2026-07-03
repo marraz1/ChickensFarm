@@ -8,6 +8,15 @@ export function formatDateLT(date: Date | string): string {
   }).format(d);
 }
 
+// Parses a user-entered decimal that may use the Lithuanian comma separator
+// ("1,50" → 1.5). Returns NaN for empty/invalid input so callers/validators can
+// decide how to treat it.
+export function parseDecimalInput(value: unknown): number {
+  if (typeof value === "number") return value;
+  const s = String(value ?? "").trim().replace(/\s/g, "").replace(",", ".");
+  return s === "" ? NaN : Number(s);
+}
+
 export function formatEUR(amount: number | string | { toString(): string }): string {
   const n = typeof amount === "number" ? amount : Number(amount.toString());
   return new Intl.NumberFormat("lt-LT", {
