@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, Users, Egg, AlertTriangle, ShoppingCart, Receipt, Heart } from "lucide-react";
+import { Plus, Users, Egg, AlertTriangle, ShoppingCart, Receipt, Heart, Utensils } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,7 @@ type QuickAction = {
 const BIRDS_ACTIONS: QuickAction[] = [
   { href: "/bird-groups/new", label: "Nauja paukščių grupė", icon: Users },
   { href: "/eggs/collections/new", label: "Surinkti kiaušinius", icon: Egg },
+  { href: "/eggs/consumptions/new", label: "Suvartoti kiaušinius", icon: Utensils },
   { href: "/losses/new", label: "Registruoti nuostolį", icon: AlertTriangle },
   { href: "/mother-hens/new", label: "Nauja perekšlė", icon: Heart },
 ];
