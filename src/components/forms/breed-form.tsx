@@ -69,7 +69,7 @@ export function BreedForm({
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="birdType">Paukščio tipas</Label>
-        <Select value={birdType} onValueChange={(v) => v && setValue("birdType", v as CreateBreedInput["birdType"], { shouldValidate: true })}>
+        <Select items={birdTypeLabels} value={birdType} onValueChange={(v) => v && setValue("birdType", v as CreateBreedInput["birdType"], { shouldValidate: true })}>
           <SelectTrigger id="birdType" className="h-11 w-full">
             <SelectValue placeholder="Pasirinkite tipą" />
           </SelectTrigger>

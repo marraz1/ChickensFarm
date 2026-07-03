@@ -38,6 +38,7 @@ export function EggCollectionForm({ birdGroups }: { birdGroups: BirdGroupOption[
   });
 
   const birdGroupId = watch("birdGroupId");
+  const groupItems = Object.fromEntries(birdGroups.map((g) => [g.id, g.label]));
 
   async function onSubmit(data: CreateEggCollectionInput) {
     setServerError(null);
@@ -77,6 +78,7 @@ export function EggCollectionForm({ birdGroups }: { birdGroups: BirdGroupOption[
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="birdGroupId">Paukščių grupė (neprivaloma)</Label>
           <Select
+            items={groupItems}
             value={birdGroupId ?? ""}
             onValueChange={(v) => setValue("birdGroupId", v ?? "")}
           >

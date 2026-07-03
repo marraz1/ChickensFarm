@@ -48,6 +48,9 @@ enum EggQuality {
 }
 
 enum BirdCategory {
+  CHICK // viščiukai (išperinti jaunikliai)
+  PULLET // jauniklės vištos
+  COCKEREL // jaunikliai gaidukai
   LAYER // dedeklės
   ROOSTER // gaidukai
   OTHER // kita

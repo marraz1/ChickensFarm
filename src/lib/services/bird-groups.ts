@@ -128,17 +128,23 @@ export async function manualAdjustBirdGroup(
     const group = await tx.birdGroup.findFirst({ where: { id: birdGroupId, farmId } });
     if (!group) throw new ValidationError("Paukščių grupė nerasta");
 
-    const delta = input.quantity - group.quantity;
-    if (delta === 0) return group;
+    // Category reclassification (e.g. chicks grown into pullets/cockerels) — no
+    // quantity effect, so no audit event is recorded for it.
+    if (input.category && input.category !== group.category) {
+      await tx.birdGroup.update({ where: { id: birdGroupId }, data: { category: input.category } });
+    }
 
-    await adjustBirdGroupQuantityTx(tx, {
-      birdGroupId,
-      farmId,
-      delta,
-      eventType: "MANUAL_ADJUSTMENT",
-      note: input.note,
-      userId,
-    });
+    const delta = input.quantity - group.quantity;
+    if (delta !== 0) {
+      await adjustBirdGroupQuantityTx(tx, {
+        birdGroupId,
+        farmId,
+        delta,
+        eventType: "MANUAL_ADJUSTMENT",
+        note: input.note,
+        userId,
+      });
+    }
 
     return tx.birdGroup.findFirstOrThrow({ where: { id: birdGroupId } });
   });

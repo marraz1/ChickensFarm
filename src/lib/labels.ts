@@ -8,6 +8,9 @@ import type {
 } from "@/generated/prisma/client";
 
 export const birdCategoryLabels: Record<BirdCategory, string> = {
+  CHICK: "Viščiukai",
+  PULLET: "Jauniklės vištos",
+  COCKEREL: "Jaunikliai gaidukai",
   LAYER: "Dedeklės",
   ROOSTER: "Gaidukai",
   OTHER: "Kita",

@@ -38,6 +38,7 @@ export function LossForm({ birdGroups }: { birdGroups: BirdGroupOption[] }) {
 
   const reasonType = watch("reasonType");
   const birdGroupId = watch("birdGroupId");
+  const groupItems = Object.fromEntries(birdGroups.map((g) => [g.id, g.label]));
 
   async function onSubmit(data: CreateLossInput) {
     setServerError(null);
@@ -93,7 +94,7 @@ export function LossForm({ birdGroups }: { birdGroups: BirdGroupOption[] }) {
       {birdGroups.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="birdGroupId">Paukščių grupė (neprivaloma)</Label>
-          <Select value={birdGroupId ?? ""} onValueChange={(v) => setValue("birdGroupId", v ?? "")}>
+          <Select items={groupItems} value={birdGroupId ?? ""} onValueChange={(v) => setValue("birdGroupId", v ?? "")}>
             <SelectTrigger id="birdGroupId" className="h-11 w-full">
               <SelectValue placeholder="Nenurodyta" />
             </SelectTrigger>
