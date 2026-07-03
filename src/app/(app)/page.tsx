@@ -22,7 +22,8 @@ export default async function DashboardPage() {
           <p className="mb-1 text-xs text-muted-foreground">Paukščių iš viso</p>
           <p className="text-xl font-medium">{data.totalBirds}</p>
           <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
-            Dedeklės {data.layerBirds} · Gaidukai {data.roosterBirds}
+            Dedeklės {data.layerBirds} · Gaidukai {data.roosterBirds} · Jaunikliai{" "}
+            {data.hatchedChicks}
           </p>
         </Card>
         <Card className="p-3">
