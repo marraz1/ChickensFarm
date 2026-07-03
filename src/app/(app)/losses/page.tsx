@@ -30,18 +30,20 @@ export default async function LossesPage() {
           <p className="py-8 text-center text-sm text-muted-foreground">Dar nėra įrašų.</p>
         )}
         {losses.map((loss) => (
-          <Card key={loss.id} className="flex flex-row items-center justify-between p-4">
-            <div>
-              <p className="font-medium">
-                {lossReasonLabels[loss.reasonType]} · {formatDateLT(loss.lossDate)}
-              </p>
-              {loss.birdGroup && (
-                <p className="text-sm text-muted-foreground">{loss.birdGroup.breed.name}</p>
-              )}
-              {loss.comment && <p className="text-sm text-muted-foreground">{loss.comment}</p>}
-            </div>
-            <p className="text-lg font-semibold text-destructive">-{loss.quantity}</p>
-          </Card>
+          <Link key={loss.id} href={`/losses/${loss.id}/edit`}>
+            <Card className="flex flex-row items-center justify-between p-4">
+              <div>
+                <p className="font-medium">
+                  {lossReasonLabels[loss.reasonType]} · {formatDateLT(loss.lossDate)}
+                </p>
+                {loss.birdGroup && (
+                  <p className="text-sm text-muted-foreground">{loss.birdGroup.breed.name}</p>
+                )}
+                {loss.comment && <p className="text-sm text-muted-foreground">{loss.comment}</p>}
+              </div>
+              <p className="text-lg font-semibold text-destructive">-{loss.quantity}</p>
+            </Card>
+          </Link>
         ))}
       </div>
     </div>

@@ -3,6 +3,7 @@ import { requireActiveFarm } from "@/lib/session";
 import { getBreed } from "@/lib/services/breeds";
 import { PageHeader } from "@/components/layout/page-header";
 import { BreedForm } from "@/components/forms/breed-form";
+import { DeleteRecordButton } from "@/components/forms/delete-record-button";
 
 export default async function EditBreedPage({
   params,
@@ -17,7 +18,7 @@ export default async function EditBreedPage({
   return (
     <div>
       <PageHeader title="Redaguoti veislę" backHref="/breeds" />
-      <div className="px-4">
+      <div className="flex flex-col gap-6 px-4">
         <BreedForm
           breedId={breed.id}
           defaultValues={{
@@ -26,6 +27,13 @@ export default async function EditBreedPage({
             description: breed.description ?? "",
           }}
           onSuccessPath="/breeds"
+        />
+        <DeleteRecordButton
+          endpoint={`/api/breeds/${breed.id}`}
+          redirectTo="/breeds"
+          triggerLabel="Ištrinti veislę"
+          title="Ištrinti veislę?"
+          description="Veislė bus visam laikui ištrinta. Šio veiksmo atšaukti nepavyks."
         />
       </div>
     </div>
