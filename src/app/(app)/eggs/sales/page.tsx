@@ -29,16 +29,18 @@ export default async function EggSalesPage() {
           <p className="py-8 text-center text-sm text-muted-foreground">Dar nėra pardavimų.</p>
         )}
         {sales.map((sale) => (
-          <Card key={sale.id} className="flex flex-row items-center justify-between p-4">
-            <div>
-              <p className="font-medium">{formatDateLT(sale.saleDate)}</p>
-              <p className="text-sm text-muted-foreground">
-                {sale.quantity} vnt. × {formatEUR(sale.unitPrice)}
-                {sale.buyer ? ` · ${sale.buyer}` : ""}
-              </p>
-            </div>
-            <p className="text-lg font-semibold text-emerald-600">{formatEUR(sale.totalAmount)}</p>
-          </Card>
+          <Link key={sale.id} href={`/eggs/sales/${sale.id}/edit`}>
+            <Card className="flex flex-row items-center justify-between p-4">
+              <div>
+                <p className="font-medium">{formatDateLT(sale.saleDate)}</p>
+                <p className="text-sm text-muted-foreground">
+                  {sale.quantity} vnt. × {formatEUR(sale.unitPrice)}
+                  {sale.buyer ? ` · ${sale.buyer}` : ""}
+                </p>
+              </div>
+              <p className="text-lg font-semibold text-emerald-600">{formatEUR(sale.totalAmount)}</p>
+            </Card>
+          </Link>
         ))}
       </div>
     </div>

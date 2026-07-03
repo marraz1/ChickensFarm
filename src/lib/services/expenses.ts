@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ValidationError } from "@/lib/errors";
 import type { CreateExpenseInput } from "@/lib/validation/expenses";
 import type { ExpenseCategory } from "@/generated/prisma/client";
 
@@ -7,6 +8,10 @@ export function listExpenses(farmId: string) {
     where: { farmId },
     orderBy: { expenseDate: "desc" },
   });
+}
+
+export function getExpense(farmId: string, id: string) {
+  return prisma.expense.findFirst({ where: { id, farmId } });
 }
 
 export function createExpense(farmId: string, input: CreateExpenseInput) {
@@ -19,6 +24,27 @@ export function createExpense(farmId: string, input: CreateExpenseInput) {
       description: input.description || null,
     },
   });
+}
+
+export async function updateExpense(farmId: string, id: string, input: CreateExpenseInput) {
+  const existing = await prisma.expense.findFirst({ where: { id, farmId } });
+  if (!existing) throw new ValidationError("Išlaidos įrašas nerastas");
+
+  return prisma.expense.update({
+    where: { id },
+    data: {
+      expenseDate: new Date(input.expenseDate),
+      category: input.category,
+      amount: input.amount,
+      description: input.description || null,
+    },
+  });
+}
+
+export async function deleteExpense(farmId: string, id: string) {
+  const existing = await prisma.expense.findFirst({ where: { id, farmId } });
+  if (!existing) throw new ValidationError("Išlaidos įrašas nerastas");
+  await prisma.expense.delete({ where: { id } });
 }
 
 export async function getExpensesByCategoryReport(farmId: string, range: { from: Date; to: Date }) {

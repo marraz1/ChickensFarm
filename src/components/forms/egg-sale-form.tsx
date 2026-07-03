@@ -10,10 +10,23 @@ import { Label } from "@/components/ui/label";
 import { createEggSaleSchema, type CreateEggSaleInput } from "@/lib/validation/egg-sales";
 import { todayInputValue, formatEUR } from "@/lib/format";
 
-export function EggSaleForm() {
+export function EggSaleForm({
+  saleId,
+  defaultValues,
+  onSuccessPath = "/eggs/sales",
+}: {
+  saleId?: string;
+  defaultValues?: Partial<CreateEggSaleInput>;
+  onSuccessPath?: string;
+} = {}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [overrideTotal, setOverrideTotal] = useState(false);
+  // When editing, treat a stored total that doesn't match quantity × price as a
+  // manual override so it stays editable instead of being recomputed away.
+  const [overrideTotal, setOverrideTotal] = useState(
+    defaultValues?.totalAmount != null &&
+      Math.abs(defaultValues.totalAmount - (defaultValues.quantity ?? 0) * (defaultValues.unitPrice ?? 0)) > 0.005
+  );
 
   const {
     register,
@@ -23,7 +36,7 @@ export function EggSaleForm() {
     formState: { errors, isSubmitting },
   } = useForm<CreateEggSaleInput>({
     resolver: zodResolver(createEggSaleSchema),
-    defaultValues: { saleDate: todayInputValue(), quantity: 1, unitPrice: 0 },
+    defaultValues: { saleDate: todayInputValue(), quantity: 1, unitPrice: 0, ...defaultValues },
   });
 
   const quantity = watch("quantity");
@@ -39,8 +52,8 @@ export function EggSaleForm() {
 
   async function onSubmit(data: CreateEggSaleInput) {
     setServerError(null);
-    const res = await fetch("/api/egg-sales", {
-      method: "POST",
+    const res = await fetch(saleId ? `/api/egg-sales/${saleId}` : "/api/egg-sales", {
+      method: saleId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...data,
@@ -54,7 +67,7 @@ export function EggSaleForm() {
       return;
     }
 
-    router.push("/eggs/sales");
+    router.push(onSuccessPath);
     router.refresh();
   }
 

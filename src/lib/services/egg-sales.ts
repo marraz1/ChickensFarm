@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ValidationError } from "@/lib/errors";
 import type { CreateEggSaleInput } from "@/lib/validation/egg-sales";
 
 export function listEggSales(farmId: string) {
@@ -6,6 +7,10 @@ export function listEggSales(farmId: string) {
     where: { farmId },
     orderBy: { saleDate: "desc" },
   });
+}
+
+export function getEggSale(farmId: string, id: string) {
+  return prisma.eggSale.findFirst({ where: { id, farmId } });
 }
 
 export function createEggSale(farmId: string, input: CreateEggSaleInput) {
@@ -20,6 +25,29 @@ export function createEggSale(farmId: string, input: CreateEggSaleInput) {
       buyer: input.buyer || null,
     },
   });
+}
+
+export async function updateEggSale(farmId: string, id: string, input: CreateEggSaleInput) {
+  const existing = await prisma.eggSale.findFirst({ where: { id, farmId } });
+  if (!existing) throw new ValidationError("Pardavimo įrašas nerastas");
+
+  const totalAmount = input.totalAmount ?? input.quantity * input.unitPrice;
+  return prisma.eggSale.update({
+    where: { id },
+    data: {
+      saleDate: new Date(input.saleDate),
+      quantity: input.quantity,
+      unitPrice: input.unitPrice,
+      totalAmount,
+      buyer: input.buyer || null,
+    },
+  });
+}
+
+export async function deleteEggSale(farmId: string, id: string) {
+  const existing = await prisma.eggSale.findFirst({ where: { id, farmId } });
+  if (!existing) throw new ValidationError("Pardavimo įrašas nerastas");
+  await prisma.eggSale.delete({ where: { id } });
 }
 
 export async function getEggStockReport(farmId: string, range?: { from: Date; to: Date }) {

@@ -18,7 +18,15 @@ import { createExpenseSchema, type CreateExpenseInput } from "@/lib/validation/e
 import { expenseCategoryLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
 
-export function ExpenseForm() {
+export function ExpenseForm({
+  expenseId,
+  defaultValues,
+  onSuccessPath = "/expenses",
+}: {
+  expenseId?: string;
+  defaultValues?: Partial<CreateExpenseInput>;
+  onSuccessPath?: string;
+} = {}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -30,15 +38,15 @@ export function ExpenseForm() {
     formState: { errors, isSubmitting },
   } = useForm<CreateExpenseInput>({
     resolver: zodResolver(createExpenseSchema),
-    defaultValues: { expenseDate: todayInputValue(), category: "FEED" },
+    defaultValues: { expenseDate: todayInputValue(), category: "FEED", ...defaultValues },
   });
 
   const category = watch("category");
 
   async function onSubmit(data: CreateExpenseInput) {
     setServerError(null);
-    const res = await fetch("/api/expenses", {
-      method: "POST",
+    const res = await fetch(expenseId ? `/api/expenses/${expenseId}` : "/api/expenses", {
+      method: expenseId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
@@ -49,7 +57,7 @@ export function ExpenseForm() {
       return;
     }
 
-    router.push("/expenses");
+    router.push(onSuccessPath);
     router.refresh();
   }
 
