@@ -54,13 +54,13 @@ export function FarmSwitcher({
               <DropdownMenuItem
                 key={farm.id}
                 disabled={pendingId === farm.id}
-                onSelect={() => switchFarm(farm.id)}
+                onClick={() => switchFarm(farm.id)}
               >
                 {farm.name}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => router.push("/farms/new")}>
+            <DropdownMenuItem onClick={() => router.push("/farms/new")}>
               + Naujas ūkis
             </DropdownMenuItem>
           </DropdownMenuContent>
