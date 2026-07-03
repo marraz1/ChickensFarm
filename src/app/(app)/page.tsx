@@ -13,6 +13,7 @@ const ACTIVITY_ICONS = {
 export default async function DashboardPage() {
   const { farm } = await requireActiveFarm();
   const data = await getDashboardData(farm.id);
+  const balanceThisMonth = data.incomeThisMonth - data.expensesThisMonth;
 
   return (
     <div className="pt-2">
@@ -26,8 +27,17 @@ export default async function DashboardPage() {
           <p className="text-xl font-medium">{data.eggsLast7d}</p>
         </Card>
         <Card className="p-3">
-          <p className="mb-1 text-xs text-muted-foreground">Pajamos (mėn.)</p>
-          <p className="text-xl font-medium text-emerald-600">{formatEUR(data.incomeThisMonth)}</p>
+          <p className="mb-1 text-xs text-muted-foreground">Balansas (mėn.)</p>
+          <p
+            className={`text-xl font-medium ${
+              balanceThisMonth >= 0 ? "text-emerald-600" : "text-destructive"
+            }`}
+          >
+            {formatEUR(balanceThisMonth)}
+          </p>
+          <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
+            Pajamos {formatEUR(data.incomeThisMonth)} · Išlaidos {formatEUR(data.expensesThisMonth)}
+          </p>
         </Card>
         <Card className="p-3">
           <p className="mb-1 text-xs text-muted-foreground">Aktyvus perinimas</p>
