@@ -23,8 +23,8 @@ export default async function EditEggSalePage({
           saleId={sale.id}
           defaultValues={{
             saleDate: sale.saleDate.toISOString().slice(0, 10),
-            quantity: sale.quantity,
-            unitPrice: Number(sale.unitPrice),
+            tens: sale.quantity / 10,
+            pricePerTen: Number(sale.unitPrice) * 10,
             totalAmount: Number(sale.totalAmount),
             buyer: sale.buyer ?? "",
           }}

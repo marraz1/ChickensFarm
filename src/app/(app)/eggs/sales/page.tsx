@@ -34,7 +34,7 @@ export default async function EggSalesPage() {
               <div>
                 <p className="font-medium">{formatDateLT(sale.saleDate)}</p>
                 <p className="text-sm text-muted-foreground">
-                  {sale.quantity} vnt. × {formatEUR(sale.unitPrice)}
+                  {sale.quantity} vnt. · {formatEUR(Number(sale.unitPrice) * 10)} už 10
                   {sale.buyer ? ` · ${sale.buyer}` : ""}
                 </p>
               </div>

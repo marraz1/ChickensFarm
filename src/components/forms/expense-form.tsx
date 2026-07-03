@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { z } from "zod";
 import { createExpenseSchema, type CreateExpenseInput } from "@/lib/validation/expenses";
 import { expenseCategoryLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
@@ -36,7 +37,7 @@ export function ExpenseForm({
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<CreateExpenseInput>({
+  } = useForm<z.input<typeof createExpenseSchema>, unknown, CreateExpenseInput>({
     resolver: zodResolver(createExpenseSchema),
     defaultValues: { expenseDate: todayInputValue(), category: "FEED", ...defaultValues },
   });
@@ -87,7 +88,7 @@ export function ExpenseForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="amount">Suma (€)</Label>
-        <Input id="amount" type="number" step="0.01" inputMode="decimal" min={0} className="h-11" {...register("amount", { valueAsNumber: true })} />
+        <Input id="amount" type="text" inputMode="decimal" placeholder="pvz. 12,50" className="h-11" {...register("amount")} />
         {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
       </div>
 
