@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireActiveFarm } from "@/lib/session";
 import { getIncubationCycle } from "@/lib/services/incubation";
 import { PageHeader } from "@/components/layout/page-header";
@@ -13,12 +13,21 @@ export default async function NewGrowthLogPage({
   const { farm } = await requireActiveFarm();
   const cycle = await getIncubationCycle(farm.id, cycleId);
   if (!cycle) notFound();
+  // No more logs once the raising is finished.
+  if (cycle.growthCompletedAt) redirect(`/incubation/${cycleId}`);
 
   return (
     <div>
       <PageHeader title="Jauniklių sekimas" backHref={`/incubation/${cycleId}`} />
       <div className="px-4">
-        <GrowthLogForm cycleId={cycleId} />
+        <GrowthLogForm
+          cycleId={cycleId}
+          cohort={
+            cycle.resultingGroup
+              ? { category: cycle.resultingGroup.category, sex: cycle.resultingGroup.sex }
+              : null
+          }
+        />
       </div>
     </div>
   );

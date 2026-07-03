@@ -9,7 +9,8 @@ import { Card } from "@/components/ui/card";
 import { CandlingForm } from "@/components/forms/candling-form";
 import { HatchForm } from "@/components/forms/hatch-form";
 import { formatDateLT, formatPercent } from "@/lib/format";
-import { Plus } from "lucide-react";
+import { birdCategoryLabels } from "@/lib/labels";
+import { Plus, CheckCircle2, Flag } from "lucide-react";
 
 export default async function IncubationCycleDetailPage({
   params,
@@ -23,6 +24,10 @@ export default async function IncubationCycleDetailPage({
 
   const stats = computeCycleStats(cycle);
   const hatched = cycle.hatchDate != null;
+  const growthDone = cycle.growthCompletedAt != null;
+  const cohort = cycle.resultingGroup;
+  const availableToDistribute = cohort ? cohort.quantity : cycle.hatchedCount ?? 0;
+  const canFinish = hatched && !growthDone && availableToDistribute > 0;
 
   const [groups, breeds] = hatched
     ? [[], []]
@@ -107,15 +112,41 @@ export default async function IncubationCycleDetailPage({
         {hatched && (
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Jauniklių sekimas</p>
-              <Link
-                href={`/incubation/${cycle.id}/growth-logs/new`}
-                className="flex h-9 items-center gap-1 rounded-lg border px-3 text-sm font-medium"
-              >
-                <Plus size={14} aria-hidden /> Įrašas
-              </Link>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Jauniklių sekimas</p>
+                {cohort && (
+                  <p className="text-xs text-muted-foreground">
+                    Grupė: {birdCategoryLabels[cohort.category]} · {cohort.quantity} vnt.
+                  </p>
+                )}
+              </div>
+              {!growthDone && (
+                <Link
+                  href={`/incubation/${cycle.id}/growth-logs/new`}
+                  className="flex h-9 items-center gap-1 rounded-lg border px-3 text-sm font-medium"
+                >
+                  <Plus size={14} aria-hidden /> Įrašas
+                </Link>
+              )}
             </div>
-            {cycle.growthLogs.length === 0 && (
+
+            {growthDone ? (
+              <div className="mb-2 flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
+                <CheckCircle2 size={18} aria-hidden />
+                Auginimas baigtas {cycle.growthCompletedAt && formatDateLT(cycle.growthCompletedAt)}
+              </div>
+            ) : (
+              canFinish && (
+                <Link
+                  href={`/incubation/${cycle.id}/finish`}
+                  className="mb-3 flex h-11 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-medium text-primary-foreground"
+                >
+                  <Flag size={16} aria-hidden /> Užbaigti sekimą
+                </Link>
+              )
+            )}
+
+            {cycle.growthLogs.length === 0 && !growthDone && (
               <p className="py-4 text-center text-sm text-muted-foreground">
                 Dar nėra sekimo įrašų.
               </p>

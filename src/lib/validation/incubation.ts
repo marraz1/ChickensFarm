@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { birdCategoryEnum, sexEnum } from "@/lib/validation/bird-groups";
 
 // Start a new incubation cycle (F10.1)
 export const createIncubationCycleSchema = z.object({
@@ -41,10 +42,29 @@ export type UpdateIncubationCycleInput = z.infer<typeof updateIncubationCycleSch
 export type CandlingInput = z.infer<typeof candlingSchema>;
 export type HatchInput = z.infer<typeof hatchSchema>;
 
-// Periodic survival tracking of the hatched chicks (F10.4)
+// Periodic survival tracking of the hatched chicks (F10.4). Category/sex optionally
+// reclassify the resulting cohort as the chicks mature.
 export const createGrowthLogSchema = z.object({
   logDate: z.string().min(1, "Įveskite datą"),
   aliveCount: z.number().int().min(0),
+  category: birdCategoryEnum.optional(),
+  sex: sexEnum.optional(),
   note: z.string().trim().max(1000).optional().or(z.literal("")),
 });
 export type CreateGrowthLogInput = z.infer<typeof createGrowthLogSchema>;
+
+// Finish the raising by distributing the chicks. Chicks are usually of different kinds
+// (future hens vs roosters), so several entries can be added — each moves a count into
+// an existing group, or into a new group of the chosen category (breedId below).
+export const finishTransferEntrySchema = z.object({
+  targetGroupId: z.string().optional().or(z.literal("")), // empty => create a new group
+  category: birdCategoryEnum.optional(), // used when creating a new group
+  count: z.number().int().min(1, "Kiekis turi būti bent 1"),
+});
+
+export const finishGrowthTrackingSchema = z.object({
+  breedId: z.string().optional().or(z.literal("")), // breed for any new groups
+  entries: z.array(finishTransferEntrySchema).min(1, "Pridėkite bent vieną perkėlimą"),
+});
+export type FinishGrowthTrackingInput = z.infer<typeof finishGrowthTrackingSchema>;
+export type FinishTransferEntry = z.infer<typeof finishTransferEntrySchema>;

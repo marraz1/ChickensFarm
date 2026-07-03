@@ -6,6 +6,7 @@ import type {
   CandlingInput,
   HatchInput,
   CreateGrowthLogInput,
+  FinishGrowthTrackingInput,
 } from "@/lib/validation/incubation";
 
 export function listIncubationCycles(farmId: string) {
@@ -128,18 +129,120 @@ export async function finalizeHatch(
   });
 }
 
-// F10.4 — periodic survival update for the hatched chicks.
+// F10.4 — periodic survival update for the hatched chicks. Optionally reclassifies the
+// resulting cohort's category/sex as the chicks mature.
 export async function addGrowthLog(farmId: string, cycleId: string, input: CreateGrowthLogInput) {
-  const cycle = await prisma.incubationCycle.findFirst({ where: { id: cycleId, farmId } });
-  if (!cycle) throw new ValidationError("Perinimo ciklas nerastas");
+  return prisma.$transaction(async (tx) => {
+    const cycle = await tx.incubationCycle.findFirst({ where: { id: cycleId, farmId } });
+    if (!cycle) throw new ValidationError("Perinimo ciklas nerastas");
+    if (cycle.growthCompletedAt) throw new ValidationError("Sekimas jau užbaigtas");
 
-  return prisma.incubationGrowthLog.create({
-    data: {
-      incubationCycleId: cycleId,
-      logDate: new Date(input.logDate),
-      aliveCount: input.aliveCount,
-      note: input.note || null,
-    },
+    const log = await tx.incubationGrowthLog.create({
+      data: {
+        incubationCycleId: cycleId,
+        logDate: new Date(input.logDate),
+        aliveCount: input.aliveCount,
+        note: input.note || null,
+      },
+    });
+
+    if (cycle.resultingGroupId && (input.category || input.sex)) {
+      await tx.birdGroup.updateMany({
+        where: { id: cycle.resultingGroupId, farmId },
+        data: {
+          ...(input.category ? { category: input.category } : {}),
+          ...(input.sex ? { sex: input.sex } : {}),
+        },
+      });
+    }
+
+    return log;
+  });
+}
+
+// Finish the raising by distributing the chicks into groups. Supports several entries
+// (chicks of different kinds), each moving a count into an existing group or a new group
+// of a chosen category. If a cohort group exists, the moved birds are deducted from it
+// (a transfer); if not (hatch recorded without a group), the birds enter inventory now.
+// Everything runs through the audited quantity writer, then the cycle is marked complete.
+export async function finishGrowthTracking(
+  farmId: string,
+  cycleId: string,
+  userId: string,
+  input: FinishGrowthTrackingInput
+) {
+  return prisma.$transaction(async (tx) => {
+    const cycle = await tx.incubationCycle.findFirst({
+      where: { id: cycleId, farmId },
+      include: { resultingGroup: true },
+    });
+    if (!cycle) throw new ValidationError("Perinimo ciklas nerastas");
+    if (cycle.growthCompletedAt) throw new ValidationError("Sekimas jau užbaigtas");
+    if (!cycle.hatchDate) throw new ValidationError("Ciklas dar neužbaigtas išsiritimu");
+
+    const cohort = cycle.resultingGroup; // may be null (hatch recorded without a group)
+    const available = cohort ? cohort.quantity : cycle.hatchedCount ?? 0;
+    const totalDistributed = input.entries.reduce((sum, e) => sum + e.count, 0);
+    if (totalDistributed > available) {
+      throw new ValidationError(`Negalima perkelti daugiau nei turima (${available})`);
+    }
+
+    for (const entry of input.entries) {
+      let targetId = entry.targetGroupId || null;
+
+      if (targetId) {
+        if (cohort && targetId === cohort.id) {
+          throw new ValidationError("Pasirinkite kitą grupę nei jauniklių grupė");
+        }
+        const target = await tx.birdGroup.findFirst({ where: { id: targetId, farmId } });
+        if (!target) throw new ValidationError("Pasirinkta grupė nerasta");
+      } else {
+        // Create a new group of the chosen category using the selected breed.
+        if (!input.breedId) throw new ValidationError("Pasirinkite naujų grupių veislę");
+        const breed = await tx.breed.findFirst({ where: { id: input.breedId, farmId } });
+        if (!breed) throw new ValidationError("Veislė nerasta");
+        const created = await tx.birdGroup.create({
+          data: {
+            farmId,
+            breedId: input.breedId,
+            sex: "UNKNOWN",
+            category: entry.category ?? "OTHER",
+            quantity: 0,
+            birthOrAcquiredDate: cycle.hatchDate,
+            notes: "Iš perinimo ciklo",
+          },
+        });
+        targetId = created.id;
+      }
+
+      await adjustBirdGroupQuantityTx(tx, {
+        birdGroupId: targetId,
+        farmId,
+        delta: entry.count,
+        // Moving out of a cohort is an adjustment; entering fresh inventory is a hatch.
+        eventType: cohort ? "MANUAL_ADJUSTMENT" : "INCUBATION_HATCH",
+        sourceType: "incubation_cycle",
+        sourceId: cycleId,
+        note: "Paskirstyti jaunikliai (perinimas)",
+        userId,
+      });
+
+      if (cohort) {
+        await adjustBirdGroupQuantityTx(tx, {
+          birdGroupId: cohort.id,
+          farmId,
+          delta: -entry.count,
+          eventType: "MANUAL_ADJUSTMENT",
+          note: "Perkelta iš jauniklių grupės",
+          userId,
+        });
+      }
+    }
+
+    return tx.incubationCycle.update({
+      where: { id: cycleId },
+      data: { growthCompletedAt: new Date() },
+    });
   });
 }
 

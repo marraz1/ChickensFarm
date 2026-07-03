@@ -316,6 +316,7 @@ model IncubationCycle {
   resultingGroupId  String?
   resultingGroup    BirdGroup? @relation("ResultingGroup", fields: [resultingGroupId], references: [id], onDelete: SetNull)
   notes             String?
+  growthCompletedAt DateTime? // set when jauniklių auginimas/sekimas is finished
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
