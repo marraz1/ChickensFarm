@@ -17,6 +17,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ChickensFarm — Paukštininkystės ūkio valdymas",
   description: "Paukštininkystės ūkio valdymo sistema",
+  // iOS ignores the manifest before 16.4, so the home-screen app needs its own tags.
+  appleWebApp: {
+    capable: true,
+    title: "ChickensFarm",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
