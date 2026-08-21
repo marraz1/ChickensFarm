@@ -13,13 +13,7 @@ import {
 
 type Farm = { id: string; name: string };
 
-export function FarmSwitcher({
-  farms,
-  activeFarm,
-}: {
-  farms: Farm[];
-  activeFarm: Farm;
-}) {
+export function FarmSwitcher({ farms, activeFarm }: { farms: Farm[]; activeFarm: Farm }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);

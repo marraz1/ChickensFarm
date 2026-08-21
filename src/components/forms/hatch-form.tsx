@@ -94,12 +94,23 @@ export function HatchForm({
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="hatchDate">Išsiritimo data</Label>
           <Input id="hatchDate" type="date" className="h-11" {...register("hatchDate")} />
-          {errors.hatchDate && <p className="text-sm text-destructive">{errors.hatchDate.message}</p>}
+          {errors.hatchDate && (
+            <p className="text-sm text-destructive">{errors.hatchDate.message}</p>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="hatchedCount">Išsirito (vnt.)</Label>
-          <Input id="hatchedCount" type="number" inputMode="numeric" min={0} className="h-11" {...register("hatchedCount", { valueAsNumber: true })} />
-          {errors.hatchedCount && <p className="text-sm text-destructive">{errors.hatchedCount.message}</p>}
+          <Input
+            id="hatchedCount"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            className="h-11"
+            {...register("hatchedCount", { valueAsNumber: true })}
+          />
+          {errors.hatchedCount && (
+            <p className="text-sm text-destructive">{errors.hatchedCount.message}</p>
+          )}
         </div>
       </div>
 
@@ -113,7 +124,9 @@ export function HatchForm({
               onClick={() => setMode(b.value)}
               className={cn(
                 "h-11 rounded-lg border text-sm font-medium",
-                mode === b.value ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground"
+                mode === b.value
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "text-muted-foreground",
               )}
             >
               {b.label}
@@ -141,8 +154,8 @@ export function HatchForm({
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Grupė bus sukurta kaip „Viščiukai". Paaugus galėsite atskirti į jauniklės vištas ir
-            gaidukus grupės kortelėje.
+            Grupė bus sukurta kaip „Viščiukai&ldquo;. Paaugus galėsite atskirti į jauniklės vištas
+            ir gaidukus grupės kortelėje.
           </p>
         </div>
       )}
@@ -150,7 +163,11 @@ export function HatchForm({
       {mode === "existing" && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="existingGroup">Esama grupė</Label>
-          <Select items={groupItems} value={birdGroupId} onValueChange={(v) => v && setBirdGroupId(v)}>
+          <Select
+            items={groupItems}
+            value={birdGroupId}
+            onValueChange={(v) => v && setBirdGroupId(v)}
+          >
             <SelectTrigger id="existingGroup" className="h-11 w-full">
               <SelectValue placeholder="Pasirinkite grupę" />
             </SelectTrigger>

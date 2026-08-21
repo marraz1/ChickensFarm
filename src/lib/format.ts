@@ -13,7 +13,10 @@ export function formatDateLT(date: Date | string): string {
 // decide how to treat it.
 export function parseDecimalInput(value: unknown): number {
   if (typeof value === "number") return value;
-  const s = String(value ?? "").trim().replace(/\s/g, "").replace(",", ".");
+  const s = String(value ?? "")
+    .trim()
+    .replace(/\s/g, "")
+    .replace(",", ".");
   return s === "" ? NaN : Number(s);
 }
 

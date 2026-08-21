@@ -78,8 +78,17 @@ export function GrowthLogForm({
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="aliveCount">Gyvų jauniklių</Label>
-        <Input id="aliveCount" type="number" inputMode="numeric" min={0} className="h-11" {...register("aliveCount", { valueAsNumber: true })} />
-        {errors.aliveCount && <p className="text-sm text-destructive">{errors.aliveCount.message}</p>}
+        <Input
+          id="aliveCount"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          className="h-11"
+          {...register("aliveCount", { valueAsNumber: true })}
+        />
+        {errors.aliveCount && (
+          <p className="text-sm text-destructive">{errors.aliveCount.message}</p>
+        )}
       </div>
 
       {cohort && (
@@ -106,7 +115,11 @@ export function GrowthLogForm({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="sex">Lytis</Label>
-            <Select items={sexLabels} value={sex ?? cohort.sex} onValueChange={(v) => v && setValue("sex", v as Sex)}>
+            <Select
+              items={sexLabels}
+              value={sex ?? cohort.sex}
+              onValueChange={(v) => v && setValue("sex", v as Sex)}
+            >
               <SelectTrigger id="sex" className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -119,7 +132,8 @@ export function GrowthLogForm({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Kategorija ir lytis atnaujina jauniklių grupę (pvz. paaugę tampa „Jauniklės vištos").
+              Kategorija ir lytis atnaujina jauniklių grupę (pvz. paaugę tampa „Jauniklės
+              vištos&ldquo;).
             </p>
           </div>
         </>

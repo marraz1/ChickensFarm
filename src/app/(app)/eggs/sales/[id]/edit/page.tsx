@@ -5,11 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { EggSaleForm } from "@/components/forms/egg-sale-form";
 import { DeleteRecordButton } from "@/components/forms/delete-record-button";
 
-export default async function EditEggSalePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function EditEggSalePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { farm } = await requireActiveFarm();
   const sale = await getEggSale(farm.id, id);

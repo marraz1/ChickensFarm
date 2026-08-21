@@ -38,7 +38,9 @@ export default async function EggSalesPage() {
                   {sale.buyer ? ` · ${sale.buyer}` : ""}
                 </p>
               </div>
-              <p className="text-lg font-semibold text-emerald-600">{formatEUR(sale.totalAmount)}</p>
+              <p className="text-lg font-semibold text-emerald-600">
+                {formatEUR(sale.totalAmount)}
+              </p>
             </Card>
           </Link>
         ))}

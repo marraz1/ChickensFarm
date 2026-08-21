@@ -5,11 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ExpenseForm } from "@/components/forms/expense-form";
 import { DeleteRecordButton } from "@/components/forms/delete-record-button";
 
-export default async function EditExpensePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function EditExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { farm } = await requireActiveFarm();
   const expense = await getExpense(farm.id, id);

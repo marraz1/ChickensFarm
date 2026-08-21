@@ -67,12 +67,18 @@ export function ExpenseForm({
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="expenseDate">Data</Label>
         <Input id="expenseDate" type="date" className="h-11" {...register("expenseDate")} />
-        {errors.expenseDate && <p className="text-sm text-destructive">{errors.expenseDate.message}</p>}
+        {errors.expenseDate && (
+          <p className="text-sm text-destructive">{errors.expenseDate.message}</p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="category">Kategorija</Label>
-        <Select items={expenseCategoryLabels} value={category} onValueChange={(v) => v && setValue("category", v as CreateExpenseInput["category"])}>
+        <Select
+          items={expenseCategoryLabels}
+          value={category}
+          onValueChange={(v) => v && setValue("category", v as CreateExpenseInput["category"])}
+        >
           <SelectTrigger id="category" className="h-11 w-full">
             <SelectValue />
           </SelectTrigger>
@@ -88,7 +94,14 @@ export function ExpenseForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="amount">Suma (€)</Label>
-        <Input id="amount" type="text" inputMode="decimal" placeholder="pvz. 12,50" className="h-11" {...register("amount")} />
+        <Input
+          id="amount"
+          type="text"
+          inputMode="decimal"
+          placeholder="pvz. 12,50"
+          className="h-11"
+          {...register("amount")}
+        />
         {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
       </div>
 
