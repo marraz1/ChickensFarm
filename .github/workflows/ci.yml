@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    env:
+      # `npm ci` runs `postinstall: prisma generate`, which reads DATABASE_URL
+      # via prisma.config.ts. No database is contacted during generate.
+      DATABASE_URL: postgresql://user:pass@localhost:5432/placeholder
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prettier (changed files only)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          FILES=$(git diff --name-only --diff-filter=ACMR FETCH_HEAD...HEAD)
+          if [ -z "$FILES" ]; then echo "No changed files."; exit 0; fi
+          echo "$FILES" | xargs -d '\n' npx prettier --check --ignore-unknown
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

@@ -15,7 +15,7 @@ const amountField = z.preprocess(
     const n = parseDecimalInput(v);
     return Number.isNaN(n) ? undefined : n;
   },
-  z.number({ error: "Įveskite sumą" }).min(0.01, "Suma turi būti didesnė už 0")
+  z.number({ error: "Įveskite sumą" }).min(0.01, "Suma turi būti didesnė už 0"),
 );
 
 export const createExpenseSchema = z.object({

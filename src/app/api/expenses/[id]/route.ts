@@ -11,7 +11,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json();
     const parsed = createExpenseSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Neteisingi duomenys" }, { status: 400 });
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Neteisingi duomenys" },
+        { status: 400 },
+      );
     }
     const expense = await updateExpense(farm.id, id, parsed.data);
     return NextResponse.json(expense);

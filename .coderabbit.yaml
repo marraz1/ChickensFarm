@@ -1,0 +1,71 @@
+# https://docs.coderabbit.ai/reference/yaml-template
+language: en-US
+tone_instructions: >-
+  Be concise and concrete. This is a small solo-maintained project; prioritize
+  correctness and data-isolation bugs over stylistic nitpicks. UI copy is in
+  Lithuanian by design — never flag Lithuanian strings as typos or ask for
+  translation.
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+  path_filters:
+    - "!package-lock.json"
+    - "!prisma/migrations/**"
+    - "!src/generated/**"
+    - "!public/**"
+    - "!*.html"
+  path_instructions:
+    - path: "src/app/api/**/route.ts"
+      instructions: >-
+        Every handler must open with one of the guards from src/lib/session:
+        requireActiveFarmApi(), requireFarmAccessApi(farmId) or
+        requireUserApi(). All three are valid — do not insist on
+        requireActiveFarmApi specifically. Routes under src/app/api/auth are
+        intentionally public (registration, password reset, NextAuth); never
+        flag those for a missing guard.
+
+        Beyond the guard, a handler must validate its request body with a zod
+        schema from src/lib/validation via safeParse, delegate data access to
+        src/lib/services (no prisma import in a route handler), and wrap the
+        body in a try/catch returning handleApiError(err).
+    - path: "src/lib/services/**/*.ts"
+      instructions: >-
+        This app is multi-tenant: every farm-owned row is scoped to a farm, and
+        a query that loses its scope leaks one farm's data to another.
+
+        Two patterns are both correct, and only a query matching NEITHER should
+        be flagged:
+        (a) farmId appears directly in the where clause; or
+        (b) for a mutation addressed by id, the function first runs
+        findFirst({ where: { id, farmId } }) and throws when it returns null —
+        the subsequent update/delete by id is then already proven to be in
+        scope. Child records (MotherHenLog, IncubationGrowthLog) are scoped
+        through their parent the same way: verify the parent, then write.
+
+        auth.ts (User, PasswordResetToken) and listFarmsForUser (scoped by
+        userId) operate above the farm level by design — do not flag them.
+    - path: "src/**/*.tsx"
+      instructions: >-
+        Next.js 16 App Router. Flag "use client" added to a component with no
+        interactivity, server-only imports or secrets leaking into client
+        components, async work with no error or loading state, and explicit any.
+    - path: "prisma/schema.prisma"
+      instructions: >-
+        Flag schema changes that arrive without a matching migration in
+        prisma/migrations. New farm-owned models should carry farmId; models
+        that are global (User, Farm, PasswordResetToken) or scoped through a
+        parent relation are fine as they are.
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "REVIEW.md"
+      - "AGENTS.md"
