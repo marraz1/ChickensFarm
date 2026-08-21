@@ -24,19 +24,33 @@ reviews:
   path_instructions:
     - path: "src/app/api/**/route.ts"
       instructions: >-
-        Every handler must call requireActiveFarmApi() (or the equivalent session
-        guard) before touching data, validate the request body with a zod schema
-        from src/lib/validation via safeParse, and wrap the body in a try/catch
-        that returns handleApiError(err). Flag any handler missing one of these.
-        Data access belongs in src/lib/services — flag direct prisma calls made
-        from a route handler.
+        Every handler must open with one of the guards from src/lib/session:
+        requireActiveFarmApi(), requireFarmAccessApi(farmId) or
+        requireUserApi(). All three are valid — do not insist on
+        requireActiveFarmApi specifically. Routes under src/app/api/auth are
+        intentionally public (registration, password reset, NextAuth); never
+        flag those for a missing guard.
+
+        Beyond the guard, a handler must validate its request body with a zod
+        schema from src/lib/validation via safeParse, delegate data access to
+        src/lib/services (no prisma import in a route handler), and wrap the
+        body in a try/catch returning handleApiError(err).
     - path: "src/lib/services/**/*.ts"
       instructions: >-
-        This app is multi-tenant: every row is scoped to a farm. Flag any prisma
-        query (findMany, findFirst, update, updateMany, delete, deleteMany,
-        aggregate, groupBy) whose where clause is missing farmId, and any code
-        that trusts a caller-supplied id without confirming it belongs to the
-        caller's farm — that is a cross-farm data leak.
+        This app is multi-tenant: every farm-owned row is scoped to a farm, and
+        a query that loses its scope leaks one farm's data to another.
+
+        Two patterns are both correct, and only a query matching NEITHER should
+        be flagged:
+        (a) farmId appears directly in the where clause; or
+        (b) for a mutation addressed by id, the function first runs
+        findFirst({ where: { id, farmId } }) and throws when it returns null —
+        the subsequent update/delete by id is then already proven to be in
+        scope. Child records (MotherHenLog, IncubationGrowthLog) are scoped
+        through their parent the same way: verify the parent, then write.
+
+        auth.ts (User, PasswordResetToken) and listFarmsForUser (scoped by
+        userId) operate above the farm level by design — do not flag them.
     - path: "src/**/*.tsx"
       instructions: >-
         Next.js 16 App Router. Flag "use client" added to a component with no
@@ -45,7 +59,9 @@ reviews:
     - path: "prisma/schema.prisma"
       instructions: >-
         Flag schema changes that arrive without a matching migration in
-        prisma/migrations, and any new model that lacks a farmId scope.
+        prisma/migrations. New farm-owned models should carry farmId; models
+        that are global (User, Farm, PasswordResetToken) or scoped through a
+        parent relation are fine as they are.
 
 knowledge_base:
   code_guidelines:
