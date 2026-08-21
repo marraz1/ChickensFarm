@@ -1,0 +1,55 @@
+# https://docs.coderabbit.ai/reference/yaml-template
+language: en-US
+tone_instructions: >-
+  Be concise and concrete. This is a small solo-maintained project; prioritize
+  correctness and data-isolation bugs over stylistic nitpicks. UI copy is in
+  Lithuanian by design — never flag Lithuanian strings as typos or ask for
+  translation.
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+  path_filters:
+    - "!package-lock.json"
+    - "!prisma/migrations/**"
+    - "!src/generated/**"
+    - "!public/**"
+    - "!*.html"
+  path_instructions:
+    - path: "src/app/api/**/route.ts"
+      instructions: >-
+        Every handler must call requireActiveFarmApi() (or the equivalent session
+        guard) before touching data, validate the request body with a zod schema
+        from src/lib/validation via safeParse, and wrap the body in a try/catch
+        that returns handleApiError(err). Flag any handler missing one of these.
+        Data access belongs in src/lib/services — flag direct prisma calls made
+        from a route handler.
+    - path: "src/lib/services/**/*.ts"
+      instructions: >-
+        This app is multi-tenant: every row is scoped to a farm. Flag any prisma
+        query (findMany, findFirst, update, updateMany, delete, deleteMany,
+        aggregate, groupBy) whose where clause is missing farmId, and any code
+        that trusts a caller-supplied id without confirming it belongs to the
+        caller's farm — that is a cross-farm data leak.
+    - path: "src/**/*.tsx"
+      instructions: >-
+        Next.js 16 App Router. Flag "use client" added to a component with no
+        interactivity, server-only imports or secrets leaking into client
+        components, async work with no error or loading state, and explicit any.
+    - path: "prisma/schema.prisma"
+      instructions: >-
+        Flag schema changes that arrive without a matching migration in
+        prisma/migrations, and any new model that lacks a farmId scope.
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "REVIEW.md"
+      - "AGENTS.md"
