@@ -201,12 +201,70 @@ docs/
 travels in the URL. The Prisma client is generated into `src/generated/prisma`
 (gitignored, recreated by `npm install`).
 
-## Deployment
+## Deployment (Vercel + Neon)
 
-Built for **Vercel** with a **Neon** database. Set `DATABASE_URL`, `AUTH_SECRET`
-and any optional variables in the project settings, then run
-`npx prisma migrate deploy` against the production database when the schema
-changes. Serve over HTTPS so the app stays installable.
+The app is built for **Vercel** with a **Neon** Postgres database. Vercel detects
+Next.js on its own — there is no `vercel.json` and none is needed.
+
+### One-time setup
+
+1. **Import the repository** in Vercel (New Project → import from GitHub). Framework
+   preset *Next.js*, root directory `./`, build command and output left on their
+   defaults.
+2. **Set the Node.js version** to 20.x or newer in *Project Settings → General*.
+   Next.js 16 requires 20.9+.
+3. **Add the environment variables** in *Project Settings → Environment Variables*.
+   Add them to **Production**, **Preview** and **Development** — a variable that
+   exists only in Production makes preview deployments fail at runtime.
+
+   | Variable | Value |
+   | --- | --- |
+   | `DATABASE_URL` | Neon connection string (see below) |
+   | `AUTH_SECRET` | `openssl rand -base64 32` — a different value per environment is fine |
+   | `RESEND_API_KEY`, `EMAIL_FROM` | Only if password-reset email should really be sent |
+   | `BLOB_READ_WRITE_TOKEN` | Added automatically when a Vercel Blob store is linked |
+
+   `AUTH_URL` is not needed: Auth.js detects the deployment URL on Vercel.
+
+4. **Connect Neon**, either through the Vercel integration or by pasting the
+   connection string. Neon gives two forms of URL:
+   - **pooled** (`...-pooler...`) — what the running app uses through
+     `@prisma/adapter-neon`;
+   - **unpooled/direct** — what `prisma migrate` needs.
+
+   `prisma.config.ts` reads a single `DATABASE_URL`, so keep the **direct** URL in
+   your local `.env` for migrations, and use the pooled URL on Vercel.
+
+### Migrations
+
+Migrations do **not** run during the Vercel build — the build only runs
+`prisma generate` (via `postinstall`) and `next build`. After deploying a schema
+change, apply it yourself:
+
+```bash
+DATABASE_URL="<direct-neon-url>" npx prisma migrate deploy
+```
+
+Preview deployments point at whatever database `DATABASE_URL` names, so they share
+production data unless you give previews their own Neon branch.
+
+### If a deployment fails
+
+Open the failing deployment → *Building* log, and check in this order:
+
+- **`Environment variable not found: DATABASE_URL`** — the variable is missing for
+  that environment (Preview and Production are configured separately).
+- **`Cannot find module '../src/generated/prisma'`** — `postinstall` did not run.
+  That happens when the install command is overridden with something that skips
+  lifecycle scripts (`--ignore-scripts`); restore the default install command or add
+  `prisma generate` to the build command.
+- **`npm ci` errors about the lockfile** — `package-lock.json` is out of sync with
+  `package.json`; run `npm install` locally and commit the lockfile.
+- **Node version errors** — the project is still on Node 18; raise it to 20.x+.
+- **Type or lint errors** — reproduce locally with `npm run build`; the same build
+  runs on Vercel, so a clean local build means the failure is environment-specific.
+
+Serve over HTTPS so the app stays installable as a PWA — Vercel does this by default.
 
 ## Documentation
 

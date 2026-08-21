@@ -22,5 +22,11 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  // Static assets must stay outside the auth redirect: the manifest and the app
+  // icons are fetched by the browser/OS while signed out, and a redirect to
+  // /login makes them arrive as HTML — which is why an installed app showed no
+  // icon.
+  matcher: [
+    "/((?!api/auth|_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|webmanifest)$).*)",
+  ],
 };
