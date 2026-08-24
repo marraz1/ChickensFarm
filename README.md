@@ -76,16 +76,17 @@ sign in with **demo@chickensfarm.lt** / **password123**.
 
 ### Scripts
 
-| Command                     | What it does                                       |
-| --------------------------- | -------------------------------------------------- |
-| `npm run dev`               | Development server on port 3000                    |
-| `npm run build`             | Production build                                   |
-| `npm start`                 | Serve the production build                         |
-| `npm run lint`              | ESLint                                             |
-| `npm run db:seed`           | Seed demo data (`prisma/seed.ts`)                  |
-| `npx prisma migrate dev`    | Apply migrations locally and regenerate the client |
-| `npx prisma migrate deploy` | Apply migrations in production                     |
-| `npx prisma studio`         | Browse the database                                |
+| Command                     | What it does                                                |
+| --------------------------- | ----------------------------------------------------------- |
+| `npm run dev`               | Development server on port 3000                             |
+| `npm run build`             | Production build                                            |
+| `npm run vercel-build`      | What Vercel runs: migrates first on production, then builds |
+| `npm start`                 | Serve the production build                                  |
+| `npm run lint`              | ESLint                                                      |
+| `npm run db:seed`           | Seed demo data (`prisma/seed.ts`)                           |
+| `npx prisma migrate dev`    | Apply migrations locally and regenerate the client          |
+| `npx prisma migrate deploy` | Apply migrations in production                              |
+| `npx prisma studio`         | Browse the database                                         |
 
 ---
 
@@ -177,7 +178,14 @@ Setup, in order:
 2. Set `CRON_SECRET` and `APP_URL` in Vercel → Production, then deploy.
 3. Add the repository **secret** `CRON_SECRET` (same value) and the repository
    **variable** `APP_URL` under Settings → Secrets and variables → Actions.
+   `APP_URL` is the app's own origin — `https://example.vercel.app`, not a
+   vercel.com dashboard link, and **without a trailing slash**.
 4. Run the workflow once via **Run workflow** to verify end to end.
+
+The workflow prints the URL it calls and, on a non-2xx reply, says what the code
+usually means: `401` the two `CRON_SECRET` values differ, `404`/`308` `APP_URL` is
+wrong, `500` the migration has not been applied, `503` `CRON_SECRET` is missing on
+the deployment.
 
 Two operational notes: scheduled workflows only run on the default branch, and
 GitHub disables them after 60 days of repository inactivity — re-enable from the
@@ -271,16 +279,26 @@ Next.js on its own — there is no `vercel.json` and none is needed.
 
 ### Migrations
 
-Migrations do **not** run during the Vercel build — the build only runs
-`prisma generate` (via `postinstall`) and `next build`. After deploying a schema
-change, apply it yourself:
+**Production deployments apply migrations themselves.** The `vercel-build` script
+runs `prisma migrate deploy` before `next build`, but **only** when
+`VERCEL_ENV=production`. If the migration fails the build stops, so a deployment
+never goes live against a schema it does not have.
+
+Preview builds deliberately skip it: previews point at whatever database
+`DATABASE_URL` names, so they share production data unless you give previews their
+own Neon branch — and migrating from a preview would then rewrite production.
+
+`prisma migrate deploy` needs Neon's **unpooled** connection string. `DATABASE_URL`
+is already meant to be the unpooled one (see the table above), so nothing extra is
+required. If you ever switch `DATABASE_URL` to the pooled/pgbouncer URL, set
+`DIRECT_URL` to the unpooled one — the build prefers it when present.
+
+You can still apply a migration by hand, and you must do so the first time a new
+table is needed before the deployment that uses it:
 
 ```bash
 DATABASE_URL="<direct-neon-url>" npx prisma migrate deploy
 ```
-
-Preview deployments point at whatever database `DATABASE_URL` names, so they share
-production data unless you give previews their own Neon branch.
 
 ### If a deployment fails
 
