@@ -11,9 +11,14 @@ export type ActivityItem = {
 
 export async function getDashboardData(farmId: string) {
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const yearStart = new Date(now.getFullYear(), 0, 1);
-  const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+  const currentYear = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth();
+  // Boundaries are built in UTC because the date columns are `@db.Date`, which
+  // Prisma returns at exactly 00:00:00.000Z. A local-midnight boundary west of
+  // UTC lands *after* that, silently excluding records dated the 1st.
+  const monthStart = new Date(Date.UTC(currentYear, currentMonth, 1));
+  const yearStart = new Date(Date.UTC(currentYear, 0, 1));
+  const thirtyDaysAgo = new Date(Date.UTC(currentYear, currentMonth, now.getUTCDate() - 29));
 
   const [
     totalBirdsAgg,
@@ -26,6 +31,8 @@ export async function getDashboardData(farmId: string) {
     eggsConsumedTotalAgg,
     incomeThisMonthAgg,
     expensesThisMonthAgg,
+    incomeThisYearAgg,
+    expensesThisYearAgg,
     lossesLast30dAgg,
     recentCollections,
     recentLosses,
@@ -58,6 +65,16 @@ export async function getDashboardData(farmId: string) {
     }),
     prisma.expense.aggregate({
       where: { farmId, expenseDate: { gte: monthStart } },
+      _sum: { amount: true },
+    }),
+    // Same two sums over the whole calendar year, so the dashboard can show a
+    // year-to-date balance next to the monthly one.
+    prisma.eggSale.aggregate({
+      where: { farmId, saleDate: { gte: yearStart } },
+      _sum: { totalAmount: true },
+    }),
+    prisma.expense.aggregate({
+      where: { farmId, expenseDate: { gte: yearStart } },
       _sum: { amount: true },
     }),
     prisma.loss.aggregate({
@@ -129,7 +146,13 @@ export async function getDashboardData(farmId: string) {
     eggsRemaining,
     incomeThisMonth: Number(incomeThisMonthAgg._sum.totalAmount ?? 0),
     expensesThisMonth: Number(expensesThisMonthAgg._sum.amount ?? 0),
+    incomeThisYear: Number(incomeThisYearAgg._sum.totalAmount ?? 0),
+    expensesThisYear: Number(expensesThisYearAgg._sum.amount ?? 0),
     lossesLast30d: lossesLast30dAgg._sum.quantity ?? 0,
+    // Reported alongside the sums so the page labels the very same period the
+    // aggregates were built from, instead of re-deriving "now" itself.
+    currentMonth,
+    currentYear,
     activity,
   };
 }
