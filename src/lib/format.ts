@@ -50,3 +50,31 @@ export function formatPercent(ratio: number | null | undefined): string {
   if (ratio == null) return "—";
   return `${Math.round(ratio * 100)}%`;
 }
+
+// Hardcoded rather than derived from Intl: `Intl.DateTimeFormat("lt-LT", { month:
+// "long" })` yields a lowercase name and depends on the runtime's ICU data, while
+// these labels are used as headings. Same approach as src/lib/labels.ts.
+export const ltMonthNames = [
+  "Sausis",
+  "Vasaris",
+  "Kovas",
+  "Balandis",
+  "Gegužė",
+  "Birželis",
+  "Liepa",
+  "Rugpjūtis",
+  "Rugsėjis",
+  "Spalis",
+  "Lapkritis",
+  "Gruodis",
+] as const;
+
+/** 0-based month index → "Rugpjūtis". Out-of-range input returns "—". */
+export function formatMonthLT(monthIndex: number): string {
+  return ltMonthNames[monthIndex] ?? "—";
+}
+
+/** 0-based month index → "Rugpjūtis 2026". */
+export function formatMonthYearLT(year: number, monthIndex: number): string {
+  return `${formatMonthLT(monthIndex)} ${year}`;
+}

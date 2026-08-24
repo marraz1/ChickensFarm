@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
-import { ShoppingCart, Receipt, BarChart3, ChevronRight } from "lucide-react";
+import { ShoppingCart, Receipt, BarChart3, ChevronRight, TrendingUp } from "lucide-react";
 
 const LINKS = [
   { href: "/eggs/sales", label: "Kiaušinių pardavimai", icon: ShoppingCart },
   { href: "/expenses", label: "Išlaidos", icon: Receipt },
+  { href: "/finance/profit-loss", label: "Pelnas / Nuostoliai", icon: TrendingUp },
   { href: "/eggs/reports", label: "Kiaušinių ataskaita", icon: BarChart3 },
   { href: "/losses/reports", label: "Nuostolių ataskaita", icon: BarChart3 },
   { href: "/expenses/reports", label: "Išlaidų ataskaita", icon: BarChart3 },
