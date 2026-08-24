@@ -23,23 +23,27 @@ const timeZoneField = z
     }
   }, "Nežinoma laiko juosta");
 
+const messageField = z
+  .string()
+  .trim()
+  .min(1, "Įveskite priminimo tekstą")
+  .max(300, "Tekstas per ilgas (iki 300 simbolių)");
+
+// Optional: empty means the reminder goes to the account email.
+const emailField = z
+  .string()
+  .trim()
+  .email("Neteisingas el. pašto formatas")
+  .max(254)
+  .optional()
+  .or(z.literal(""));
+
 export const notificationSettingSchema = z
   .object({
     enabled: z.boolean(),
-    message: z
-      .string()
-      .trim()
-      .min(1, "Įveskite priminimo tekstą")
-      .max(300, "Tekstas per ilgas (iki 300 simbolių)"),
+    message: messageField,
     sendTime: z.string().regex(SEND_TIME_PATTERN, "Neteisingas laikas"),
-    // Optional: empty means the reminder goes to the account email.
-    email: z
-      .string()
-      .trim()
-      .email("Neteisingas el. pašto formatas")
-      .max(254)
-      .optional()
-      .or(z.literal("")),
+    email: emailField,
     timeZone: timeZoneField,
     // Independent rather than one enum: both channels can be on at once.
     emailEnabled: z.boolean(),
@@ -58,6 +62,28 @@ export const notificationSettingSchema = z
   });
 
 export type NotificationSettingInput = z.infer<typeof notificationSettingSchema>;
+
+// For the "send test now" button: the same message/email/channel fields, but
+// with no sendTime or timeZone — a test bypasses the schedule entirely, it
+// never touches lastRunOn, so there is nothing to be due.
+export const notificationTestSchema = z
+  .object({
+    message: messageField,
+    email: emailField,
+    emailEnabled: z.boolean(),
+    pushEnabled: z.boolean(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.emailEnabled && !value.pushEnabled) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["emailEnabled"],
+        message: "Pasirinkite bent vieną pranešimo būdą",
+      });
+    }
+  });
+
+export type NotificationTestInput = z.infer<typeof notificationTestSchema>;
 
 export const notificationSettingDefaults: NotificationSettingInput = {
   enabled: false,

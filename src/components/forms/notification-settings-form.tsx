@@ -43,6 +43,8 @@ export function NotificationSettingsForm({
   const [pushError, setPushError] = useState<string | null>(null);
   const [pushBusy, setPushBusy] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testBusy, setTestBusy] = useState(false);
 
   const {
     register,
@@ -67,6 +69,7 @@ export function NotificationSettingsForm({
   async function onPushToggle(next: boolean) {
     setPushError(null);
     setTestResult(null);
+    setTestError(null);
 
     if (!next) {
       setValue("pushEnabled", false, { shouldDirty: true });
@@ -92,16 +95,52 @@ export function NotificationSettingsForm({
     }
   }
 
+  /**
+   * Tests whichever channels are currently on, using the message/address the
+   * user has typed right now — not what was last saved. Bypasses the schedule
+   * entirely (the API route never touches lastRunOn), so this can never
+   * accidentally mark today as handled and suppress the real reminder.
+   */
   async function onSendTest() {
     setTestResult(null);
-    setPushError(null);
-    const res = await fetch("/api/push/test", { method: "POST" });
-    if (!res.ok) {
+    setTestError(null);
+    setTestBusy(true);
+    try {
+      const res = await fetch("/api/notifications/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: watch("message"),
+          email: watch("email"),
+          emailEnabled: watch("emailEnabled"),
+          pushEnabled: watch("pushEnabled"),
+        }),
+      });
       const body = await res.json().catch(() => null);
-      setPushError(body?.error ?? "Nepavyko išsiųsti bandomojo pranešimo.");
-      return;
+      if (!res.ok) {
+        setTestError(body?.error ?? "Nepavyko išsiųsti bandomojo pranešimo.");
+        return;
+      }
+
+      const parts: string[] = [];
+      if (body.email?.attempted) {
+        parts.push(
+          body.email.sent
+            ? "el. laiškas išsiųstas"
+            : `el. laiškas nepavyko (${body.email.reason ?? "nežinoma klaida"})`,
+        );
+      }
+      if (body.push?.attempted) {
+        parts.push(
+          body.push.sent > 0
+            ? "pranešimas telefone išsiųstas"
+            : `pranešimas telefone nepavyko (${body.push.reason ?? "nežinoma klaida"})`,
+        );
+      }
+      setTestResult(parts.length > 0 ? `${parts.join("; ")}.` : null);
+    } finally {
+      setTestBusy(false);
     }
-    setTestResult("Bandomasis pranešimas išsiųstas.");
   }
 
   async function onSubmit(data: NotificationSettingInput) {
@@ -203,11 +242,18 @@ export function NotificationSettingsForm({
           <p className="text-sm text-destructive">{errors.emailEnabled.message}</p>
         )}
         {pushError && <p className="text-sm text-destructive">{pushError}</p>}
+        {testError && <p className="text-sm text-destructive">{testError}</p>}
         {testResult && <p className="text-sm text-emerald-600">{testResult}</p>}
 
-        {pushEnabled && (
-          <Button type="button" variant="outline" className="h-11" onClick={onSendTest}>
-            Siųsti bandomąjį
+        {(emailEnabled || pushEnabled) && (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            disabled={testBusy}
+            onClick={onSendTest}
+          >
+            {testBusy ? "Siunčiama..." : "Siųsti bandomąjį"}
           </Button>
         )}
 
