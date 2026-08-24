@@ -41,19 +41,18 @@ export const notificationSettingSchema = z
       .optional()
       .or(z.literal("")),
     timeZone: timeZoneField,
-    // The full union is kept so the type lines up with the Prisma enum that the
-    // profile page reads back.
-    channel: z.enum(["EMAIL", "PUSH"]),
+    // Independent rather than one enum: both channels can be on at once.
+    emailEnabled: z.boolean(),
+    pushEnabled: z.boolean(),
   })
-  // PUSH exists in the database enum so phase 2 needs no migration, but nothing
-  // can deliver it yet — reject it here rather than storing an unsendable
-  // channel. Done at the object level so `channel` keeps its union type.
+  // Reminders on with nowhere to send them is a silent no-op, and the user would
+  // have no way to tell it from a broken schedule.
   .superRefine((value, ctx) => {
-    if (value.channel !== "EMAIL") {
+    if (value.enabled && !value.emailEnabled && !value.pushEnabled) {
       ctx.addIssue({
         code: "custom",
-        path: ["channel"],
-        message: "Pranešimai telefone dar neveikia",
+        path: ["emailEnabled"],
+        message: "Pasirinkite bent vieną pranešimo būdą",
       });
     }
   });
@@ -66,5 +65,6 @@ export const notificationSettingDefaults: NotificationSettingInput = {
   sendTime: DEFAULT_SEND_TIME,
   email: "",
   timeZone: DEFAULT_TIME_ZONE,
-  channel: "EMAIL",
+  emailEnabled: true,
+  pushEnabled: false,
 };

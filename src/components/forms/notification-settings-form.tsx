@@ -4,13 +4,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch, SwitchThumb } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
 import { DEFAULT_TIME_ZONE } from "@/lib/notification-schedule";
+import { PushSetupError, disablePush, enablePush } from "@/lib/push-client";
 import {
   notificationSettingSchema,
   notificationSettingDefaults,
@@ -29,14 +28,21 @@ export function NotificationSettingsForm({
   defaultValues,
   lastSentAt,
   accountEmail,
+  vapidPublicKey,
 }: {
   defaultValues?: Partial<NotificationSettingInput>;
   lastSentAt?: string | null;
   accountEmail?: string;
+  /** Passed from the server so the key never has to become a NEXT_PUBLIC_ var.
+   *  Null when VAPID is unconfigured — the push toggle then stays disabled. */
+  vapidPublicKey?: string | null;
 }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   const {
     register,
@@ -50,7 +56,53 @@ export function NotificationSettingsForm({
   });
 
   const enabled = watch("enabled");
-  const channel = watch("channel");
+  const emailEnabled = watch("emailEnabled");
+  const pushEnabled = watch("pushEnabled");
+
+  /**
+   * Browser setup runs before the field flips, and the field is only set once it
+   * succeeded — otherwise the UI would claim push is on while no subscription
+   * exists, and the user would wait for notifications that can never arrive.
+   */
+  async function onPushToggle(next: boolean) {
+    setPushError(null);
+    setTestResult(null);
+
+    if (!next) {
+      setValue("pushEnabled", false, { shouldDirty: true });
+      await disablePush().catch(() => {});
+      return;
+    }
+
+    if (!vapidPublicKey) {
+      setPushError("Pranešimai telefone nesukonfigūruoti serveryje.");
+      return;
+    }
+
+    setPushBusy(true);
+    try {
+      await enablePush(vapidPublicKey);
+      setValue("pushEnabled", true, { shouldDirty: true });
+    } catch (err) {
+      setPushError(
+        err instanceof PushSetupError ? err.message : "Nepavyko įjungti pranešimų telefone.",
+      );
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function onSendTest() {
+    setTestResult(null);
+    setPushError(null);
+    const res = await fetch("/api/push/test", { method: "POST" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      setPushError(body?.error ?? "Nepavyko išsiųsti bandomojo pranešimo.");
+      return;
+    }
+    setTestResult("Bandomasis pranešimas išsiųstas.");
+  }
 
   async function onSubmit(data: NotificationSettingInput) {
     setServerError(null);
@@ -121,33 +173,48 @@ export function NotificationSettingsForm({
         </p>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label>Pranešimo tipas</Label>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setValue("channel", "EMAIL", { shouldDirty: true })}
-            className={cn(
-              "flex h-11 items-center justify-center gap-2 rounded-lg border text-sm font-medium",
-              channel === "EMAIL"
-                ? "border-primary bg-primary text-primary-foreground"
-                : "text-muted-foreground",
-            )}
+      <div className="flex flex-col gap-3">
+        <Label>Pranešimo būdas</Label>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm">El. paštu</span>
+          <Switch
+            id="emailEnabled"
+            checked={emailEnabled}
+            onCheckedChange={(checked) => setValue("emailEnabled", checked, { shouldDirty: true })}
           >
-            <Mail size={16} aria-hidden />
-            El. paštas
-          </button>
-          <button
-            type="button"
-            disabled
-            className="flex h-11 cursor-not-allowed items-center justify-center gap-2 rounded-lg border text-sm font-medium text-muted-foreground opacity-50"
-          >
-            <Smartphone size={16} aria-hidden />
-            Telefone
-          </button>
+            <SwitchThumb />
+          </Switch>
         </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm">Telefone</span>
+          <Switch
+            id="pushEnabled"
+            checked={pushEnabled}
+            disabled={pushBusy || !vapidPublicKey}
+            onCheckedChange={onPushToggle}
+          >
+            <SwitchThumb />
+          </Switch>
+        </div>
+
+        {errors.emailEnabled && (
+          <p className="text-sm text-destructive">{errors.emailEnabled.message}</p>
+        )}
+        {pushError && <p className="text-sm text-destructive">{pushError}</p>}
+        {testResult && <p className="text-sm text-emerald-600">{testResult}</p>}
+
+        {pushEnabled && (
+          <Button type="button" variant="outline" className="h-11" onClick={onSendTest}>
+            Siųsti bandomąjį
+          </Button>
+        )}
+
         <p className="text-xs text-muted-foreground">
-          Pranešimai telefone bus galimi vėliau — įsidiegus programėlę į telefono pradžios ekraną.
+          {vapidPublicKey
+            ? "Pranešimai telefone veikia įsidiegus programėlę į pradžios ekraną."
+            : "Pranešimai telefone šiuo metu neprieinami."}
         </p>
       </div>
 

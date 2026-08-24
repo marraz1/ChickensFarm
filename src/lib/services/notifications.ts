@@ -31,7 +31,8 @@ export async function saveNotificationSetting(
     // single check everywhere downstream.
     email: input.email?.trim() || null,
     timeZone: input.timeZone,
-    channel: input.channel,
+    emailEnabled: input.emailEnabled,
+    pushEnabled: input.pushEnabled,
     ...(stampToday ? { lastRunOn: stampToday } : {}),
   };
 

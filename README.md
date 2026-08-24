@@ -73,6 +73,9 @@ sign in with **demo@chickensfarm.lt** / **password123**.
 | `BLOB_READ_WRITE_TOKEN` | no       | Vercel Blob token for mother-hen photo upload.                                                                                             |
 | `CRON_SECRET`           | no       | Shared token for `POST /api/cron/reminders`. Unset means the endpoint returns 503 and no reminders are sent.                               |
 | `APP_URL`               | no       | Absolute base URL for links inside reminder emails. Falls back to `VERCEL_PROJECT_PRODUCTION_URL`; if neither is set, the link is omitted. |
+| `VAPID_PUBLIC_KEY`      | no       | Web-push key pair, self-generated (see `.env.example`). Unset means the phone toggle is disabled and no push is sent.                      |
+| `VAPID_PRIVATE_KEY`     | no       | The private half. Never sent to the browser.                                                                                               |
+| `VAPID_SUBJECT`         | no       | Contact URI for the push services — `mailto:` or `https://`. Falls back to `APP_URL` when that is https.                                   |
 
 ### Scripts
 
@@ -147,16 +150,14 @@ installing only changes how the app is launched and framed.
 
 ### Current limitations
 
-The app is installable but not yet offline-capable: there is **no service worker**,
-so a connection is required and there is no background sync. Chromium's automatic
-install prompt normally expects a service worker with a fetch handler, so on some
-Chrome versions the menu shows _Add to Home screen_ (a shortcut) rather than
-_Install app_. The manual steps above work regardless.
+There is now a service worker (`public/sw.js`), but it handles **push only** —
+`push`, `notificationclick`, and a passthrough `fetch` listener. It does **no
+caching**, so the app is still online-only and has no background sync.
 
-The same gap is why reminders are **email only** for now. Web push additionally
-needs a service worker with `push`/`notificationclick` handlers, VAPID keys and
-stored subscriptions; on iOS it works only once the app has been added to the
-home screen. The settings screen already shows the phone option, disabled.
+Note the install-prompt wording is not something the service worker fixes:
+current Chromium does not require a fetch handler to offer _Install app_, so if
+your browser shows _Add to Home screen_ instead, the cause lies elsewhere. The
+manual steps above work regardless.
 
 ## Daily reminders
 
@@ -164,6 +165,22 @@ A user can configure one daily reminder at **Profilis → Pranešimai**: on/off,
 message text, and the time of day in their own time zone. It is sent only if no
 egg collection has been recorded that day, in any farm the user belongs to — so
 entering data on time means silence.
+
+Two delivery channels can be on independently — **El. paštu** and **Telefone** —
+so a reminder can arrive as both a notification and a durable email record.
+
+Push is **per device, not per account**. The Telefone toggle registers the
+browser you are holding; a phone and a laptop are two separate registrations, and
+turning the toggle on again on a second device adds it rather than moving it.
+Because of that, the toggle also persists the preference immediately rather than
+waiting for **Išsaugoti** — otherwise granting permission and then navigating away
+would leave push silently off. On iOS this only works once the app has been added
+to the home screen (16.4+); the toggle explains that when it detects it.
+
+Dead registrations prune themselves: a push service answering `404`/`410` means
+the app was uninstalled or site data cleared, and that row is deleted. Nothing
+else deletes a subscription — notably `403`, which is what a mis-rotated VAPID key
+returns, is treated as a bug to investigate rather than a dead device.
 
 Delivery is driven by `.github/workflows/reminders.yml`, which POSTs to
 `/api/cron/reminders` every 15 minutes with `Authorization: Bearer $CRON_SECRET`.
@@ -186,6 +203,20 @@ The workflow prints the URL it calls and, on a non-2xx reply, says what the code
 usually means: `401` the two `CRON_SECRET` values differ, `404`/`308` `APP_URL` is
 wrong, `500` the migration has not been applied, `503` `CRON_SECRET` is missing on
 the deployment.
+
+For push, additionally set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and
+`VAPID_SUBJECT` in Vercel (see `.env.example` for the offline generation command).
+Changing them needs a redeploy but **not** a rebuild — the public key is read per
+request and passed to the client, never inlined into the bundle.
+
+Verifying push needs a real device; the checklist:
+
+1. Install the PWA to the home screen — required on iOS, optional elsewhere.
+2. Profilis → Pranešimai → turn **Telefone** on and accept the prompt.
+3. Press **Siųsti bandomąjį** — a notification should arrive within seconds.
+4. Tap it: an already-open app should come to the front rather than opening a
+   second window, landing on the egg-collection form.
+5. Turn the toggle off and confirm the test button no longer delivers.
 
 Two operational notes: scheduled workflows only run on the default branch, and
 GitHub disables them after 60 days of repository inactivity — re-enable from the

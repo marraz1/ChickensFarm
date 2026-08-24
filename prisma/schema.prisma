@@ -56,11 +56,6 @@ enum BirdCategory {
   OTHER // kita
 }
 
-enum NotificationChannel {
-  EMAIL
-  PUSH // Phase 2 (web push): stored, but rejected by validation until it works.
-}
-
 enum BirdGroupEventType {
   INITIAL
   MANUAL_ADJUSTMENT
@@ -79,6 +74,7 @@ model User {
   resetTokens         PasswordResetToken[]
   birdGroupEvents     BirdGroupEvent[]     @relation("EventCreatedBy")
   notificationSetting NotificationSetting?
+  pushSubscriptions   PushSubscription[]
 
   @@map("users")
 }
@@ -95,7 +91,10 @@ model NotificationSetting {
   message    String              @db.VarChar(300)
   sendTime   String              @db.VarChar(5) // "HH:mm" in the user's own time zone
   timeZone   String              @default("Europe/Vilnius") // IANA name
-  channel    NotificationChannel @default(EMAIL)
+  // Channels are independent rather than one enum: a reminder is worth having in
+  // both places — push is instant but easy to swipe away, email is the record.
+  emailEnabled Boolean           @default(true)
+  pushEnabled  Boolean           @default(false)
   // Where reminders go. Null means "wherever the account email points", which
   // keeps existing rows working and keeps following the account if it changes —
   // a copy of the address would silently go stale.
@@ -111,6 +110,26 @@ model NotificationSetting {
   updatedAt  DateTime            @updatedAt
 
   @@map("notification_settings")
+}
+
+// One row per browser/device, not per user: the same account installed on a
+// phone and a laptop holds two subscriptions and both should ring.
+model PushSubscription {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The push service URL identifies the device. Unique so a browser that
+  // re-subscribes updates its row instead of accumulating duplicates.
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  // Set on every successful delivery, so a stale device is visible.
+  lastUsedAt DateTime?
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 model PasswordResetToken {
