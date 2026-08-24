@@ -31,7 +31,12 @@ export const config = {
   // session, and a 302 to /login would look like a success to curl. Those routes
   // authenticate themselves with CRON_SECRET. Note this belongs here rather than
   // in PUBLIC_PATHS, which also redirects signed-in users to "/" — wrong for an API.
+  //
+  // sw.js is excluded for the same reason as the manifest: the browser fetches
+  // it before any session exists, and a redirect would hand back /login HTML,
+  // which fails registration with a MIME/type error rather than anything
+  // obviously auth-related. Only that exact path is opened, not all .js.
   matcher: [
-    "/((?!api/auth|api/cron|_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|webmanifest)$).*)",
+    "/((?!api/auth|api/cron|sw\\.js|_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|webmanifest)$).*)",
   ],
 };

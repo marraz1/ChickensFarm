@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { sendReminderEmail } from "@/lib/email";
+import { reminderPayload, sendPushToUser } from "@/lib/push";
 import { dateOnlyUtc, getLocalNow, isDue } from "@/lib/notification-schedule";
+import { resolveDeliveryOutcome, type ChannelAttempt } from "@/lib/push-utils";
 
 /** Upper bound per run. The lateness window makes a partial batch self-healing:
  *  whatever is left over is still due on the next tick. */
@@ -17,9 +19,9 @@ export type ReminderBatchResult = {
 
 export async function runReminderBatch(now: Date = new Date()): Promise<ReminderBatchResult> {
   const settings = await prisma.notificationSetting.findMany({
-    // channel is filtered here too, so a PUSH row could never be picked up by
-    // the email sender if one ever got stored.
-    where: { enabled: true, channel: "EMAIL" },
+    // A row with both channels off would be claimed and then deliver nothing,
+    // burning the day silently — so it is never picked up in the first place.
+    where: { enabled: true, OR: [{ emailEnabled: true }, { pushEnabled: true }] },
     take: MAX_PER_RUN,
     select: {
       id: true,
@@ -29,6 +31,8 @@ export async function runReminderBatch(now: Date = new Date()): Promise<Reminder
       timeZone: true,
       lastRunOn: true,
       email: true,
+      emailEnabled: true,
+      pushEnabled: true,
       user: { select: { email: true } },
     },
   });
@@ -83,16 +87,24 @@ export async function runReminderBatch(now: Date = new Date()): Promise<Reminder
           if (!hasFarm.has(setting.userId)) return "skipped" as const;
           if (hasData.has(setting.userId)) return "skipped" as const;
 
-          // The configured address wins; otherwise fall back to the account one.
-          const recipient = setting.email ?? setting.user.email;
-          if (!recipient) return "skipped" as const;
+          // Both channels are attempted independently. The day is already
+          // claimed, so one failing must not abort the other — a push outage
+          // should never cost the user their email.
+          const [emailAttempt, pushAttempt] = await Promise.all([
+            attemptEmail(setting),
+            attemptPush(setting),
+          ]);
 
-          await sendReminderEmail(recipient, setting.message);
-          await prisma.notificationSetting.update({
-            where: { id: setting.id },
-            data: { lastSentAt: now },
-          });
-          return "sent" as const;
+          const outcome = resolveDeliveryOutcome(emailAttempt, pushAttempt);
+          if (outcome === "sent") {
+            // Only on a real delivery, so "Paskutinis priminimas" on the settings
+            // screen keeps telling the truth and a dead channel stays noticeable.
+            await prisma.notificationSetting.update({
+              where: { id: setting.id },
+              data: { lastSentAt: now },
+            });
+          }
+          return outcome;
         }),
       );
 
@@ -101,12 +113,51 @@ export async function runReminderBatch(now: Date = new Date()): Promise<Reminder
           failed += 1;
           console.error("[reminders] send failed", result.reason);
         } else if (result.value === "sent") sent += 1;
+        else if (result.value === "failed") failed += 1;
         else skipped += 1;
       }
     }
   }
 
   return { checked: settings.length, due: due.length, sent, skipped, failed };
+}
+
+type DueSetting = {
+  id: string;
+  userId: string;
+  message: string;
+  email: string | null;
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  user: { email: string | null };
+};
+
+async function attemptEmail(setting: DueSetting): Promise<ChannelAttempt> {
+  if (!setting.emailEnabled) return "not-attempted";
+  // The configured address wins; otherwise fall back to the account one.
+  const recipient = setting.email ?? setting.user.email;
+  if (!recipient) return "not-attempted";
+  try {
+    await sendReminderEmail(recipient, setting.message);
+    return "delivered";
+  } catch (err) {
+    console.error("[reminders] email failed", { settingId: setting.id, err });
+    return "failed";
+  }
+}
+
+async function attemptPush(setting: DueSetting): Promise<ChannelAttempt> {
+  if (!setting.pushEnabled) return "not-attempted";
+  try {
+    const result = await sendPushToUser(setting.userId, reminderPayload(setting.message));
+    if (result.sent > 0) return "delivered";
+    // Zero devices is not an error — the user uninstalled the app, or VAPID is
+    // unconfigured. Only a device that exists and rejected the push counts.
+    return result.failed > 0 ? "failed" : "not-attempted";
+  } catch (err) {
+    console.error("[reminders] push failed", { settingId: setting.id, err });
+    return "failed";
+  }
 }
 
 /**

@@ -3,6 +3,7 @@ import { getNotificationSetting } from "@/lib/services/notifications";
 import { PageHeader } from "@/components/layout/page-header";
 import { NotificationSettingsForm } from "@/components/forms/notification-settings-form";
 import { formatRelativeLT } from "@/lib/format";
+import { pushPublicKey } from "@/lib/push";
 
 export default async function NotificationSettingsPage() {
   const user = await requireUser();
@@ -22,12 +23,16 @@ export default async function NotificationSettingsPage() {
                   sendTime: setting.sendTime,
                   email: setting.email ?? "",
                   timeZone: setting.timeZone,
-                  channel: setting.channel,
+                  emailEnabled: setting.emailEnabled,
+                  pushEnabled: setting.pushEnabled,
                 }
               : undefined
           }
           lastSentAt={setting?.lastSentAt ? formatRelativeLT(setting.lastSentAt) : null}
           accountEmail={user.email ?? undefined}
+          // Read per request on the server, so the key never becomes a
+          // NEXT_PUBLIC_ variable baked into the client bundle at build time.
+          vapidPublicKey={pushPublicKey()}
         />
       </div>
     </div>
