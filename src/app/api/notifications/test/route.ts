@@ -5,8 +5,30 @@ import { notificationTestSchema } from "@/lib/validation/notifications";
 import { isEmailConfigured, sendReminderEmail } from "@/lib/email";
 import { pushPublicKey, reminderPayload, sendPushToUser } from "@/lib/push";
 
-type ChannelResult = { attempted: boolean; sent: boolean; reason?: string };
+type ChannelResult = {
+  attempted: boolean;
+  sent: boolean;
+  reason?: string;
+  /** Echoed back so the user can see WHERE it tried to send — the usual cause of
+   *  a rejection is the address, not the configuration. */
+  to?: string;
+};
 type PushChannelResult = { attempted: boolean; sent: number; reason?: string };
+
+/**
+ * The provider's own words, trimmed to something a person can read in a toast.
+ *
+ * Worth surfacing rather than flattening to "send failed": Resend's free tier
+ * refuses any recipient other than the account owner while the sender is
+ * onboarding@resend.dev, and its message names both the restriction and the
+ * allowed address — which is the entire diagnosis, and unguessable without it.
+ */
+function describeSendError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const cleaned = raw.replace(/^Resend failed:\s*/, "").trim();
+  if (!cleaned) return "siuntimo klaida";
+  return cleaned.length > 200 ? `${cleaned.slice(0, 199)}…` : cleaned;
+}
 
 /**
  * Sends a test notification through whichever channels the caller has on,
@@ -41,9 +63,15 @@ export async function POST(req: Request) {
         } else {
           try {
             await sendReminderEmail(recipient, message);
-            emailResult = { attempted: true, sent: true };
-          } catch {
-            emailResult = { attempted: true, sent: false, reason: "siuntimo klaida" };
+            emailResult = { attempted: true, sent: true, to: recipient };
+          } catch (err) {
+            console.error("[notifications/test] email failed", { to: recipient, err });
+            emailResult = {
+              attempted: true,
+              sent: false,
+              reason: describeSendError(err),
+              to: recipient,
+            };
           }
         }
       }

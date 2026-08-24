@@ -124,10 +124,13 @@ export function NotificationSettingsForm({
 
       const parts: string[] = [];
       if (body.email?.attempted) {
+        // The address is included on failure because a rejection is far more
+        // often about who it was sent to than about the configuration.
+        const to = body.email.to ? ` → ${body.email.to}` : "";
         parts.push(
           body.email.sent
-            ? "el. laiškas išsiųstas"
-            : `el. laiškas nepavyko (${body.email.reason ?? "nežinoma klaida"})`,
+            ? `el. laiškas išsiųstas${to}`
+            : `el. laiškas nepavyko${to}: ${body.email.reason ?? "nežinoma klaida"}`,
         );
       }
       if (body.push?.attempted) {
