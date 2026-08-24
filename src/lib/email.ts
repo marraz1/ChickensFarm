@@ -3,6 +3,12 @@ import { escapeHtml, escapeHtmlWithBreaks } from "@/lib/html";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
+/** Mirrors pushPublicKey() in src/lib/push.ts — lets a caller tell "nothing is
+ *  configured" apart from "the send itself failed". */
+export function isEmailConfigured(): boolean {
+  return resend !== null;
+}
+
 /**
  * Absolute base URL of the deployment, for links inside emails.
  *
