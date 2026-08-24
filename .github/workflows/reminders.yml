@@ -21,19 +21,36 @@ jobs:
     steps:
       - name: Trigger reminder batch
         env:
-          ENDPOINT: ${{ vars.APP_URL }}/api/cron/reminders
+          APP_URL: ${{ vars.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          if [ -z "${{ vars.APP_URL }}" ]; then
+          if [ -z "$APP_URL" ]; then
             echo "::error::Repository variable APP_URL is not set"
             exit 1
           fi
+          # A trailing slash in the variable would build ".../api/cron/reminders"
+          # with a doubled slash, which Next.js answers with a 308 redirect that
+          # curl does not follow by default — so the job failed on a typo.
+          BASE=$(printf '%s' "$APP_URL" | sed 's:/*$::')
+          ENDPOINT="$BASE/api/cron/reminders"
+          echo "POST $ENDPOINT"
+          # Follow redirects but keep POST: curl preserves the method on 307/308 by
+          # itself, and --post30{1,2,3} covers the older codes. It also drops the
+          # auth header on a cross-host redirect, so a stray one fails loudly as
+          # 401 instead of leaking the secret.
           code=$(curl -sS -o response.json -w '%{http_code}' \
             --max-time 120 --retry 2 --retry-all-errors \
+            --location --post301 --post302 --post303 \
             -X POST "$ENDPOINT" \
             -H "Authorization: Bearer $CRON_SECRET")
           cat response.json; echo
           if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
             echo "::error::Reminder endpoint returned HTTP $code"
+            case "$code" in
+              401) echo "::error::CRON_SECRET differs between the GitHub secret and Vercel" ;;
+              404|308) echo "::error::Check the APP_URL variable — it must be the app origin, e.g. https://example.vercel.app" ;;
+              500) echo "::error::Server error — most likely the database migration has not been applied (npx prisma migrate deploy)" ;;
+              503) echo "::error::CRON_SECRET is not set on the deployment" ;;
+            esac
             exit 1
           fi
