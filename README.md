@@ -12,16 +12,16 @@ quick entry, and screens that stay usable with one hand in a coop.
 
 ## What it does
 
-| Module | Screens | What you track |
-| --- | --- | --- |
-| **Dashboard** | `/` | Bird count by type, egg balance, monthly income vs. expenses, active incubation cycles, latest activity |
-| **Birds** | `/birds`, `/bird-groups`, `/breeds` | Bird groups by category and sex, breeds, group events, growth |
-| **Eggs** | `/eggs/collections`, `/eggs/sales`, `/eggs/consumptions`, `/eggs/reports` | Daily collections with quality, sales, home consumption, period reports |
-| **Incubation** | `/incubation` | Incubation cycles, candling, hatch results, growth logs, finishing a cycle |
-| **Mother hens** | `/mother-hens` | Broody hens, their logs and photos |
-| **Losses** | `/losses`, `/losses/reports` | Losses by reason, with reporting |
-| **Finance** | `/finance`, `/expenses`, `/expenses/reports` | Expenses by category, income from egg sales, balance |
-| **Farms & profile** | `/farms`, `/profile` | Multiple farms, farm settings, members and roles |
+| Module              | Screens                                                                   | What you track                                                                                          |
+| ------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Dashboard**       | `/`                                                                       | Bird count by type, egg balance, monthly income vs. expenses, active incubation cycles, latest activity |
+| **Birds**           | `/birds`, `/bird-groups`, `/breeds`                                       | Bird groups by category and sex, breeds, group events, growth                                           |
+| **Eggs**            | `/eggs/collections`, `/eggs/sales`, `/eggs/consumptions`, `/eggs/reports` | Daily collections with quality, sales, home consumption, period reports                                 |
+| **Incubation**      | `/incubation`                                                             | Incubation cycles, candling, hatch results, growth logs, finishing a cycle                              |
+| **Mother hens**     | `/mother-hens`                                                            | Broody hens, their logs and photos                                                                      |
+| **Losses**          | `/losses`, `/losses/reports`                                              | Losses by reason, with reporting                                                                        |
+| **Finance**         | `/finance`, `/expenses`, `/expenses/reports`                              | Expenses by category, income from egg sales, balance                                                    |
+| **Farms & profile** | `/farms`, `/profile`                                                      | Multiple farms, farm settings, members and roles                                                        |
 
 Authentication is email + password with password reset by email.
 
@@ -64,26 +64,28 @@ sign in with **demo@chickensfarm.lt** / **password123**.
 
 ### Environment variables
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `DATABASE_URL` | yes | Neon Postgres connection string. Use the **unpooled/direct** URL so `prisma migrate` works reliably. |
-| `AUTH_SECRET` | yes | Auth.js signing secret — generate with `openssl rand -base64 32`. |
-| `RESEND_API_KEY` | no | Sends password-reset email. Unset in development, reset links are printed to the server console instead. |
-| `EMAIL_FROM` | no | Sender address for those emails. |
-| `BLOB_READ_WRITE_TOKEN` | no | Vercel Blob token for mother-hen photo upload. |
+| Variable                | Required | Purpose                                                                                                                                    |
+| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`          | yes      | Neon Postgres connection string. Use the **unpooled/direct** URL so `prisma migrate` works reliably.                                       |
+| `AUTH_SECRET`           | yes      | Auth.js signing secret — generate with `openssl rand -base64 32`.                                                                          |
+| `RESEND_API_KEY`        | no       | Sends password-reset email. Unset in development, reset links are printed to the server console instead.                                   |
+| `EMAIL_FROM`            | no       | Sender address for those emails.                                                                                                           |
+| `BLOB_READ_WRITE_TOKEN` | no       | Vercel Blob token for mother-hen photo upload.                                                                                             |
+| `CRON_SECRET`           | no       | Shared token for `POST /api/cron/reminders`. Unset means the endpoint returns 503 and no reminders are sent.                               |
+| `APP_URL`               | no       | Absolute base URL for links inside reminder emails. Falls back to `VERCEL_PROJECT_PRODUCTION_URL`; if neither is set, the link is omitted. |
 
 ### Scripts
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Development server on port 3000 |
-| `npm run build` | Production build |
-| `npm start` | Serve the production build |
-| `npm run lint` | ESLint |
-| `npm run db:seed` | Seed demo data (`prisma/seed.ts`) |
-| `npx prisma migrate dev` | Apply migrations locally and regenerate the client |
-| `npx prisma migrate deploy` | Apply migrations in production |
-| `npx prisma studio` | Browse the database |
+| Command                     | What it does                                       |
+| --------------------------- | -------------------------------------------------- |
+| `npm run dev`               | Development server on port 3000                    |
+| `npm run build`             | Production build                                   |
+| `npm start`                 | Serve the production build                         |
+| `npm run lint`              | ESLint                                             |
+| `npm run db:seed`           | Seed demo data (`prisma/seed.ts`)                  |
+| `npx prisma migrate dev`    | Apply migrations locally and regenerate the client |
+| `npx prisma migrate deploy` | Apply migrations in production                     |
+| `npx prisma studio`         | Browse the database                                |
 
 ---
 
@@ -147,21 +149,53 @@ installing only changes how the app is launched and framed.
 The app is installable but not yet offline-capable: there is **no service worker**,
 so a connection is required and there is no background sync. Chromium's automatic
 install prompt normally expects a service worker with a fetch handler, so on some
-Chrome versions the menu shows *Add to Home screen* (a shortcut) rather than
-*Install app*. The manual steps above work regardless.
+Chrome versions the menu shows _Add to Home screen_ (a shortcut) rather than
+_Install app_. The manual steps above work regardless.
+
+The same gap is why reminders are **email only** for now. Web push additionally
+needs a service worker with `push`/`notificationclick` handlers, VAPID keys and
+stored subscriptions; on iOS it works only once the app has been added to the
+home screen. The settings screen already shows the phone option, disabled.
+
+## Daily reminders
+
+A user can configure one daily reminder at **Profilis → Pranešimai**: on/off, the
+message text, and the time of day in their own time zone. It is sent only if no
+egg collection has been recorded that day, in any farm the user belongs to — so
+entering data on time means silence.
+
+Delivery is driven by `.github/workflows/reminders.yml`, which POSTs to
+`/api/cron/reminders` every 15 minutes with `Authorization: Bearer $CRON_SECRET`.
+GitHub Actions is used rather than Vercel Cron because Vercel's Hobby plan only
+allows a once-per-day schedule. The schedule runs in UTC; per-user local time is
+resolved by the app, and a reminder is delivered up to 2 hours late to absorb
+scheduler drift, after which it is skipped until the next day.
+
+Setup, in order:
+
+1. `npx prisma migrate deploy` (the `notification_settings` table).
+2. Set `CRON_SECRET` and `APP_URL` in Vercel → Production, then deploy.
+3. Add the repository **secret** `CRON_SECRET` (same value) and the repository
+   **variable** `APP_URL` under Settings → Secrets and variables → Actions.
+4. Run the workflow once via **Run workflow** to verify end to end.
+
+Two operational notes: scheduled workflows only run on the default branch, and
+GitHub disables them after 60 days of repository inactivity — re-enable from the
+Actions tab. The settings screen shows _Paskutinis priminimas_, which is the
+easiest way to notice that the schedule has stopped.
 
 ---
 
 ## Icons and branding
 
-| File | Used for |
-| --- | --- |
-| `src/app/favicon.ico` | Browser tab, bookmarks — multi-size ICO (16/24/32/48/64) |
-| `src/app/icon.png` | Tab icon via the Next.js `icon` file convention |
-| `src/app/apple-icon.png` | iOS home-screen icon (180×180) |
-| `public/icon-192.png`, `public/icon-512.png` | Manifest icons for installed apps |
-| `public/icon-maskable-512.png` | Android maskable icon — the bird sits inside the 80% safe zone |
-| `src/app/manifest.ts` | Web manifest served at `/manifest.webmanifest` |
+| File                                         | Used for                                                       |
+| -------------------------------------------- | -------------------------------------------------------------- |
+| `src/app/favicon.ico`                        | Browser tab, bookmarks — multi-size ICO (16/24/32/48/64)       |
+| `src/app/icon.png`                           | Tab icon via the Next.js `icon` file convention                |
+| `src/app/apple-icon.png`                     | iOS home-screen icon (180×180)                                 |
+| `public/icon-192.png`, `public/icon-512.png` | Manifest icons for installed apps                              |
+| `public/icon-maskable-512.png`               | Android maskable icon — the bird sits inside the 80% safe zone |
+| `src/app/manifest.ts`                        | Web manifest served at `/manifest.webmanifest`                 |
 
 To swap the artwork, replace these files at the same sizes. Next.js links them
 automatically from the file names — no `<link>` tags to edit. Keep a maskable
@@ -209,20 +243,20 @@ Next.js on its own — there is no `vercel.json` and none is needed.
 ### One-time setup
 
 1. **Import the repository** in Vercel (New Project → import from GitHub). Framework
-   preset *Next.js*, root directory `./`, build command and output left on their
+   preset _Next.js_, root directory `./`, build command and output left on their
    defaults.
-2. **Set the Node.js version** to 20.x or newer in *Project Settings → General*.
+2. **Set the Node.js version** to 20.x or newer in _Project Settings → General_.
    Next.js 16 requires 20.9+.
-3. **Add the environment variables** in *Project Settings → Environment Variables*.
+3. **Add the environment variables** in _Project Settings → Environment Variables_.
    Add them to **Production**, **Preview** and **Development** — a variable that
    exists only in Production makes preview deployments fail at runtime.
 
-   | Variable | Value |
-   | --- | --- |
-   | `DATABASE_URL` | Neon connection string (see below) |
-   | `AUTH_SECRET` | `openssl rand -base64 32` — a different value per environment is fine |
-   | `RESEND_API_KEY`, `EMAIL_FROM` | Only if password-reset email should really be sent |
-   | `BLOB_READ_WRITE_TOKEN` | Added automatically when a Vercel Blob store is linked |
+   | Variable                       | Value                                                                 |
+   | ------------------------------ | --------------------------------------------------------------------- |
+   | `DATABASE_URL`                 | Neon connection string (see below)                                    |
+   | `AUTH_SECRET`                  | `openssl rand -base64 32` — a different value per environment is fine |
+   | `RESEND_API_KEY`, `EMAIL_FROM` | Only if password-reset email should really be sent                    |
+   | `BLOB_READ_WRITE_TOKEN`        | Added automatically when a Vercel Blob store is linked                |
 
    `AUTH_URL` is not needed: Auth.js detects the deployment URL on Vercel.
 
@@ -250,7 +284,7 @@ production data unless you give previews their own Neon branch.
 
 ### If a deployment fails
 
-Open the failing deployment → *Building* log, and check in this order:
+Open the failing deployment → _Building_ log, and check in this order:
 
 - **`Environment variable not found: DATABASE_URL`** — the variable is missing for
   that environment (Preview and Production are configured separately).

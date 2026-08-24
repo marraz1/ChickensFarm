@@ -56,6 +56,11 @@ enum BirdCategory {
   OTHER // kita
 }
 
+enum NotificationChannel {
+  EMAIL
+  PUSH // Phase 2 (web push): stored, but rejected by validation until it works.
+}
+
 enum BirdGroupEventType {
   INITIAL
   MANUAL_ADJUSTMENT
@@ -64,17 +69,44 @@ enum BirdGroupEventType {
 }
 
 model User {
-  id              String               @id @default(cuid())
-  email           String               @unique
-  passwordHash    String
-  name            String?
-  createdAt       DateTime             @default(now())
-  farmsOwned      Farm[]               @relation("FarmOwner")
-  farmMemberships FarmUser[]
-  resetTokens     PasswordResetToken[]
-  birdGroupEvents BirdGroupEvent[]     @relation("EventCreatedBy")
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  passwordHash        String
+  name                String?
+  createdAt           DateTime             @default(now())
+  farmsOwned          Farm[]               @relation("FarmOwner")
+  farmMemberships     FarmUser[]
+  resetTokens         PasswordResetToken[]
+  birdGroupEvents     BirdGroupEvent[]     @relation("EventCreatedBy")
+  notificationSetting NotificationSetting?
 
   @@map("users")
+}
+
+// One row per user, created lazily on the first save — existing users simply
+// have none, so no backfill is needed. The reminder batch scans every enabled
+// row on each run; there is no extra index because the table holds one row per
+// user and the scan is sub-millisecond at this scale.
+model NotificationSetting {
+  id         String              @id @default(cuid())
+  userId     String              @unique
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled    Boolean             @default(false)
+  message    String              @db.VarChar(300)
+  sendTime   String              @db.VarChar(5) // "HH:mm" in the user's own time zone
+  timeZone   String              @default("Europe/Vilnius") // IANA name
+  channel    NotificationChannel @default(EMAIL)
+  // The local day this setting was last acted on — either a reminder was sent,
+  // or it was deliberately skipped because the data was already there. Doubles
+  // as the compare-and-set key that keeps overlapping cron runs idempotent.
+  lastRunOn  DateTime?           @db.Date
+  // The last reminder actually delivered, shown in the UI so a silently broken
+  // schedule is noticeable.
+  lastSentAt DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@map("notification_settings")
 }
 
 model PasswordResetToken {

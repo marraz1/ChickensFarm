@@ -26,7 +26,12 @@ export const config = {
   // icons are fetched by the browser/OS while signed out, and a redirect to
   // /login makes them arrive as HTML — which is why an installed app showed no
   // icon.
+  //
+  // api/cron is excluded for the same reason api/auth is: the scheduler has no
+  // session, and a 302 to /login would look like a success to curl. Those routes
+  // authenticate themselves with CRON_SECRET. Note this belongs here rather than
+  // in PUBLIC_PATHS, which also redirects signed-in users to "/" — wrong for an API.
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|webmanifest)$).*)",
+    "/((?!api/auth|api/cron|_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|webmanifest)$).*)",
   ],
 };
