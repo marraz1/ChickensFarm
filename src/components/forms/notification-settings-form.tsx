@@ -28,9 +28,11 @@ function browserTimeZone(): string {
 export function NotificationSettingsForm({
   defaultValues,
   lastSentAt,
+  accountEmail,
 }: {
   defaultValues?: Partial<NotificationSettingInput>;
   lastSentAt?: string | null;
+  accountEmail?: string;
 }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -88,6 +90,25 @@ export function NotificationSettingsForm({
         <Label htmlFor="message">Priminimo tekstas</Label>
         <Input id="message" className="h-11" maxLength={300} {...register("message")} />
         {errors.message && <p className="text-sm text-destructive">{errors.message.message}</p>}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="email">El. paštas</Label>
+        <Input
+          id="email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          className="h-11"
+          placeholder={accountEmail}
+          {...register("email")}
+        />
+        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+        <p className="text-xs text-muted-foreground">
+          {accountEmail
+            ? `Palikus tuščią, priminimai siunčiami paskyros adresu (${accountEmail}).`
+            : "Palikus tuščią, priminimai siunčiami paskyros adresu."}
+        </p>
       </div>
 
       <div className="flex flex-col gap-1.5">

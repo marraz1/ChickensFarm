@@ -28,6 +28,7 @@ export async function runReminderBatch(now: Date = new Date()): Promise<Reminder
       sendTime: true,
       timeZone: true,
       lastRunOn: true,
+      email: true,
       user: { select: { email: true } },
     },
   });
@@ -81,9 +82,12 @@ export async function runReminderBatch(now: Date = new Date()): Promise<Reminder
           // them daily would be pure noise. The day is already claimed above.
           if (!hasFarm.has(setting.userId)) return "skipped" as const;
           if (hasData.has(setting.userId)) return "skipped" as const;
-          if (!setting.user.email) return "skipped" as const;
 
-          await sendReminderEmail(setting.user.email, setting.message);
+          // The configured address wins; otherwise fall back to the account one.
+          const recipient = setting.email ?? setting.user.email;
+          if (!recipient) return "skipped" as const;
+
+          await sendReminderEmail(recipient, setting.message);
           await prisma.notificationSetting.update({
             where: { id: setting.id },
             data: { lastSentAt: now },

@@ -27,6 +27,9 @@ export async function saveNotificationSetting(
     enabled: input.enabled,
     message: input.message,
     sendTime: input.sendTime,
+    // Stored as null rather than "" so the fallback to the account email is a
+    // single check everywhere downstream.
+    email: input.email?.trim() || null,
     timeZone: input.timeZone,
     channel: input.channel,
     ...(stampToday ? { lastRunOn: stampToday } : {}),
