@@ -96,6 +96,10 @@ model NotificationSetting {
   sendTime   String              @db.VarChar(5) // "HH:mm" in the user's own time zone
   timeZone   String              @default("Europe/Vilnius") // IANA name
   channel    NotificationChannel @default(EMAIL)
+  // Where reminders go. Null means "wherever the account email points", which
+  // keeps existing rows working and keeps following the account if it changes —
+  // a copy of the address would silently go stale.
+  email      String?
   // The local day this setting was last acted on — either a reminder was sent,
   // or it was deliberately skipped because the data was already there. Doubles
   // as the compare-and-set key that keeps overlapping cron runs idempotent.

@@ -32,6 +32,14 @@ export const notificationSettingSchema = z
       .min(1, "Įveskite priminimo tekstą")
       .max(300, "Tekstas per ilgas (iki 300 simbolių)"),
     sendTime: z.string().regex(SEND_TIME_PATTERN, "Neteisingas laikas"),
+    // Optional: empty means the reminder goes to the account email.
+    email: z
+      .string()
+      .trim()
+      .email("Neteisingas el. pašto formatas")
+      .max(254)
+      .optional()
+      .or(z.literal("")),
     timeZone: timeZoneField,
     // The full union is kept so the type lines up with the Prisma enum that the
     // profile page reads back.
@@ -56,6 +64,7 @@ export const notificationSettingDefaults: NotificationSettingInput = {
   enabled: false,
   message: DEFAULT_REMINDER_MESSAGE,
   sendTime: DEFAULT_SEND_TIME,
+  email: "",
   timeZone: DEFAULT_TIME_ZONE,
   channel: "EMAIL",
 };

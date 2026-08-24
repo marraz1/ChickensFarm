@@ -20,12 +20,14 @@ export default async function NotificationSettingsPage() {
                   enabled: setting.enabled,
                   message: setting.message,
                   sendTime: setting.sendTime,
+                  email: setting.email ?? "",
                   timeZone: setting.timeZone,
                   channel: setting.channel,
                 }
               : undefined
           }
           lastSentAt={setting?.lastSentAt ? formatRelativeLT(setting.lastSentAt) : null}
+          accountEmail={user.email ?? undefined}
         />
       </div>
     </div>
