@@ -167,6 +167,7 @@ jobs:
 
           DEADLINE=$((SECONDS + TIMEOUT_SECONDS))
           echo "Waiting for the build of ${SHA:0:7} (up to ${TIMEOUT_SECONDS}s)..."
+          POLL=0
           while :; do
             STATE=""
             check_github
@@ -180,6 +181,17 @@ jobs:
               break
             fi
             sleep 15
+            POLL=$((POLL + 1))
+            # A line once a minute, not just at the start and the end — without
+            # it the log goes dead for up to fifteen minutes, indistinguishable
+            # from a hung job to anyone watching it run.
+            if [ $((POLL % 4)) -eq 0 ]; then
+              if [ "$SEEN" = "1" ]; then
+                echo "  [${SECONDS}s] build found, still not finished"
+              else
+                echo "  [${SECONDS}s] no deployment record yet"
+              fi
+            fi
           done
           echo "Result: $STATE after ${SECONDS}s."
 
