@@ -223,11 +223,18 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git checkout "$SOURCE_BRANCH"
+          # Pinned to the remote ref rather than relying on whatever state
+          # actions/checkout left behind, so this is the same operation whether
+          # the local branch exists, is detached, or has drifted.
+          git checkout -B "$SOURCE_BRANCH" "origin/$SOURCE_BRANCH"
 
           echo "Bumping package.json to $VERSION"
           npm version "$VERSION" --no-git-tag-version --allow-same-version
-          git add package.json package-lock.json
+          # package-lock.json carries the version too, but only add it if npm
+          # actually touched it — `git add` on an unchanged path is fine, on a
+          # missing one is not.
+          git add package.json
+          if [ -f package-lock.json ]; then git add package-lock.json; fi
           git commit -m "chore(release): v$VERSION"
           git push origin "$SOURCE_BRANCH"
           echo "✅ \`$SOURCE_BRANCH\` bumped to \`$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
