@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch, SwitchThumb } from "@/components/ui/switch";
 import { DEFAULT_TIME_ZONE } from "@/lib/notification-schedule";
+import type { NotificationStatusReason } from "@/lib/services/notifications";
 import { PushSetupError, disablePush, enablePush } from "@/lib/push-client";
 import {
   notificationSettingSchema,
@@ -24,14 +25,57 @@ function browserTimeZone(): string {
   }
 }
 
+type StatusView = {
+  reason: NotificationStatusReason;
+  /** Pre-formatted on the server — see the page component. */
+  lastSentAt: string | null;
+  nextSendAt: string | null;
+};
+
+/**
+ * Plain-language reason the reminder is not going out, and whether that is a
+ * problem the user can act on.
+ *
+ * "warn" is reserved for states where the user believes reminders are on but
+ * nothing can ever arrive; the ordinary waiting states stay neutral so the
+ * screen does not cry wolf every afternoon.
+ */
+const STATUS_TEXT: Record<NotificationStatusReason, { text: string; tone: "warn" | "muted" }> = {
+  notConfigured: {
+    text: "Priminimai dar nesukonfigūruoti — išsaugokite nustatymus.",
+    tone: "muted",
+  },
+  disabled: { text: "Priminimai išjungti.", tone: "muted" },
+  noChannel: {
+    text: "Nepasirinktas nė vienas pranešimo būdas, todėl priminimai nesiunčiami.",
+    tone: "warn",
+  },
+  invalidTime: {
+    text: "Neteisingas priminimo laikas — išsaugokite nustatymus iš naujo.",
+    tone: "warn",
+  },
+  noFarm: { text: "Neturite ūkio, todėl priminimai nesiunčiami.", tone: "warn" },
+  dataEntered: {
+    text: "Šiandien kiaušinių surinkimas jau įvestas — priminimo nereikia.",
+    tone: "muted",
+  },
+  alreadyHandled: { text: "Šios dienos priminimas jau apdorotas.", tone: "muted" },
+  beforeTime: { text: "Laukiama nustatyto laiko.", tone: "muted" },
+  windowMissed: {
+    text: "Šiandienos laikas praleistas — priminimas bus siunčiamas kitą dieną.",
+    tone: "muted",
+  },
+  due: { text: "Priminimas turi būti išsiųstas artimiausiu metu.", tone: "muted" },
+};
+
 export function NotificationSettingsForm({
   defaultValues,
-  lastSentAt,
+  status,
   accountEmail,
   vapidPublicKey,
 }: {
   defaultValues?: Partial<NotificationSettingInput>;
-  lastSentAt?: string | null;
+  status?: StatusView;
   accountEmail?: string;
   /** Passed from the server so the key never has to become a NEXT_PUBLIC_ var.
    *  Null when VAPID is unconfigured — the push toggle then stays disabled. */
@@ -267,8 +311,26 @@ export function NotificationSettingsForm({
         </p>
       </div>
 
-      {lastSentAt && (
-        <p className="text-xs text-muted-foreground">Paskutinis priminimas: {lastSentAt}</p>
+      {status && (
+        <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/40 p-3 text-xs">
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Paskutinis priminimas</span>
+            <span className="text-right font-medium">{status.lastSentAt ?? "dar nesiųsta"}</span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Kitas priminimas</span>
+            <span className="text-right font-medium">{status.nextSendAt ?? "nenumatytas"}</span>
+          </div>
+          <p
+            className={
+              STATUS_TEXT[status.reason].tone === "warn"
+                ? "mt-1 text-destructive"
+                : "mt-1 text-muted-foreground"
+            }
+          >
+            {STATUS_TEXT[status.reason].text}
+          </p>
+        </div>
       )}
 
       {serverError && <p className="text-sm text-destructive">{serverError}</p>}
