@@ -59,21 +59,67 @@ only `release` reaches production.
    - `minor` — new features, backwards compatible (0.1.0 → 0.2.0)
    - `major` — breaking changes (0.1.0 → 1.0.0)
    - `custom` — type an exact `X.Y.Z`
-4. Optionally tick **dry_run** first: every check runs, nothing is pushed. Use
-   it to see which migrations a release would apply before committing to it.
+4. Optionally tick **dry_run** first: every check still runs, nothing is
+   pushed. Use it to see which migrations a release would apply, and to prove
+   the release would succeed, before committing to it.
 5. Run it, and watch the run page.
 
-### What the five jobs prove
+### Quality gates
 
-| Job           | What it establishes                                                                                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Preflight** | Dispatched from `main`; CI green there; `release` fast-forwards cleanly; the version is free; and _which migrations this release will apply_. Nothing has been pushed yet. |
-| **Version**   | `package.json` bumped and committed to `main`, `release` fast-forwarded, tag `vX.Y.Z` pushed. The push to `release` is what starts Vercel.                                 |
-| **Build**     | Watches Vercel's deployment state as it changes, and prints the build output. Fails the release if the build fails.                                                        |
-| **Verify**    | Polls `/api/health` until both the **version** and the **commit** match what was just published, then reports exactly which migrations were applied.                       |
-| **Summary**   | The release drawn as a diagram, plus old → new version, tag, commit and production URL.                                                                                    |
+Five checks run against the exact commit being released, before anything is
+pushed, tagged or deployed:
 
-A release is only successful if all five are.
+| Gate                 | Runs                             | Catches                             |
+| -------------------- | -------------------------------- | ----------------------------------- |
+| **Lint**             | `npm run lint`                   | lint regressions                    |
+| **Typecheck**        | `npm run typecheck`              | type errors                         |
+| **Test**             | `npm test`                       | the unit suite                      |
+| **Production build** | `npm run build`                  | prerender and route-config failures |
+| **Schema checks**    | migrations + drift + safety scan | broken or destructive migrations    |
+
+The production build matters more than it looks. Without it the build is only
+proven _after_ `release` has been tagged and pushed, so a build failure leaves
+a `vX.Y.Z` tag and a release branch pointing at broken code, to be unpicked by
+hand.
+
+**Schema checks** does three things against a throwaway Postgres:
+
+1. Applies every migration to an empty database, proving they run at all before
+   production tries them.
+2. Diffs the result against `schema.prisma`. A difference means the schema was
+   edited without a migration, so production would run code expecting a shape
+   the database has not been given. Fix with `npx prisma migrate dev` and commit
+   the migration.
+3. Scans the migrations this release will apply for statements that destroy or
+   rewrite data — `DROP TABLE`, `DROP COLUMN`, `DROP TYPE`, `TRUNCATE`,
+   `ALTER COLUMN … TYPE`, `SET NOT NULL`, `RENAME`.
+
+### Destructive migrations
+
+If the scan finds anything, **the release is blocked** and each statement is
+listed with its file and line. This is deliberate: rolling back a deployment
+does not bring back a dropped column, and the currently-running code may still
+be using it.
+
+Two ways forward:
+
+- **Split the change.** Stop writing the column in one release, drop it in a
+  later one. Safe, and rollback keeps working throughout.
+- **Tick `allow_destructive`** and run again, if the loss is intended and you
+  have checked nothing live still depends on it.
+
+### What the jobs prove
+
+| Job           | What it establishes                                                                                                                                                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Preflight** | Dispatched from `main`; CI green there; `release` fast-forwards cleanly; the version is free; and _which migrations this release will apply_. Nothing has been pushed yet.                                            |
+| **Gates**     | Lint, Typecheck, Test, Production build and Schema checks, against the commit being released. Still nothing pushed.                                                                                                   |
+| **Version**   | `package.json` bumped and committed to `main`, `release` fast-forwarded, tag `vX.Y.Z` pushed. The push to `release` is what starts Vercel.                                                                            |
+| **Build**     | Watches Vercel's deployment state as it changes, and prints the build output. Fails the release if the build fails.                                                                                                   |
+| **Verify**    | Polls `/api/health` until both the **version** and the **commit** match what was just published, reports exactly which migrations were applied, then smoke-tests `/login`, `/manifest.webmanifest`, `/sw.js` and `/`. |
+| **Summary**   | The release drawn as a diagram, plus old → new version, tag, commit and production URL.                                                                                                                               |
+
+A release is only successful if every one of them is.
 
 ---
 
@@ -90,6 +136,23 @@ Someone pushed to `release` directly. Bring it back before releasing:
 ```bash
 git checkout main && git merge origin/release && git push
 ```
+
+### Schema checks — "schema.prisma has changes with no migration behind them"
+
+Someone edited the model without generating a migration. Run
+`npx prisma migrate dev` locally and commit the migration it creates.
+
+### Schema checks — "Destructive migration blocked"
+
+See **Destructive migrations** above. Split the change, or tick
+`allow_destructive` if the loss is intended.
+
+### Verify — a smoke test failed
+
+The deployment is live but not serving correctly. A `/sw.js` that returns 200
+with an HTML content-type is the classic one: it means something is redirecting
+it, and the browser will refuse to register the service worker, silently
+breaking push notifications for installed apps.
 
 ### Build — "No deployment record appeared"
 
