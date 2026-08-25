@@ -16,7 +16,7 @@ export function pushPublicKey(): string | null {
  * `mailto:` or `https://` — `web-push` rejects anything else, and the angle
  * brackets shown in some guides (`<mailto:…>`) are exactly what it rejects.
  */
-function vapidSubject(): string | null {
+export function vapidSubject(): string | null {
   const explicit = process.env.VAPID_SUBJECT?.trim();
   if (explicit) return explicit;
   // APP_URL is already required for reminder-email links, so production usually
