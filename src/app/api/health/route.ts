@@ -138,6 +138,11 @@ export async function GET(req: Request) {
     {
       status,
       time: new Date().toISOString(),
+      // Baked in at build from package.json (see next.config.ts). The release
+      // workflow compares this against the version it just published, which is
+      // the difference between "a deploy succeeded" and "the intended version
+      // is being served".
+      version: process.env.APP_VERSION ?? null,
       commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
       environment: process.env.VERCEL_ENV ?? null,
       region: process.env.VERCEL_REGION ?? null,

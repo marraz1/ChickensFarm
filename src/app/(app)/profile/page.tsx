@@ -57,6 +57,14 @@ export default async function ProfilePage() {
         </div>
 
         <LogoutButton />
+
+        {/* Which release this phone is actually running. Worth showing: the app
+            is installed to the home screen, so a stale service worker can serve
+            an old build long after a deploy, and this is the quickest way to
+            tell from the device itself. */}
+        <p className="pb-2 text-center text-xs text-muted-foreground">
+          Versija {process.env.APP_VERSION ?? "—"}
+        </p>
       </div>
     </div>
   );
