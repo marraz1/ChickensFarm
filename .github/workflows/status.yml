@@ -450,6 +450,7 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     outputs:
+      # "ok" | "failing" | "running" | "none"
       state: ${{ steps.ci.outputs.state }}
     steps:
       - name: Read CI history on the default branch
@@ -457,6 +458,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          # On a push, CI is triggered by the very same event as this workflow
+          # and is therefore still running when this job starts. Judging that
+          # unfinished run reported a perfectly green CI as red. Wait for the
+          # run belonging to this commit instead.
+          WAIT_SHA: ${{ github.event_name == 'push' && github.sha || '' }}
+          TIMEOUT_SECONDS: 600
         run: |
           echo "## Tests" >> "$GITHUB_STEP_SUMMARY"
           echo "state=none" >> "$GITHUB_OUTPUT"
@@ -465,52 +472,100 @@ jobs:
           # re-defaulted, and this would then silently report on nothing.
           BRANCH=$(gh api "repos/$REPO" --jq .default_branch 2>/dev/null || echo main)
 
-          runs=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=$BRANCH&per_page=10" 2>/dev/null || echo '{}')
-          total=$(echo "$runs" | jq '.workflow_runs // [] | length')
+          fetch_runs() {
+            gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=$BRANCH&per_page=10" 2>/dev/null || echo '{}'
+          }
 
-          if [ "$total" -eq 0 ]; then
+          runs=$(fetch_runs)
+          if [ "$(echo "$runs" | jq '.workflow_runs // [] | length')" -eq 0 ]; then
             echo "No CI runs found on \`$BRANCH\`." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          # The newest run is the verdict; the rest are context. A single old
-          # failure among nine passes is a very different story from a run of
-          # reds, and the table shows which one this is.
-          latest=$(echo "$runs" | jq -r '.workflow_runs[0].conclusion // "running"')
-          sha=$(echo "$runs" | jq -r '.workflow_runs[0].head_sha[0:7]')
-          url=$(echo "$runs" | jq -r '.workflow_runs[0].html_url')
-          failed=$(echo "$runs" | jq '[.workflow_runs[] | select(.conclusion != "success")] | length')
+          # Which run answers the question. On a push it is this commit's run —
+          # anything else describes code that is no longer live. Otherwise it is
+          # the newest run that actually reached a conclusion.
+          ROW=""
+          if [ -n "$WAIT_SHA" ]; then
+            echo "Waiting for CI on ${WAIT_SHA:0:7} (up to ${TIMEOUT_SECONDS}s)..."
+            DEADLINE=$((SECONDS + TIMEOUT_SECONDS))
+            while :; do
+              ROW=$(echo "$runs" | jq -c --arg s "$WAIT_SHA" \
+                '[.workflow_runs[] | select(.head_sha == $s)][0] // empty')
+              if [ -n "$ROW" ] && [ "$(echo "$ROW" | jq -r '.status')" = "completed" ]; then break; fi
+              if [ "$SECONDS" -ge "$DEADLINE" ]; then break; fi
+              sleep 15
+              runs=$(fetch_runs)
+            done
+          fi
 
-          if [ "$latest" = "success" ]; then ICON="✅"; else ICON="❌"; fi
-          echo "**$ICON $latest** on \`$BRANCH\` at [\`$sha\`]($url)" >> "$GITHUB_STEP_SUMMARY"
+          # Falls back whenever the commit's own run is unusable: not registered
+          # yet, or still going when the budget ran out.
+          FELL_BACK=0
+          if [ -z "$ROW" ] || [ "$(echo "$ROW" | jq -r '.status')" != "completed" ]; then
+            if [ -n "$WAIT_SHA" ]; then FELL_BACK=1; fi
+            ROW=$(echo "$runs" | jq -c '[.workflow_runs[] | select(.status == "completed")][0] // empty')
+          fi
+
+          if [ -z "$ROW" ]; then
+            echo "⏳ CI has not finished for any run on \`$BRANCH\` yet." >> "$GITHUB_STEP_SUMMARY"
+            echo "state=running" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CONCLUSION=$(echo "$ROW" | jq -r '.conclusion // "running"')
+          SHA=$(echo "$ROW" | jq -r '.head_sha[0:7]')
+          URL=$(echo "$ROW" | jq -r '.html_url')
+          RUN_ID=$(echo "$ROW" | jq -r '.id')
+
+          if [ "$CONCLUSION" = "success" ]; then ICON="✅"; else ICON="❌"; fi
+          echo "**$ICON $CONCLUSION** on \`$BRANCH\` at [\`$SHA\`]($URL)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$FELL_BACK" = "1" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "⏳ CI for \`${WAIT_SHA:0:7}\` had not finished within ${TIMEOUT_SECONDS}s, so this" >> "$GITHUB_STEP_SUMMARY"
+            echo "reports the newest completed run instead." >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Last $total runs: $((total - failed)) succeeded, $failed failed." >> "$GITHUB_STEP_SUMMARY"
+
+          # Only completed runs are counted. Counting `conclusion != "success"`
+          # scored every still-running run as a failure, which is how a green CI
+          # came to be reported as red.
+          done_n=$(echo "$runs" | jq '[.workflow_runs[] | select(.status == "completed")] | length')
+          failed=$(echo "$runs" | jq '[.workflow_runs[]
+            | select(.status == "completed" and .conclusion != "success")] | length')
+          echo "Last $done_n completed runs: $((done_n - failed)) succeeded, $failed failed." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
           echo "| Started | Commit | Result |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
           echo "$runs" | jq -r '.workflow_runs[] |
-            "| \(.run_started_at) | [`\(.head_sha[0:7])`](\(.html_url)) | \(if .conclusion == "success" then "✅" else "❌ " + (.conclusion // "running") end) |"' \
+            "| \(.run_started_at) | [`\(.head_sha[0:7])`](\(.html_url)) | \(
+               if .status != "completed" then "⏳ running"
+               elif .conclusion == "success" then "✅"
+               else "❌ " + (.conclusion // "unknown") end) |"' \
             >> "$GITHUB_STEP_SUMMARY"
 
-          # Per-job detail for the newest run, so a red node says *which* gate
-          # failed — lint, typecheck or the suite — without opening the run.
-          run_id=$(echo "$runs" | jq -r '.workflow_runs[0].id')
-          jobs=$(gh api "repos/$REPO/actions/runs/$run_id/jobs" 2>/dev/null || echo '{}')
+          # Per-job detail for the run being judged, so a red node says *which*
+          # gate failed — lint, typecheck, the suite or the Vercel build.
+          jobs=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs" 2>/dev/null || echo '{}')
           if [ "$(echo "$jobs" | jq '.jobs // [] | length')" -gt 0 ]; then
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Latest run:" >> "$GITHUB_STEP_SUMMARY"
+            echo "Gates of that run:" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "$jobs" | jq -r '.jobs[] |
-              "- \(if .conclusion == "success" then "✅" else "❌ " + (.conclusion // "running") end) \(.name)"' \
+              "- \(if .status != "completed" then "⏳"
+                   elif .conclusion == "success" then "✅"
+                   else "❌ " + (.conclusion // "unknown") end) \(.name)"' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          if [ "$latest" = "success" ]; then
-            echo "state=ok" >> "$GITHUB_OUTPUT"
-          else
-            echo "state=failing" >> "$GITHUB_OUTPUT"
-          fi
+          # "running" is never a verdict: an unfinished run says nothing about
+          # the code, and failing on it would make every merge go red.
+          case "$CONCLUSION" in
+            success) echo "state=ok" >> "$GITHUB_OUTPUT" ;;
+            running) echo "state=running" >> "$GITHUB_OUTPUT" ;;
+            *)       echo "state=failing" >> "$GITHUB_OUTPUT" ;;
+          esac
 
   build:
     name: Build log
@@ -609,7 +664,7 @@ jobs:
             case "$1" in
               ok|success|ready) echo ok ;;
               degraded|failed|pending|failing|error|unreachable) echo bad ;;
-              outdated|unknown|building|queued) echo warn ;;
+              outdated|unknown|building|queued|running) echo warn ;;
               *) echo skip ;;
             esac
           }
