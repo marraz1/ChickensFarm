@@ -1,3 +1,5 @@
+import { addLocalDays, formatSendTime, getLocalNow } from "@/lib/notification-schedule";
+
 export function formatDateLT(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("lt-LT", {
@@ -40,6 +42,29 @@ export function formatRelativeLT(date: Date | string): string {
   if (dayDiff === 0) return `Šiandien, ${time}`;
   if (dayDiff === 1) return `Vakar, ${time}`;
   return `${formatDateLT(d)}, ${time}`;
+}
+
+/**
+ * A future or past instant as Lithuanian wall-clock text in a given zone.
+ *
+ * Separate from formatRelativeLT, which resolves "today" against the *server's*
+ * zone (UTC on Vercel) and only labels the past. A reminder time has to be
+ * stated in the user's own zone, or an evening slot shows up on the wrong day.
+ */
+export function formatZonedDateTimeLT(
+  date: Date,
+  timeZone: string,
+  now: Date = new Date(),
+): string {
+  const target = getLocalNow(date, timeZone);
+  const today = getLocalNow(now, timeZone);
+  const time = formatSendTime(target.minutes);
+
+  if (target.date === today.date) return `Šiandien, ${time}`;
+  if (target.date === addLocalDays(today.date, 1)) return `Rytoj, ${time}`;
+  if (target.date === addLocalDays(today.date, -1)) return `Vakar, ${time}`;
+  // Already "YYYY-MM-DD", which is the Lithuanian convention.
+  return `${target.date}, ${time}`;
 }
 
 export function todayInputValue(): string {

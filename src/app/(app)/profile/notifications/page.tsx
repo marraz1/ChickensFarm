@@ -1,13 +1,16 @@
 import { requireUser } from "@/lib/session";
-import { getNotificationSetting } from "@/lib/services/notifications";
+import { getNotificationSetting, getNotificationStatus } from "@/lib/services/notifications";
 import { PageHeader } from "@/components/layout/page-header";
 import { NotificationSettingsForm } from "@/components/forms/notification-settings-form";
-import { formatRelativeLT } from "@/lib/format";
+import { formatRelativeLT, formatZonedDateTimeLT } from "@/lib/format";
 import { pushPublicKey } from "@/lib/push";
 
 export default async function NotificationSettingsPage() {
   const user = await requireUser();
-  const setting = await getNotificationSetting(user.id);
+  const [setting, status] = await Promise.all([
+    getNotificationSetting(user.id),
+    getNotificationStatus(user.id),
+  ]);
 
   return (
     <div>
@@ -28,7 +31,16 @@ export default async function NotificationSettingsPage() {
                 }
               : undefined
           }
-          lastSentAt={setting?.lastSentAt ? formatRelativeLT(setting.lastSentAt) : null}
+          // Dates are formatted here rather than in the client component so the
+          // next-send instant is rendered in the user's stored zone, not in
+          // whatever zone the device happens to be in right now.
+          status={{
+            reason: status.reason,
+            lastSentAt: status.lastSentAt ? formatRelativeLT(status.lastSentAt) : null,
+            nextSendAt: status.nextSendAt
+              ? formatZonedDateTimeLT(status.nextSendAt, status.timeZone)
+              : null,
+          }}
           accountEmail={user.email ?? undefined}
           // Read per request on the server, so the key never becomes a
           // NEXT_PUBLIC_ variable baked into the client bundle at build time.

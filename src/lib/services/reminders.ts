@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { sendReminderEmail } from "@/lib/email";
 import { reminderPayload, sendPushToUser } from "@/lib/push";
-import { dateOnlyUtc, getLocalNow, isDue } from "@/lib/notification-schedule";
+import { dateOnlyUtc, evaluateDue, getLocalNow, type DueReason } from "@/lib/notification-schedule";
 import { resolveDeliveryOutcome, type ChannelAttempt } from "@/lib/push-utils";
+import { loadDataPresence } from "@/lib/services/data-presence";
 
 /** Upper bound per run. The lateness window makes a partial batch self-healing:
  *  whatever is left over is still due on the next tick. */
@@ -15,6 +16,15 @@ export type ReminderBatchResult = {
   sent: number;
   skipped: number;
   failed: number;
+  /**
+   * Why the settings that were checked did not come up due, keyed by reason.
+   *
+   * Reported because the workflow log is the only view into a scheduled run,
+   * and a bare `due: 0` cannot distinguish "everyone is waiting for their
+   * evening slot" from "every row is stuck". Counts only — no user, address, or
+   * identifier — because Actions logs are public on a public repository.
+   */
+  notDue: Partial<Record<Exclude<DueReason, "due">, number>>;
 };
 
 export async function runReminderBatch(now: Date = new Date()): Promise<ReminderBatchResult> {
@@ -37,9 +47,16 @@ export async function runReminderBatch(now: Date = new Date()): Promise<Reminder
     },
   });
 
-  const due = settings.filter((s) => isDue(s, now));
+  const due: typeof settings = [];
+  const notDue: Partial<Record<Exclude<DueReason, "due">, number>> = {};
+  for (const setting of settings) {
+    const reason = evaluateDue(setting, now);
+    if (reason === "due") due.push(setting);
+    else notDue[reason] = (notDue[reason] ?? 0) + 1;
+  }
+
   if (due.length === 0) {
-    return { checked: settings.length, due: 0, sent: 0, skipped: 0, failed: 0 };
+    return { checked: settings.length, due: 0, sent: 0, skipped: 0, failed: 0, notDue };
   }
 
   // Group by local date so the "did they enter data today?" lookup is one query
@@ -119,7 +136,7 @@ export async function runReminderBatch(now: Date = new Date()): Promise<Reminder
     }
   }
 
-  return { checked: settings.length, due: due.length, sent, skipped, failed };
+  return { checked: settings.length, due: due.length, sent, skipped, failed, notDue };
 }
 
 type DueSetting = {
@@ -158,40 +175,4 @@ async function attemptPush(setting: DueSetting): Promise<ChannelAttempt> {
     console.error("[reminders] push failed", { settingId: setting.id, err });
     return "failed";
   }
-}
-
-/**
- * Which of these users belong to a live farm, and which already logged an egg
- * collection on the given local day.
- *
- * The active farm lives in a cookie the cron cannot see, so every farm the user
- * belongs to counts — including one a co-worker entered data into. Both facts
- * come back in a single round trip.
- */
-async function loadDataPresence(userIds: string[], localDate: string) {
-  const rows = await prisma.farmUser.findMany({
-    // Soft-deleted farms must not count, or a record left in one would silence
-    // the reminder forever.
-    where: { userId: { in: userIds }, farm: { deletedAt: null } },
-    select: {
-      userId: true,
-      farm: {
-        select: {
-          eggCollections: {
-            where: { collectionDate: dateOnlyUtc(localDate) },
-            select: { id: true },
-            take: 1,
-          },
-        },
-      },
-    },
-  });
-
-  const hasFarm = new Set<string>();
-  const hasData = new Set<string>();
-  for (const row of rows) {
-    hasFarm.add(row.userId);
-    if (row.farm.eggCollections.length > 0) hasData.add(row.userId);
-  }
-  return { hasFarm, hasData };
 }
