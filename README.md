@@ -283,20 +283,68 @@ feature/*  ──>  develop  ──>  main  ──>  release  ──>  productio
 - **`develop`** — where new work lands.
 - **`main`** — reviewed and green; the candidate for the next release. Stays the
   default branch, because GitHub only runs scheduled workflows from it.
-- **`release`** — production. Written only by the **PROD_deployment** workflow,
-  which versions `main`, fast-forwards `release`, tags `vX.Y.Z`, then watches
-  Vercel build and deploy it until `/api/health` confirms that exact version is
-  being served.
+- **`release`** — production. Written only by the **PROD_deployment** workflow.
+  Never push to it by hand.
 
-Releases are cut by hand: **Actions → PROD_deployment → Run workflow** from
-`main`, choosing `patch`, `minor` or `major`. Tick `dry_run` to see what a
-release would do — including which migrations it would apply — without pushing
-anything.
+### Cutting a release: PROD_deployment
+
+**Actions → PROD_deployment → Run workflow**, with the branch dropdown set to
+**`main`** (the workflow refuses to run from anything else — `release` included,
+since that branch is its output, not its input).
+
+| Input               | What it does                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------- |
+| `bump`              | `patch` (0.1.0→0.1.1), `minor` (→0.2.0), `major` (→1.0.0), or `custom` for an exact version |
+| `version`           | The exact `X.Y.Z`, only used when `bump` is `custom`                                        |
+| `dry_run`           | Runs every check and shows what would happen — pushes, tags and deploys nothing             |
+| `allow_destructive` | Only needed if a pending migration drops or rewrites data; see below                        |
+
+Recommended for the first run of any batch of changes: tick **`dry_run`** first
+to see the plan — including exactly which migrations would apply — before
+doing it for real.
+
+### What it does
+
+Ten jobs, in this order:
+
+```
+                ┌─ Lint ────────────┐
+                ├─ Typecheck ───────┤
+Preflight ──────┼─ Test ────────────┼──> Version and promote ──> Build and deploy ──> Verify live ──> Summary
+                ├─ Production build ┤
+                └─ Schema checks ───┘
+```
+
+1. **Preflight** — confirms `main` is green in CI, that `release` can
+   fast-forward cleanly, and that the requested version is free. Reads
+   `/api/health` to snapshot what is live and which migrations this release
+   would apply. Nothing is touched yet.
+2. **Lint / Typecheck / Test / Production build / Schema checks** — run in
+   parallel against the exact commit being released, not a past CI result.
+   **Schema checks** applies every migration to a throwaway database, diffs the
+   result against `schema.prisma` to catch drift, and scans for destructive SQL
+   (`DROP TABLE/COLUMN/TYPE`, `TRUNCATE`, `SET NOT NULL`, …) — which blocks the
+   release unless `allow_destructive` is ticked.
+3. **Version and promote** — only step that writes anything. Bumps
+   `package.json` on `main`, fast-forwards `release` to match, and tags
+   `vX.Y.Z`. The push to `release` is what triggers Vercel.
+4. **Build and deploy** — watches the Vercel deployment live (queued → building
+   → ready) and streams the build log when `VERCEL_TOKEN` is set.
+5. **Verify live** — polls `/api/health` until both the **version and the
+   commit** match what was just published, then smoke-tests `/login`,
+   `/manifest.webmanifest`, `/sw.js` and `/`.
+6. **Summary** — the whole release drawn as a diagram: old → new version, tag,
+   migrations applied, production URL.
+
+The run's own log and step summary show each stage as it happens — not just the
+final result.
 
 The running version is reported by `GET /api/health` and shown at the bottom of
-the profile screen.
+the profile screen, so a specific device can always be checked against what was
+released.
 
-Full process, setup and failure handling: [`docs/RELEASE.md`](docs/RELEASE.md).
+Full process, one-time setup, and how to read a failure at each stage:
+[`docs/RELEASE.md`](docs/RELEASE.md).
 
 ---
 
