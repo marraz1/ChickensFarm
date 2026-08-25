@@ -1,5 +1,15 @@
 name: CI
 
+# Split into one job per gate rather than a single sequential job. Two reasons:
+# GitHub draws the run's graph from the job tree, so three jobs make it obvious
+# *which* gate failed at a glance; and a lint error no longer hides whether the
+# suite passes, which it did when all three ran in sequence and the first
+# failure ended the job.
+#
+# The cost is one `npm ci` per job instead of one per run. With the npm cache
+# that is a few seconds each, and the three run in parallel, so wall-clock time
+# is unchanged or better.
+
 on:
   pull_request:
     branches: [main]
@@ -10,17 +20,19 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  lint-and-test:
-    runs-on: ubuntu-latest
-    env:
-      # `npm ci` runs `postinstall: prisma generate`, which reads DATABASE_URL
-      # via prisma.config.ts. No database is contacted during generate.
-      DATABASE_URL: postgresql://user:pass@localhost:5432/placeholder
+env:
+  # `npm ci` runs `postinstall: prisma generate`, which reads DATABASE_URL
+  # via prisma.config.ts. No database is contacted during generate.
+  DATABASE_URL: postgresql://user:pass@localhost:5432/placeholder
 
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
+          # The Prettier step diffs against the base branch, which needs history.
           fetch-depth: 0
 
       - uses: actions/setup-node@v5
@@ -38,11 +50,56 @@ jobs:
           if [ -z "$FILES" ]; then echo "No changed files."; exit 0; fi
           echo "$FILES" | xargs -d '\n' npx prettier --check --ignore-unknown
 
-      - name: Lint
+      - name: ESLint
         run: npm run lint
 
-      - name: Typecheck
-        run: npm run typecheck
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
 
-      - name: Test
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Vitest
         run: npm test
+
+  ci:
+    # One stable check name covering all three gates, so branch protection has a
+    # single thing to require even as the jobs above are added to or renamed.
+    name: CI
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    if: always()
+    steps:
+      - name: Verdict
+        env:
+          RESULTS: ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.test.result }}
+        run: |
+          echo "lint/typecheck/test: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" != "success" ]; then
+              echo "::error::A CI gate did not pass ($RESULTS)."
+              exit 1
+            fi
+          done

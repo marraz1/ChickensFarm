@@ -312,6 +312,72 @@ jobs:
               health.json >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    outputs:
+      state: ${{ steps.ci.outputs.state }}
+    steps:
+      - name: Read CI history on the default branch
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "## Tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "state=none" >> "$GITHUB_OUTPUT"
+
+          # Asked for rather than assumed to be "main": a repo can be renamed or
+          # re-defaulted, and this would then silently report on nothing.
+          BRANCH=$(gh api "repos/$REPO" --jq .default_branch 2>/dev/null || echo main)
+
+          runs=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=$BRANCH&per_page=10" 2>/dev/null || echo '{}')
+          total=$(echo "$runs" | jq '.workflow_runs // [] | length')
+
+          if [ "$total" -eq 0 ]; then
+            echo "No CI runs found on \`$BRANCH\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # The newest run is the verdict; the rest are context. A single old
+          # failure among nine passes is a very different story from a run of
+          # reds, and the table shows which one this is.
+          latest=$(echo "$runs" | jq -r '.workflow_runs[0].conclusion // "running"')
+          sha=$(echo "$runs" | jq -r '.workflow_runs[0].head_sha[0:7]')
+          url=$(echo "$runs" | jq -r '.workflow_runs[0].html_url')
+          failed=$(echo "$runs" | jq '[.workflow_runs[] | select(.conclusion != "success")] | length')
+
+          if [ "$latest" = "success" ]; then ICON="✅"; else ICON="❌"; fi
+          echo "**$ICON $latest** on \`$BRANCH\` at [\`$sha\`]($url)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Last $total runs: $((total - failed)) succeeded, $failed failed." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "| Started | Commit | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "$runs" | jq -r '.workflow_runs[] |
+            "| \(.run_started_at) | [`\(.head_sha[0:7])`](\(.html_url)) | \(if .conclusion == "success" then "✅" else "❌ " + (.conclusion // "running") end) |"' \
+            >> "$GITHUB_STEP_SUMMARY"
+
+          # Per-job detail for the newest run, so a red node says *which* gate
+          # failed — lint, typecheck or the suite — without opening the run.
+          run_id=$(echo "$runs" | jq -r '.workflow_runs[0].id')
+          jobs=$(gh api "repos/$REPO/actions/runs/$run_id/jobs" 2>/dev/null || echo '{}')
+          if [ "$(echo "$jobs" | jq '.jobs // [] | length')" -gt 0 ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Latest run:" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "$jobs" | jq -r '.jobs[] |
+              "- \(if .conclusion == "success" then "✅" else "❌ " + (.conclusion // "running") end) \(.name)"' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "$latest" = "success" ]; then
+            echo "state=ok" >> "$GITHUB_OUTPUT"
+          else
+            echo "state=failing" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build log
     runs-on: ubuntu-latest
@@ -386,7 +452,7 @@ jobs:
   summary:
     name: Verdict
     runs-on: ubuntu-latest
-    needs: [probe, deployment, migrations, reminders, build]
+    needs: [probe, deployment, migrations, reminders, build, tests]
     if: always()
     steps:
       - name: Draw the pipeline
@@ -398,6 +464,7 @@ jobs:
           PENDING: ${{ needs.migrations.outputs.pending }}
           CRON: ${{ needs.reminders.outputs.state }}
           BUILD: ${{ needs.build.outputs.state }}
+          TESTS: ${{ needs.tests.outputs.state }}
         run: |
           # Mermaid renders natively in a job summary, so the pipeline can be
           # drawn with live colour rather than described. If it ever fails to
@@ -423,6 +490,7 @@ jobs:
           # Defaulted once, up front, so the colour and the label can never
           # disagree — reading the state twice with different fallbacks made a
           # failed probe render as a grey "skipped" rather than an amber warning.
+          TESTS="${TESTS:-unknown}"
           DEPLOY="${DEPLOY:-none}"
           BUILD="${BUILD:-unknown}"
           MIGRATE="${MIGRATE:-unknown}"
@@ -437,12 +505,13 @@ jobs:
             echo ""
             echo '```mermaid'
             echo "flowchart LR"
+            echo "  T[\"Tests<br/>$(icon "$TESTS") $TESTS\"]:::$(node_class "$TESTS")"
             echo "  D[\"Deploy<br/>$(icon "$DEPLOY") $DEPLOY\"]:::$(node_class "$DEPLOY")"
             echo "  B[\"Build<br/>$(icon "$BUILD") $BUILD\"]:::$(node_class "$BUILD")"
             echo "  M[\"Migrations<br/>$(icon "$MIGRATE") $MIGRATE_LABEL\"]:::$(node_class "$MIGRATE")"
             echo "  A[\"App<br/>$(icon "$APP") $APP\"]:::$(node_class "$APP")"
             echo "  R[\"Reminders<br/>$(icon "$CRON") $CRON\"]:::$(node_class "$CRON")"
-            echo "  D --> B --> M --> A --> R"
+            echo "  T --> D --> B --> M --> A --> R"
             echo "  classDef ok fill:#1a7f37,stroke:#1a7f37,color:#ffffff"
             echo "  classDef bad fill:#cf222e,stroke:#cf222e,color:#ffffff"
             echo "  classDef warn fill:#9a6700,stroke:#9a6700,color:#ffffff"
@@ -451,6 +520,7 @@ jobs:
             echo ""
             echo "| Stage | State |"
             echo "|---|---|"
+            echo "| Tests | $(icon "$TESTS") $TESTS |"
             echo "| Deployment | $(icon "$DEPLOY") $DEPLOY |"
             echo "| Build log | $(icon "$BUILD") $BUILD |"
             echo "| Migrations | $(icon "$MIGRATE") $MIGRATE_LABEL |"
@@ -466,6 +536,7 @@ jobs:
         env:
           APP: ${{ needs.probe.outputs.state }}
           MIGRATE: ${{ needs.migrations.outputs.state }}
+          TESTS: ${{ needs.tests.outputs.state }}
         run: |
           # A green check has to mean something: the run goes red when the app is
           # not healthy, or the database is behind the code.
@@ -476,6 +547,10 @@ jobs:
           fi
           if [ "$MIGRATE" = "pending" ] || [ "$MIGRATE" = "failed" ]; then
             echo "::error::Migrations are '$MIGRATE' — see the summary."
+            FAIL=1
+          fi
+          if [ "$TESTS" = "failing" ]; then
+            echo "::error::CI is red on the default branch — see the summary."
             FAIL=1
           fi
           exit $FAIL
