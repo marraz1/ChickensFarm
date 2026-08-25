@@ -274,6 +274,32 @@ docs/
 travels in the URL. The Prisma client is generated into `src/generated/prisma`
 (gitignored, recreated by `npm install`).
 
+## Branches and releases
+
+```
+feature/*  ──>  develop  ──>  main  ──>  release  ──>  production
+```
+
+- **`develop`** — where new work lands.
+- **`main`** — reviewed and green; the candidate for the next release. Stays the
+  default branch, because GitHub only runs scheduled workflows from it.
+- **`release`** — production. Written only by the **PROD_deployment** workflow,
+  which versions `main`, fast-forwards `release`, tags `vX.Y.Z`, then watches
+  Vercel build and deploy it until `/api/health` confirms that exact version is
+  being served.
+
+Releases are cut by hand: **Actions → PROD_deployment → Run workflow** from
+`main`, choosing `patch`, `minor` or `major`. Tick `dry_run` to see what a
+release would do — including which migrations it would apply — without pushing
+anything.
+
+The running version is reported by `GET /api/health` and shown at the bottom of
+the profile screen.
+
+Full process, setup and failure handling: [`docs/RELEASE.md`](docs/RELEASE.md).
+
+---
+
 ## Deployment (Vercel + Neon)
 
 The app is built for **Vercel** with a **Neon** Postgres database. Vercel detects
@@ -351,6 +377,7 @@ Serve over HTTPS so the app stays installable as a PWA — Vercel does this by d
 
 ## Documentation
 
+- [`docs/RELEASE.md`](docs/RELEASE.md) — branch model, how to cut a release, and how to read a failed one
 - [`docs/implementation-plan.md`](docs/implementation-plan.md) — build plan and notes on how the shipped code differs from it
 - [`Paukstininkyste_reikalavimu_specifikacija.md`](Paukstininkyste_reikalavimu_specifikacija.md) — requirements specification (Lithuanian)
 - [`AGENTS.md`](AGENTS.md) — notes for AI coding agents working in this repo

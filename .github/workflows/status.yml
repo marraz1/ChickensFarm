@@ -17,12 +17,13 @@ name: Status
 # when the secret exists and explains how to add it when it does not.
 
 on:
-  # After a merge, so the question "did what I just merged actually reach
-  # production, and is it healthy?" is answered without asking. This workflow
-  # never deploys anything — Vercel does that on its own through its Git
-  # integration; the run below only watches for the result and reports it.
-  push:
-    branches: [main]
+  # Deliberately not triggered by a push any more. Production is deployed from
+  # `release` by the PROD_deployment workflow, which watches its own deploy
+  # through to a health check — so a push trigger here would either duplicate
+  # that, or, on a push to `main`, wait out its full budget for a commit that is
+  # never going to be the production commit and report a false failure.
+  #
+  # This workflow stays the general dashboard: "what is live right now?"
   workflow_dispatch:
   schedule:
     # Once each morning, off the top of the hour (GitHub's busiest minute).

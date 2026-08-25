@@ -1,0 +1,592 @@
+name: PROD_deployment
+
+# The only way code reaches production.
+#
+# Production is deployed from `release`, and this workflow is the only thing
+# that writes to it: it versions `main`, fast-forwards `release`, tags, and then
+# watches Vercel build and deploy the result until a health check confirms that
+# the exact version published is the one being served.
+#
+# Split into five sequential jobs so the run graph *is* the release pipeline and
+# each stage is visible while it happens rather than only once it ends.
+#
+#   preflight -> release -> deploy -> verify -> summary
+#
+# This workflow does not build anything itself. Vercel builds and deploys
+# `release` through its Git integration; everything here either prepares that
+# push or reports on what Vercel then does.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump"
+        type: choice
+        required: true
+        default: patch
+        options: [patch, minor, major, custom]
+      version:
+        description: "Exact version, when bump = custom (e.g. 1.4.0)"
+        type: string
+        required: false
+      dry_run:
+        description: "Run every check and change nothing"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+  deployments: read
+  actions: read
+
+concurrency:
+  # Never two releases at once: they would race for the same branch and tag.
+  group: prod-deployment
+  cancel-in-progress: false
+
+env:
+  RELEASE_BRANCH: release
+  SOURCE_BRANCH: main
+
+jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.checks.outputs.version }}
+      previous: ${{ steps.checks.outputs.previous }}
+      # Applied migrations before this release, so `verify` can report exactly
+      # what the release changed rather than just what exists afterwards.
+      applied_before: ${{ steps.checks.outputs.applied_before }}
+      pending: ${{ steps.checks.outputs.pending }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate and plan the release
+        id: checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BUMP: ${{ inputs.bump }}
+          CUSTOM: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "## Preflight" >> "$GITHUB_STEP_SUMMARY"
+          FAIL=0
+
+          # 1. Released from main only. Dispatching from a feature branch would
+          #    quietly ship whatever happened to be on it.
+          if [ "$GITHUB_REF_NAME" != "$SOURCE_BRANCH" ]; then
+            echo "❌ Dispatch this from \`$SOURCE_BRANCH\`, not \`$GITHUB_REF_NAME\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::PROD_deployment must be run from $SOURCE_BRANCH"
+            exit 1
+          fi
+
+          # 2. CI must be green on main. Only a completed run can be judged — an
+          #    in-progress one says nothing, and treating it as a failure (or as
+          #    a pass) would both be wrong.
+          runs=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=$SOURCE_BRANCH&per_page=20" 2>/dev/null || echo '{}')
+          row=$(echo "$runs" | jq -c '[.workflow_runs[]? | select(.status == "completed")][0] // empty')
+          if [ -z "$row" ]; then
+            echo "❌ No completed CI run on \`$SOURCE_BRANCH\` to judge." >> "$GITHUB_STEP_SUMMARY"
+            FAIL=1
+          else
+            CI_CONCLUSION=$(echo "$row" | jq -r '.conclusion')
+            CI_SHA=$(echo "$row" | jq -r '.head_sha[0:7]')
+            CI_URL=$(echo "$row" | jq -r '.html_url')
+            if [ "$CI_CONCLUSION" = "success" ]; then
+              echo "✅ CI green on \`$SOURCE_BRANCH\` at [\`$CI_SHA\`]($CI_URL)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "❌ CI is \`$CI_CONCLUSION\` on \`$SOURCE_BRANCH\` at [\`$CI_SHA\`]($CI_URL)" >> "$GITHUB_STEP_SUMMARY"
+              FAIL=1
+            fi
+          fi
+
+          # 3. release must be a fast-forward of main. Anything else means
+          #    someone pushed to release directly, and merging would either
+          #    conflict or silently revert their commit.
+          if git rev-parse --verify "origin/$RELEASE_BRANCH" >/dev/null 2>&1; then
+            if git merge-base --is-ancestor "origin/$RELEASE_BRANCH" "origin/$SOURCE_BRANCH"; then
+              AHEAD=$(git rev-list --count "origin/$RELEASE_BRANCH..origin/$SOURCE_BRANCH")
+              echo "✅ \`$RELEASE_BRANCH\` fast-forwards cleanly — $AHEAD commit(s) to ship" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "❌ \`$RELEASE_BRANCH\` has commits that are not on \`$SOURCE_BRANCH\`." >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "Only this workflow should write to \`$RELEASE_BRANCH\`. Merge it back first:" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              echo "git checkout $SOURCE_BRANCH && git merge origin/$RELEASE_BRANCH && git push" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              FAIL=1
+            fi
+          else
+            echo "ℹ️ \`$RELEASE_BRANCH\` does not exist yet — it will be created from \`$SOURCE_BRANCH\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # 4. Work out the next version.
+          PREVIOUS=$(jq -r '.version' package.json)
+          if [ "$BUMP" = "custom" ]; then
+            NEXT="$CUSTOM"
+            if ! printf '%s' "$NEXT" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "❌ \`$NEXT\` is not a valid version (expected X.Y.Z)." >> "$GITHUB_STEP_SUMMARY"
+              FAIL=1
+              NEXT="$PREVIOUS"
+            fi
+          else
+            IFS=. read -r MA MI PA <<< "$PREVIOUS"
+            case "$BUMP" in
+              major) NEXT="$((MA + 1)).0.0" ;;
+              minor) NEXT="$MA.$((MI + 1)).0" ;;
+              *)     NEXT="$MA.$MI.$((PA + 1))" ;;
+            esac
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v$NEXT" >/dev/null 2>&1; then
+            echo "❌ Tag \`v$NEXT\` already exists." >> "$GITHUB_STEP_SUMMARY"
+            FAIL=1
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Version:** \`$PREVIOUS\` → \`$NEXT\` (\`$BUMP\`)" >> "$GITHUB_STEP_SUMMARY"
+
+          # 5. What is live now, and what this release will migrate. Shown
+          #    before anything is pushed, so the operator can still stop.
+          APPLIED_BEFORE="[]"
+          if [ -n "$APP_URL" ]; then
+            BASE=$(printf '%s' "$APP_URL" | sed 's:/*$::')
+            code=$(curl -sS -o health.json -w '%{http_code}' --max-time 60 --location \
+              -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/health" || echo 000)
+            if jq -e '.migrations.applied' health.json >/dev/null 2>&1; then
+              APPLIED_BEFORE=$(jq -c '.migrations.applied' health.json)
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "**Live now:** version \`$(jq -r '.version // "unknown"' health.json)\`, commit \`$(jq -r '.commit // "unknown" | .[0:7]' health.json)\`" >> "$GITHUB_STEP_SUMMARY"
+
+              jq -r '.migrations.applied[]' health.json | sort > applied.txt
+              ls prisma/migrations | grep -v migration_lock.toml | sort > expected.txt || true
+              PENDING=$(comm -23 expected.txt applied.txt)
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              if [ -z "$PENDING" ]; then
+                echo "**Migrations:** none pending — this release is code only." >> "$GITHUB_STEP_SUMMARY"
+                echo "pending=0" >> "$GITHUB_OUTPUT"
+              else
+                COUNT=$(echo "$PENDING" | wc -l)
+                echo "**Migrations:** $COUNT will be applied during the production build:" >> "$GITHUB_STEP_SUMMARY"
+                echo "$PENDING" | sed 's/^/- `/;s/$/`/' >> "$GITHUB_STEP_SUMMARY"
+                echo "pending=$COUNT" >> "$GITHUB_OUTPUT"
+              fi
+            else
+              echo "⚠️ Could not read migration state (HTTP $code). Set \`CRON_SECRET\` to see it." >> "$GITHUB_STEP_SUMMARY"
+              echo "pending=?" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "⚠️ \`APP_URL\` is not set — cannot report what is live." >> "$GITHUB_STEP_SUMMARY"
+            echo "pending=?" >> "$GITHUB_OUTPUT"
+          fi
+
+          {
+            echo "version=$NEXT"
+            echo "previous=$PREVIOUS"
+            echo "applied_before=$APPLIED_BEFORE"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "🧪 **Dry run** — nothing will be pushed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $FAIL
+
+  release:
+    name: Version and promote
+    runs-on: ubuntu-latest
+    needs: preflight
+    # One job on purpose: bump, merge, tag and push belong together, and
+    # spreading them over runners would leave half-released states behind.
+    if: ${{ inputs.dry_run != true }}
+    outputs:
+      sha: ${{ steps.promote.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          # Persisted so the pushes below reuse it.
+          token: ${{ github.token }}
+
+      - name: Bump, merge into release and tag
+        id: promote
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          echo "## Version and promote" >> "$GITHUB_STEP_SUMMARY"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Pinned to the remote ref rather than relying on whatever state
+          # actions/checkout left behind, so this is the same operation whether
+          # the local branch exists, is detached, or has drifted.
+          git checkout -B "$SOURCE_BRANCH" "origin/$SOURCE_BRANCH"
+
+          echo "Bumping package.json to $VERSION"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          # package-lock.json carries the version too, but only add it if npm
+          # actually touched it — `git add` on an unchanged path is fine, on a
+          # missing one is not.
+          git add package.json
+          if [ -f package-lock.json ]; then git add package-lock.json; fi
+          git commit -m "chore(release): v$VERSION"
+          git push origin "$SOURCE_BRANCH"
+          echo "✅ \`$SOURCE_BRANCH\` bumped to \`$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+          # Fast-forward release onto main. Preflight already proved this is
+          # possible, so a merge commit is never needed and never created.
+          if git rev-parse --verify "origin/$RELEASE_BRANCH" >/dev/null 2>&1; then
+            git checkout -B "$RELEASE_BRANCH" "origin/$RELEASE_BRANCH"
+            git merge --ff-only "$SOURCE_BRANCH"
+          else
+            git checkout -B "$RELEASE_BRANCH" "$SOURCE_BRANCH"
+          fi
+
+          SHA=$(git rev-parse HEAD)
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+
+          # The push to release is what triggers Vercel's production build.
+          git push origin "$RELEASE_BRANCH"
+          git push origin "v$VERSION"
+
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "✅ \`$RELEASE_BRANCH\` now at \`${SHA:0:7}\`, tagged \`v$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Vercel builds \`$RELEASE_BRANCH\` from here." >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    needs: [preflight, release]
+    outputs:
+      state: ${{ steps.watch.outputs.state }}
+      url: ${{ steps.watch.outputs.url }}
+    steps:
+      - name: Watch Vercel build the release
+        id: watch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ needs.release.outputs.sha }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          TIMEOUT_SECONDS: 1200
+        run: |
+          echo "## Build and deploy" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "state=unknown"
+            echo "url="
+          } >> "$GITHUB_OUTPUT"
+
+          # Vercel's GitHub integration writes a deployment record for the push
+          # and updates its status as the build runs. That is free and needs no
+          # Vercel credentials; the token only adds the build output.
+          DEPLOY_URL=""
+          VERCEL_UID=""
+          STATE=""
+          SEEN=0
+
+          check_github() {
+            local id st
+            for id in $(gh api "repos/$REPO/deployments?sha=$SHA&per_page=20" --jq '.[].id' 2>/dev/null); do
+              SEEN=1
+              st=$(gh api "repos/$REPO/deployments/$id/statuses?per_page=1" --jq '.[0].state // "queued"' 2>/dev/null || echo queued)
+              case "$st" in
+                success|failure|error)
+                  DEPLOY_URL=$(gh api "repos/$REPO/deployments/$id/statuses?per_page=1" \
+                    --jq '.[0].environment_url // .[0].target_url // ""' 2>/dev/null || echo "")
+                  STATE="$st"
+                  return 0 ;;
+              esac
+              PHASE="$st"
+            done
+            return 0
+          }
+
+          resolve_vercel_uid() {
+            [ -n "$VERCEL_TOKEN" ] || return 0
+            [ -z "$VERCEL_UID" ] || return 0
+            curl -sS --max-time 30 -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?limit=1&sha=$SHA" -o v.json 2>/dev/null || return 0
+            VERCEL_UID=$(jq -r '.deployments[0].uid // empty' v.json 2>/dev/null || echo "")
+            return 0
+          }
+
+          echo "Waiting for the production deployment of ${SHA:0:7} (up to ${TIMEOUT_SECONDS}s)..."
+          DEADLINE=$((SECONDS + TIMEOUT_SECONDS))
+          LAST=""
+          POLL=0
+          PHASE="not-yet-created"
+          while :; do
+            POLL=$((POLL + 1))
+            PHASE="not-yet-created"
+            check_github
+            resolve_vercel_uid
+            [ -n "$STATE" ] && break
+
+            # A line on every transition, and otherwise once a minute — so a
+            # long build still reads as alive instead of as a hung job.
+            if [ "$PHASE" != "$LAST" ] || [ $((POLL % 4)) -eq 0 ]; then
+              echo "  [${SECONDS}s] $PHASE"
+              LAST="$PHASE"
+            fi
+
+            if [ "$SECONDS" -ge "$DEADLINE" ]; then
+              if [ "$SEEN" = "1" ]; then STATE=timeout; else STATE=none; fi
+              break
+            fi
+            sleep 15
+          done
+          echo "Result: $STATE after ${SECONDS}s."
+
+          {
+            echo "state=$STATE"
+            echo "url=$DEPLOY_URL"
+          } >> "$GITHUB_OUTPUT"
+
+          case "$STATE" in
+            success)
+              echo "✅ Vercel deployed \`${SHA:0:7}\` to production." >> "$GITHUB_STEP_SUMMARY" ;;
+            failure|error)
+              echo "❌ The production build of \`${SHA:0:7}\` failed." >> "$GITHUB_STEP_SUMMARY" ;;
+            timeout)
+              echo "⚠️ The build had not finished within ${TIMEOUT_SECONDS}s." >> "$GITHUB_STEP_SUMMARY" ;;
+            none)
+              echo "❌ No deployment record appeared for \`${SHA:0:7}\`." >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "Check that Vercel's **Production Branch** is set to \`$RELEASE_BRANCH\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "under Project → Settings → Git." >> "$GITHUB_STEP_SUMMARY" ;;
+          esac
+          if [ -n "$DEPLOY_URL" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Deployment: <$DEPLOY_URL>" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # The build output, which is where a failed migration or a prerender
+          # error actually explains itself.
+          resolve_vercel_uid
+          if [ -n "$VERCEL_UID" ]; then
+            curl -sS --max-time 60 -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v3/deployments/$VERCEL_UID/events?limit=300" -o events.json || echo '[]' > events.json
+            OPEN=""
+            if [ "$STATE" != "success" ]; then OPEN=" open"; fi
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "<details$OPEN><summary>Vercel build output</summary>" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            jq -r '[.[] | select(.type == "stdout" or .type == "stderr") |
+                   .payload.text // empty] | .[-80:] | .[]' events.json 2>/dev/null |
+              sed 's/\x1b\[[0-9;]*m//g' >> "$GITHUB_STEP_SUMMARY" || \
+              echo "(no output returned)" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+          elif [ -z "$VERCEL_TOKEN" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "_Add a \`VERCEL_TOKEN\` secret to show the build output here._" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          case "$STATE" in
+            failure|error|none) exit 1 ;;
+          esac
+
+  verify:
+    name: Verify live
+    runs-on: ubuntu-latest
+    needs: [preflight, release, deploy]
+    outputs:
+      state: ${{ steps.check.outputs.state }}
+      migrated: ${{ steps.check.outputs.migrated }}
+    steps:
+      - name: Confirm the new version is being served
+        id: check
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+          APPLIED_BEFORE: ${{ needs.preflight.outputs.applied_before }}
+          SHA: ${{ needs.release.outputs.sha }}
+          TIMEOUT_SECONDS: 600
+        run: |
+          echo "## Verify live" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "state=unknown"
+            echo "migrated=0"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ -z "$APP_URL" ]; then
+            echo "❌ \`APP_URL\` is not set — cannot verify." >> "$GITHUB_STEP_SUMMARY"
+            echo "state=unconfigured" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          BASE=$(printf '%s' "$APP_URL" | sed 's:/*$::')
+
+          probe() {
+            curl -sS -o health.json -w '%{http_code}' --max-time 60 --location \
+              -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/health" || echo 000
+          }
+          live_version() { jq -r '.version // ""' health.json 2>/dev/null; }
+          live_commit()  { jq -r '.commit  // ""' health.json 2>/dev/null; }
+
+          # A successful deploy is not the same as the new code being served:
+          # Vercel can report ready while an older instance still answers. The
+          # version and the commit both have to match before this is a release.
+          echo "Waiting for v$VERSION (${SHA:0:7}) to be served (up to ${TIMEOUT_SECONDS}s)..."
+          DEADLINE=$((SECONDS + TIMEOUT_SECONDS))
+          POLL=0
+          code=$(probe)
+          while [ "$(live_version)" != "$VERSION" ] || [ "$(live_commit)" != "$SHA" ]; do
+            if [ "$SECONDS" -ge "$DEADLINE" ]; then break; fi
+            sleep 15
+            POLL=$((POLL + 1))
+            code=$(probe)
+            echo "  [${SECONDS}s] poll #$POLL: HTTP $code, serving v$(live_version | sed 's/^$/?/') ($(live_commit | cut -c1-7))"
+          done
+
+          LIVE_V=$(live_version)
+          LIVE_C=$(live_commit)
+          if [ "$LIVE_V" = "$VERSION" ] && [ "$LIVE_C" = "$SHA" ]; then
+            STATE=ok
+            echo "✅ Serving **v$VERSION** at \`${SHA:0:7}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            STATE=stale
+            echo "❌ Expected **v$VERSION** at \`${SHA:0:7}\`, but production is serving" >> "$GITHUB_STEP_SUMMARY"
+            echo "**v${LIVE_V:-unknown}** at \`${LIVE_C:0:7}\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # What this release actually migrated, as a difference against the
+          # snapshot preflight took before anything was pushed.
+          MIGRATED=0
+          if jq -e '.migrations.applied' health.json >/dev/null 2>&1; then
+            jq -r '.migrations.applied[]' health.json | sort > after.txt
+            printf '%s' "$APPLIED_BEFORE" | jq -r '.[]' 2>/dev/null | sort > before.txt || : > before.txt
+            NEW=$(comm -13 before.txt after.txt)
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            if [ -z "$NEW" ]; then
+              echo "**Migrations:** none applied by this release." >> "$GITHUB_STEP_SUMMARY"
+            else
+              MIGRATED=$(echo "$NEW" | wc -l)
+              echo "**Migrations applied ($MIGRATED):**" >> "$GITHUB_STEP_SUMMARY"
+              echo "$NEW" | sed 's/^/- `/;s/$/`/' >> "$GITHUB_STEP_SUMMARY"
+            fi
+
+            FAILED=$(jq -r '.migrations.failed // [] | length' health.json)
+            if [ "$FAILED" -gt 0 ]; then
+              STATE=migration-failed
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "❌ A migration started and never finished:" >> "$GITHUB_STEP_SUMMARY"
+              jq -r '.migrations.failed[] | "- `\(.)`"' health.json >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "Prisma refuses every later migration while this exists (P3009):" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              echo 'DATABASE_URL="<direct-neon-url>" npx prisma migrate resolve --rolled-back <name>' >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+          HEALTH=$(jq -r '.status // "unknown"' health.json 2>/dev/null)
+          if [ "$HEALTH" != "ok" ] && [ "$STATE" = "ok" ]; then STATE=degraded; fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Health:** $HEALTH" >> "$GITHUB_STEP_SUMMARY"
+
+          {
+            echo "state=$STATE"
+            echo "migrated=$MIGRATED"
+          } >> "$GITHUB_OUTPUT"
+          [ "$STATE" = "ok" ] || exit 1
+
+  summary:
+    name: Release summary
+    runs-on: ubuntu-latest
+    needs: [preflight, release, deploy, verify]
+    if: always()
+    steps:
+      - name: Draw the release
+        env:
+          PRE: ${{ needs.preflight.result }}
+          REL: ${{ needs.release.result }}
+          DEP: ${{ needs.deploy.outputs.state }}
+          DEP_JOB: ${{ needs.deploy.result }}
+          VER: ${{ needs.verify.outputs.state }}
+          VER_JOB: ${{ needs.verify.result }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+          PREVIOUS: ${{ needs.preflight.outputs.previous }}
+          SHA: ${{ needs.release.outputs.sha }}
+          URL: ${{ needs.deploy.outputs.url }}
+          MIGRATED: ${{ needs.verify.outputs.migrated }}
+          DRY: ${{ inputs.dry_run }}
+        run: |
+          # Same visual language as ci.yml and status.yml, so all three read as
+          # one system: green passed, red failed, amber inconclusive, grey not run.
+          node_class() {
+            case "$1" in
+              ok|success) echo ok ;;
+              failure|error|failed|stale|migration-failed|degraded|none) echo bad ;;
+              timeout|unknown|cancelled) echo warn ;;
+              *) echo skip ;;
+            esac
+          }
+          icon() {
+            case "$(node_class "$1")" in
+              ok) echo "✅" ;; bad) echo "❌" ;; warn) echo "⚠️" ;; *) echo "⏭" ;;
+            esac
+          }
+
+          PRE="${PRE:-unknown}"
+          REL="${REL:-unknown}"
+          DEP="${DEP:-$DEP_JOB}"; DEP="${DEP:-unknown}"
+          VER="${VER:-$VER_JOB}"; VER="${VER:-unknown}"
+          MIG="$MIGRATED"
+          if [ -z "$MIG" ] || [ "$MIG" = "0" ]; then MIG="none"; else MIG="$MIG applied"; fi
+          if [ "$DRY" = "true" ]; then REL="dry-run"; DEP="dry-run"; VER="dry-run"; fi
+
+          {
+            echo "## Release"
+            echo ""
+            echo '```mermaid'
+            echo "flowchart LR"
+            echo "  P[\"Preflight<br/>$(icon "$PRE") $PRE\"]:::$(node_class "$PRE")"
+            echo "  V[\"Version<br/>$(icon "$REL") $REL\"]:::$(node_class "$REL")"
+            echo "  B[\"Build<br/>$(icon "$DEP") $DEP\"]:::$(node_class "$DEP")"
+            echo "  M[\"Migrations<br/>$MIG\"]:::skip"
+            echo "  H[\"Health<br/>$(icon "$VER") $VER\"]:::$(node_class "$VER")"
+            echo "  P --> V --> B --> M --> H"
+            echo "  classDef ok fill:#1a7f37,stroke:#1a7f37,color:#ffffff"
+            echo "  classDef bad fill:#cf222e,stroke:#cf222e,color:#ffffff"
+            echo "  classDef warn fill:#9a6700,stroke:#9a6700,color:#ffffff"
+            echo "  classDef skip fill:#57606a,stroke:#57606a,color:#ffffff"
+            echo '```'
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`${PREVIOUS:-?}\` → \`${VERSION:-?}\` |"
+            if [ -n "$SHA" ]; then echo "| Release commit | \`${SHA:0:7}\` |"; fi
+            if [ -n "$VERSION" ]; then echo "| Tag | \`v$VERSION\` |"; fi
+            echo "| Migrations | $MIG |"
+            if [ -n "$URL" ]; then echo "| Production | <$URL> |"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verdict
+        env:
+          PRE: ${{ needs.preflight.result }}
+          REL: ${{ needs.release.result }}
+          DEP: ${{ needs.deploy.result }}
+          VER: ${{ needs.verify.result }}
+          DRY: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY" = "true" ]; then
+            echo "Dry run: preflight=$PRE"
+            [ "$PRE" = "success" ] || exit 1
+            exit 0
+          fi
+          echo "preflight=$PRE release=$REL deploy=$DEP verify=$VER"
+          for r in "$PRE" "$REL" "$DEP" "$VER"; do
+            if [ "$r" != "success" ]; then
+              echo "::error::Release did not complete (preflight=$PRE release=$REL deploy=$DEP verify=$VER)."
+              exit 1
+            fi
+          done
