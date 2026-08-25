@@ -1,0 +1,303 @@
+name: Status
+
+# A single place to answer "is production actually alive, and what is deployed?"
+#
+# Everything lands in the run's Step Summary as a rendered dashboard rather than
+# scrolling log text, so the answer is readable without expanding a single step.
+#
+# Scope note: Vercel builds the app, GitHub does not, so the *build* log lives in
+# Vercel. What GitHub can see for free is the deployment record Vercel writes
+# back (status, target URL, commit) — enough to answer "did it ship, and which
+# commit is live". The build log itself needs VERCEL_TOKEN; the last step reads
+# it when the secret exists and explains how to add it when it does not.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Once each morning, off the top of the hour (GitHub's busiest minute).
+    - cron: "17 6 * * *"
+
+permissions:
+  contents: read
+  # Reading the deployment records Vercel writes, and the reminder run history.
+  deployments: read
+  actions: read
+
+concurrency:
+  group: status
+  cancel-in-progress: true
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "## Deployment" >> "$GITHUB_STEP_SUMMARY"
+
+          # Vercel's GitHub integration writes a Deployment per push and updates
+          # its status as the build runs, so this needs no Vercel credentials.
+          if ! gh api "repos/$REPO/deployments?per_page=5" > deployments.json 2>deployments.err; then
+            echo "Could not read deployments: $(head -c 300 deployments.err)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "$(jq 'length' deployments.json)" -eq 0 ]; then
+            echo "No deployment records. Vercel writes these through its GitHub" >> "$GITHUB_STEP_SUMMARY"
+            echo "integration — if the project was linked with the Vercel CLI instead," >> "$GITHUB_STEP_SUMMARY"
+            echo "reconnect it under Vercel → Project → Settings → Git." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "| State | Environment | Commit | Created | URL |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+
+          # One status call per deployment: the deployment itself carries no
+          # state, only its most recent status does.
+          jq -r '.[] | "\(.id)\t\(.environment)\t\(.sha[0:7])\t\(.created_at)"' deployments.json |
+          while IFS=$'\t' read -r id env sha created; do
+            status=$(gh api "repos/$REPO/deployments/$id/statuses?per_page=1" 2>/dev/null || echo '[]')
+            state=$(echo "$status" | jq -r '.[0].state // "pending"')
+            url=$(echo "$status" | jq -r '.[0].environment_url // .[0].target_url // ""')
+            case "$state" in
+              success) icon="✅" ;;
+              failure|error) icon="❌" ;;
+              in_progress|queued|pending) icon="🔄" ;;
+              *) icon="•" ;;
+            esac
+            link=""
+            if [ -n "$url" ]; then link="[open]($url)"; fi
+            echo "| $icon $state | $env | \`$sha\` | $created | $link |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Health
+        id: health
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Application" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$APP_URL" ]; then
+            echo "❌ Repository variable \`APP_URL\` is not set." >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE=$(printf '%s' "$APP_URL" | sed 's:/*$::')
+          # The detailed body is gated on CRON_SECRET; without it the endpoint
+          # answers liveness only, which is still worth reporting.
+          code=$(curl -sS -o health.json -w '%{http_code}' \
+            --max-time 60 --retry 2 --retry-all-errors \
+            --location \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$BASE/api/health" || echo 000)
+
+          if [ "$code" = "000" ]; then
+            echo "❌ Could not reach \`$BASE/api/health\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A 404 means the deployment predates this endpoint — worth saying
+          # plainly rather than reporting the app as broken.
+          if [ "$code" = "404" ]; then
+            echo "⚠️ \`/api/health\` returned 404 — the live deployment is older than this endpoint." >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! jq -e . health.json >/dev/null 2>&1; then
+            echo "❌ HTTP $code, and the body was not JSON:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            head -c 500 health.json >> "$GITHUB_STEP_SUMMARY"
+            echo '' >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STATUS=$(jq -r '.status' health.json)
+          [ "$STATUS" = "ok" ] && ICON="✅" || ICON="❌"
+          echo "**$ICON $STATUS** (HTTP $code)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if jq -e '.database' health.json >/dev/null 2>&1; then
+            echo "| Check | Result |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '
+              "| Commit | `\(.commit // "unknown" | .[0:7])` |",
+              "| Environment | \(.environment // "unknown") |",
+              "| Region | \(.region // "unknown") |",
+              "| Database | \(if .database.connected then "✅ connected (\(.database.latencyMs)ms)" else "❌ \(.database.error // "unreachable")" end) |",
+              "| Migrations applied | \(.migrations.appliedCount // "?") |",
+              "| Latest migration | `\(.migrations.latest // "none")` |",
+              "| Failed migrations | \(if (.migrations.failed // [] | length) == 0 then "none" else "❌ " + (.migrations.failed | join(", ")) end) |",
+              "| Reminders enabled | \(.reminders.enabled // 0) |",
+              "| Push devices | \(.reminders.subscriptions // 0) |",
+              "| Last reminder sent | \(.reminders.lastSentAt // "never") |"
+            ' health.json >> "$GITHUB_STEP_SUMMARY"
+
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "<details><summary>Environment configuration</summary>" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Presence only — the endpoint never returns a value." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.config | to_entries[] | "- \(if .value then "✅" else "❌" end) `\(.key)`"' \
+              health.json >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "_Liveness only. Set the \`CRON_SECRET\` secret to unlock database," >> "$GITHUB_STEP_SUMMARY"
+            echo "migration and configuration detail._" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          [ "$STATUS" = "ok" ] && echo "ok=true" >> "$GITHUB_OUTPUT" || echo "ok=false" >> "$GITHUB_OUTPUT"
+
+      - name: Migrations
+        if: always()
+        run: |
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Migrations" >> "$GITHUB_STEP_SUMMARY"
+
+          # The repo knows what *should* be applied; the live database knows what
+          # *is*. Neither alone can report a pending migration, so the comparison
+          # happens here, where both are available.
+          ls prisma/migrations | grep -v migration_lock.toml | sort > expected.txt || true
+          echo "Repository: $(wc -l < expected.txt) migration(s)." >> "$GITHUB_STEP_SUMMARY"
+
+          if ! jq -e '.migrations.applied' health.json >/dev/null 2>&1; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "_Live state unavailable — see Application above._" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          jq -r '.migrations.applied[]' health.json | sort > applied.txt
+          PENDING=$(comm -23 expected.txt applied.txt)
+
+          if [ -z "$PENDING" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "✅ The database is up to date with the repository." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "❌ Pending — present in the repository, not applied to the database:" >> "$GITHUB_STEP_SUMMARY"
+            echo "$PENDING" | sed 's/^/- `/;s/$/`/' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Production applies these during \`vercel-build\`. If they are still" >> "$GITHUB_STEP_SUMMARY"
+            echo "pending, that step failed — check the Vercel build log, and confirm" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`DIRECT_URL\` is set to the unpooled Neon URL (\`prisma migrate deploy\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "takes an advisory lock, which the pooled endpoint does not support)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Reminder schedule
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Reminder cron" >> "$GITHUB_STEP_SUMMARY"
+
+          runs=$(gh api "repos/$REPO/actions/workflows/reminders.yml/runs?per_page=10" 2>/dev/null || echo '{}')
+          total=$(echo "$runs" | jq '.workflow_runs // [] | length')
+
+          if [ "$total" -eq 0 ]; then
+            echo "No runs found." >> "$GITHUB_STEP_SUMMARY"
+          else
+            failed=$(echo "$runs" | jq '[.workflow_runs[] | select(.conclusion != "success")] | length')
+            echo "Last $total runs: $((total - failed)) succeeded, $failed failed." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+
+            # Scheduled workflows are throttled under load, so the real interval
+            # is worth showing next to the one the cron asks for.
+            echo "| Started | Result |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+            echo "$runs" | jq -r '.workflow_runs[] |
+              "| \(.run_started_at) | \(if .conclusion == "success" then "✅" else "❌ " + (.conclusion // "running") end) |"' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # The batch reports why nothing was due; surfacing it here means a quiet
+          # schedule can be told apart from a stuck one without opening a run.
+          if jq -e '.reminders.byReason' health.json >/dev/null 2>&1; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Current state of enabled reminders:" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.reminders.byReason | to_entries[] | "- `\(.key)`: \(.value)"' \
+              health.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Vercel build log
+        if: always()
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT: ${{ vars.VERCEL_PROJECT }}
+        run: |
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Build log" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "_Not configured._ GitHub cannot see Vercel's build output on its" >> "$GITHUB_STEP_SUMMARY"
+            echo "own — the build runs on Vercel. To pull it in here:" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "1. Create a token at <https://vercel.com/account/tokens> (scope it to this project)." >> "$GITHUB_STEP_SUMMARY"
+            echo "2. Add it as the repository secret \`VERCEL_TOKEN\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "3. Add the repository variable \`VERCEL_PROJECT\` (the project name)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          Q=""
+          if [ -n "$VERCEL_PROJECT" ]; then Q="&projectId=$VERCEL_PROJECT"; fi
+          if ! curl -sS --max-time 60 -H "Authorization: Bearer $VERCEL_TOKEN" \
+               "https://api.vercel.com/v6/deployments?limit=1&state=BUILDING,ERROR,READY$Q" \
+               -o vercel.json; then
+            echo "❌ Could not reach the Vercel API." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if jq -e '.error' vercel.json >/dev/null 2>&1; then
+            echo "❌ Vercel API: $(jq -r '.error.message' vercel.json)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          UID_=$(jq -r '.deployments[0].uid // empty' vercel.json)
+          if [ -z "$UID_" ]; then
+            echo "No deployments returned." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          jq -r '.deployments[0] |
+            "- State: **\(.state // .readyState)**",
+            "- Created: \(.created / 1000 | todate)",
+            "- URL: <https://\(.url)>"' vercel.json >> "$GITHUB_STEP_SUMMARY"
+
+          curl -sS --max-time 60 -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v3/deployments/$UID_/events?limit=200" -o events.json || echo '[]' > events.json
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "<details><summary>Last build output</summary>" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # Tail rather than head: a build failure is always at the end.
+          jq -r '[.[] | select(.type == "stdout" or .type == "stderr") |
+                 .payload.text // empty] | .[-60:] | .[]' events.json 2>/dev/null |
+            sed 's/\x1b\[[0-9;]*m//g' >> "$GITHUB_STEP_SUMMARY" || \
+            echo "(no output returned)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reflect health in the job result
+        if: always()
+        run: |
+          # A green check has to mean something: if the app reported degraded, or
+          # could not be reached at all, this run goes red.
+          if [ "${{ steps.health.outputs.ok }}" != "true" ]; then
+            echo "::error::Application health check did not pass — see the summary."
+            exit 1
+          fi
