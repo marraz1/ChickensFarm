@@ -17,6 +17,12 @@ name: Status
 # when the secret exists and explains how to add it when it does not.
 
 on:
+  # After a merge, so the question "did what I just merged actually reach
+  # production, and is it healthy?" is answered without asking. This workflow
+  # never deploys anything — Vercel does that on its own through its Git
+  # integration; the run below only watches for the result and reports it.
+  push:
+    branches: [main]
   workflow_dispatch:
   schedule:
     # Once each morning, off the top of the hour (GitHub's busiest minute).
@@ -40,6 +46,9 @@ jobs:
       # "ok" | "degraded" | "unreachable" | "outdated" | "unconfigured"
       state: ${{ steps.probe.outputs.state }}
       commit: ${{ steps.probe.outputs.commit }}
+      # "current" | "stale" | "unverified" — whether the commit that triggered
+      # this run is the one actually being served.
+      deployed: ${{ steps.probe.outputs.deployed }}
       # The full body, compacted onto one line, for the jobs downstream. It
       # carries no secrets: configuration is reported as booleans and reminder
       # data as counts.
@@ -50,9 +59,20 @@ jobs:
         env:
           APP_URL: ${{ vars.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          # Only a push has a commit that *should* become live as a result of
+          # this run. On a schedule or a manual run the deployment is whatever
+          # it already was, and waiting for it would be waiting for nothing.
+          EXPECTED_SHA: ${{ github.event_name == 'push' && github.sha || '' }}
+          # Generous: a Next.js build here takes about two minutes, but Vercel
+          # queues under load. Bounded so a deploy that never lands fails the
+          # run rather than holding a runner indefinitely.
+          DEPLOY_TIMEOUT_SECONDS: 600
         run: |
           echo "## Application" >> "$GITHUB_STEP_SUMMARY"
-          echo "health={}" >> "$GITHUB_OUTPUT"
+          {
+            echo "health={}"
+            echo "deployed=unverified"
+          } >> "$GITHUB_OUTPUT"
 
           if [ -z "$APP_URL" ]; then
             echo "❌ Repository variable \`APP_URL\` is not set." >> "$GITHUB_STEP_SUMMARY"
@@ -61,13 +81,57 @@ jobs:
           fi
 
           BASE=$(printf '%s' "$APP_URL" | sed 's:/*$::')
+
           # The detailed body is gated on CRON_SECRET; without it the endpoint
           # answers liveness only, which is still worth reporting.
-          code=$(curl -sS -o health.json -w '%{http_code}' \
-            --max-time 60 --retry 2 --retry-all-errors \
-            --location \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$BASE/api/health" || echo 000)
+          probe_once() {
+            curl -sS -o health.json -w '%{http_code}' \
+              --max-time 60 --retry 2 --retry-all-errors \
+              --location \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              "$BASE/api/health" || echo 000
+          }
+
+          live_sha() { jq -r '.commit // ""' health.json 2>/dev/null; }
+
+          code=$(probe_once)
+
+          # Wait for the merge to land. Without this the run races Vercel and
+          # reports the *previous* deployment as though it were the new one —
+          # a green check for code that never shipped.
+          #
+          # Verified against the commit actually being served rather than
+          # against Vercel saying "ready", because those differ: a build can
+          # succeed while an older instance keeps serving.
+          DEPLOYED=unverified
+          if [ -n "$EXPECTED_SHA" ]; then
+            # A 404 today can become a 200 once the new build is live, so it is
+            # worth waiting through. No commit field at all means liveness-only
+            # (no CRON_SECRET), and nothing can be verified — do not spin.
+            if [ "$code" = "404" ] || jq -e '.commit' health.json >/dev/null 2>&1; then
+              echo "Waiting for \`${EXPECTED_SHA:0:7}\` to be served (up to ${DEPLOY_TIMEOUT_SECONDS}s)..."
+              DEADLINE=$((SECONDS + DEPLOY_TIMEOUT_SECONDS))
+              DEPLOYED=stale
+              while [ "$(live_sha)" != "$EXPECTED_SHA" ]; do
+                if [ "$SECONDS" -ge "$DEADLINE" ]; then break; fi
+                sleep 15
+                code=$(probe_once)
+              done
+              if [ "$(live_sha)" = "$EXPECTED_SHA" ]; then DEPLOYED=current; fi
+              echo "Result: $DEPLOYED after ${SECONDS}s."
+            fi
+          elif [ -n "$(live_sha)" ]; then
+            # Not a push, but drift is still worth naming: the live commit
+            # should normally be the head of the default branch.
+            if [ "$(live_sha)" = "${GITHUB_SHA}" ]; then DEPLOYED=current; else DEPLOYED=stale; fi
+          fi
+          echo "deployed=$DEPLOYED" >> "$GITHUB_OUTPUT"
+
+          case "$DEPLOYED" in
+            current) echo "✅ Serving \`$(live_sha | cut -c1-7)\` — the commit this run was triggered by." >> "$GITHUB_STEP_SUMMARY" ;;
+            stale)   echo "❌ The live deployment is **not** the commit this run was triggered by (\`${GITHUB_SHA:0:7}\`). Serving \`$(live_sha | cut -c1-7)\`." >> "$GITHUB_STEP_SUMMARY" ;;
+          esac
+          if [ "$DEPLOYED" != "unverified" ]; then echo "" >> "$GITHUB_STEP_SUMMARY"; fi
 
           if [ "$code" = "000" ]; then
             echo "❌ Could not reach \`$BASE/api/health\`." >> "$GITHUB_STEP_SUMMARY"
@@ -459,6 +523,7 @@ jobs:
         env:
           APP: ${{ needs.probe.outputs.state }}
           COMMIT: ${{ needs.probe.outputs.commit }}
+          DEPLOYED: ${{ needs.probe.outputs.deployed }}
           DEPLOY: ${{ needs.deployment.outputs.state }}
           MIGRATE: ${{ needs.migrations.outputs.state }}
           PENDING: ${{ needs.migrations.outputs.pending }}
@@ -528,7 +593,11 @@ jobs:
             echo "| Reminder cron | $(icon "$CRON") $CRON |"
             if [ -n "$COMMIT" ]; then
               echo ""
-              echo "Live commit: \`$COMMIT\`"
+              case "${DEPLOYED:-unverified}" in
+                current) echo "Live commit: \`$COMMIT\` ✅ up to date" ;;
+                stale)   echo "Live commit: \`$COMMIT\` ❌ not the commit this run was triggered by" ;;
+                *)       echo "Live commit: \`$COMMIT\`" ;;
+              esac
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -537,6 +606,8 @@ jobs:
           APP: ${{ needs.probe.outputs.state }}
           MIGRATE: ${{ needs.migrations.outputs.state }}
           TESTS: ${{ needs.tests.outputs.state }}
+          DEPLOYED: ${{ needs.probe.outputs.deployed }}
+          EVENT: ${{ github.event_name }}
         run: |
           # A green check has to mean something: the run goes red when the app is
           # not healthy, or the database is behind the code.
@@ -551,6 +622,13 @@ jobs:
           fi
           if [ "$TESTS" = "failing" ]; then
             echo "::error::CI is red on the default branch — see the summary."
+            FAIL=1
+          fi
+          # Only on a push: a merge that never reached production is the whole
+          # reason this runs after a merge. On a schedule a stale commit is
+          # reported but not failed, since nothing was expected to deploy.
+          if [ "$EVENT" = "push" ] && [ "$DEPLOYED" = "stale" ]; then
+            echo "::error::The merged commit is not being served — the Vercel deploy did not land in time."
             FAIL=1
           fi
           exit $FAIL
