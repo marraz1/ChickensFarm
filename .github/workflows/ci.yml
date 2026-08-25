@@ -16,6 +16,11 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  # Reading the deployment record Vercel writes for the PR's preview build.
+  deployments: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -84,22 +89,238 @@ jobs:
       - name: Vitest
         run: npm test
 
+  preview:
+    name: Preview build
+    runs-on: ubuntu-latest
+    # Only on a PR. A push to main produces a production deployment, which the
+    # Status workflow already watches — doing it here too would just duplicate.
+    if: github.event_name == 'pull_request'
+    outputs:
+      state: ${{ steps.wait.outputs.state }}
+      url: ${{ steps.wait.outputs.url }}
+    steps:
+      - name: Wait for Vercel to finish building this commit
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          # The PR head, NOT github.sha: on a pull_request event github.sha is
+          # the synthetic merge commit, while Vercel builds the branch head.
+          # Using the wrong one finds no deployment, forever.
+          SHA: ${{ github.event.pull_request.head.sha }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          TIMEOUT_SECONDS: 900
+        run: |
+          echo "## Preview build" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "state=none"
+            echo "url="
+          } >> "$GITHUB_OUTPUT"
+
+          # Two ways to learn the result, tried in order. The GitHub deployment
+          # record is free and needs no Vercel credentials, but only exists if
+          # the project is linked through Vercel's GitHub integration. A project
+          # linked with the Vercel CLI writes no such record, so fall back to
+          # asking Vercel directly when a token is available.
+          #
+          # These set globals and are called directly rather than through $( ):
+          # a command substitution runs in a subshell, so everything they learned
+          # besides the state itself would be discarded on return.
+          SEEN=0
+          DEPLOY_URL=""
+          VERCEL_UID=""
+          STATE=""
+
+          check_github() {
+            local id st
+            for id in $(gh api "repos/$REPO/deployments?sha=$SHA&per_page=20" --jq '.[].id' 2>/dev/null); do
+              SEEN=1
+              st=$(gh api "repos/$REPO/deployments/$id/statuses?per_page=1" \
+                --jq '.[0].state // ""' 2>/dev/null || echo "")
+              case "$st" in
+                success|failure|error)
+                  DEPLOY_URL=$(gh api "repos/$REPO/deployments/$id/statuses?per_page=1" \
+                    --jq '.[0].environment_url // .[0].target_url // ""' 2>/dev/null || echo "")
+                  STATE="$st"
+                  return 0 ;;
+              esac
+            done
+            return 0
+          }
+
+          check_vercel() {
+            [ -n "$VERCEL_TOKEN" ] || return 0
+            curl -sS --max-time 30 -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?limit=1&sha=$SHA" -o v.json 2>/dev/null || return 0
+            local uid
+            uid=$(jq -r '.deployments[0].uid // empty' v.json 2>/dev/null || echo "")
+            [ -n "$uid" ] || return 0
+            SEEN=1
+            VERCEL_UID="$uid"
+            DEPLOY_URL="https://$(jq -r '.deployments[0].url // ""' v.json)"
+            case "$(jq -r '.deployments[0].readyState // .deployments[0].state // ""' v.json)" in
+              READY) STATE=success ;;
+              ERROR|CANCELED) STATE=failure ;;
+            esac
+            return 0
+          }
+
+          DEADLINE=$((SECONDS + TIMEOUT_SECONDS))
+          echo "Waiting for the build of ${SHA:0:7} (up to ${TIMEOUT_SECONDS}s)..."
+          while :; do
+            STATE=""
+            check_github
+            if [ -z "$STATE" ]; then check_vercel; fi
+            if [ -n "$STATE" ]; then break; fi
+            if [ "$SECONDS" -ge "$DEADLINE" ]; then
+              # Told apart deliberately: a build that exists but has not finished
+              # is a slow queue, while no record at all means nothing is watching
+              # this commit. Only the first is worth waiting on again.
+              if [ "$SEEN" = "1" ]; then STATE=timeout; else STATE=none; fi
+              break
+            fi
+            sleep 15
+          done
+          echo "Result: $STATE after ${SECONDS}s."
+
+          {
+            echo "state=$STATE"
+            echo "url=$DEPLOY_URL"
+          } >> "$GITHUB_OUTPUT"
+
+          case "$STATE" in
+            success)
+              echo "✅ Vercel built \`${SHA:0:7}\` successfully." >> "$GITHUB_STEP_SUMMARY"
+              if [ -n "$DEPLOY_URL" ]; then
+                echo "" >> "$GITHUB_STEP_SUMMARY"
+                echo "Preview: <$DEPLOY_URL>" >> "$GITHUB_STEP_SUMMARY"
+              fi ;;
+            failure|error)
+              echo "❌ Vercel failed to build \`${SHA:0:7}\`." >> "$GITHUB_STEP_SUMMARY" ;;
+            timeout)
+              echo "⚠️ The build did not finish within ${TIMEOUT_SECONDS}s. Not failing CI —" >> "$GITHUB_STEP_SUMMARY"
+              echo "a slow queue is not a broken build." >> "$GITHUB_STEP_SUMMARY" ;;
+            none)
+              echo "_No Vercel build found for this commit._ Nothing to report, and CI is" >> "$GITHUB_STEP_SUMMARY"
+              echo "not failed on it. This is expected when the project is linked with the" >> "$GITHUB_STEP_SUMMARY"
+              echo "Vercel CLI rather than the GitHub integration; adding a \`VERCEL_TOKEN\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "secret lets this ask Vercel directly instead." >> "$GITHUB_STEP_SUMMARY" ;;
+          esac
+
+          # The build log is the reason this job exists: CI runs tsc, not
+          # `next build`, so a prerender or route error only shows up here.
+          if [ "$STATE" = "failure" ] || [ "$STATE" = "error" ]; then
+            if [ -z "$VERCEL_UID" ] && [ -n "$VERCEL_TOKEN" ]; then
+              curl -sS --max-time 30 -H "Authorization: Bearer $VERCEL_TOKEN" \
+                "https://api.vercel.com/v6/deployments?limit=1&sha=$SHA" -o v.json 2>/dev/null || true
+              VERCEL_UID=$(jq -r '.deployments[0].uid // empty' v.json 2>/dev/null)
+            fi
+            if [ -n "$VERCEL_UID" ]; then
+              curl -sS --max-time 60 -H "Authorization: Bearer $VERCEL_TOKEN" \
+                "https://api.vercel.com/v3/deployments/$VERCEL_UID/events?limit=200" -o events.json || echo '[]' > events.json
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "<details open><summary>Build output (last 60 lines)</summary>" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              jq -r '[.[] | select(.type == "stdout" or .type == "stderr") |
+                     .payload.text // empty] | .[-60:] | .[]' events.json 2>/dev/null |
+                sed 's/\x1b\[[0-9;]*m//g' >> "$GITHUB_STEP_SUMMARY" || \
+                echo "(no output returned)" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+              echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              if [ -n "$DEPLOY_URL" ]; then echo "Build log: <$DEPLOY_URL>" >> "$GITHUB_STEP_SUMMARY"; fi
+              echo "_Add a \`VERCEL_TOKEN\` secret to show the build output inline._" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
   ci:
-    # One stable check name covering all three gates, so branch protection has a
+    # One stable check name covering every gate, so branch protection has a
     # single thing to require even as the jobs above are added to or renamed.
     name: CI
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, preview]
     if: always()
     steps:
+      - name: Draw the gates
+        env:
+          LINT: ${{ needs.lint.result }}
+          TYPES: ${{ needs.typecheck.result }}
+          TESTS: ${{ needs.test.result }}
+          BUILD: ${{ needs.preview.outputs.state }}
+          BUILD_JOB: ${{ needs.preview.result }}
+          URL: ${{ needs.preview.outputs.url }}
+        run: |
+          # Same visual language as the Status workflow, so the two read as one
+          # system: green passed, red failed, amber inconclusive, grey not run.
+          node_class() {
+            case "$1" in
+              success|ok) echo ok ;;
+              failure|error) echo bad ;;
+              timeout|cancelled) echo warn ;;
+              *) echo skip ;;
+            esac
+          }
+          icon() {
+            case "$(node_class "$1")" in
+              ok) echo "✅" ;; bad) echo "❌" ;; warn) echo "⚠️" ;; *) echo "⏭" ;;
+            esac
+          }
+
+          # The build node reports the Vercel result when there is one, and the
+          # job's own result otherwise — a skipped job (a push, not a PR) and a
+          # build that was never found are different facts.
+          if [ "$BUILD_JOB" = "skipped" ]; then BUILD="not on push"; fi
+          BUILD="${BUILD:-unknown}"
+
+          {
+            echo "## Gates"
+            echo ""
+            echo '```mermaid'
+            echo "flowchart LR"
+            echo "  L[\"Lint<br/>$(icon "$LINT") $LINT\"]:::$(node_class "$LINT") --> R"
+            echo "  T[\"Typecheck<br/>$(icon "$TYPES") $TYPES\"]:::$(node_class "$TYPES") --> R"
+            echo "  S[\"Test<br/>$(icon "$TESTS") $TESTS\"]:::$(node_class "$TESTS") --> R"
+            echo "  B[\"Vercel build<br/>$(icon "$BUILD") $BUILD\"]:::$(node_class "$BUILD") --> R"
+            echo "  R[\"Merge ready\"]:::skip"
+            echo "  classDef ok fill:#1a7f37,stroke:#1a7f37,color:#ffffff"
+            echo "  classDef bad fill:#cf222e,stroke:#cf222e,color:#ffffff"
+            echo "  classDef warn fill:#9a6700,stroke:#9a6700,color:#ffffff"
+            echo "  classDef skip fill:#57606a,stroke:#57606a,color:#ffffff"
+            echo '```'
+            echo ""
+            echo "| Gate | Result |"
+            echo "|---|---|"
+            echo "| Lint | $(icon "$LINT") $LINT |"
+            echo "| Typecheck | $(icon "$TYPES") $TYPES |"
+            echo "| Test | $(icon "$TESTS") $TESTS |"
+            echo "| Vercel build | $(icon "$BUILD") $BUILD |"
+            if [ -n "$URL" ]; then
+              echo ""
+              echo "Preview: <$URL>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Verdict
         env:
           RESULTS: ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.test.result }}
+          BUILD: ${{ needs.preview.outputs.state }}
         run: |
-          echo "lint/typecheck/test: $RESULTS"
+          echo "lint/typecheck/test: $RESULTS ; build: ${BUILD:-n/a}"
+          FAIL=0
           for r in $RESULTS; do
             if [ "$r" != "success" ]; then
               echo "::error::A CI gate did not pass ($RESULTS)."
-              exit 1
+              FAIL=1
+              break
             fi
           done
+          # Only an actual build failure fails CI. A build that was never found,
+          # or one still queued past the timeout, says nothing about this code —
+          # failing on either would make CI red for reasons the author cannot fix.
+          if [ "$BUILD" = "failure" ] || [ "$BUILD" = "error" ]; then
+            echo "::error::Vercel failed to build this commit — see the build output in the summary."
+            FAIL=1
+          fi
+          exit $FAIL
