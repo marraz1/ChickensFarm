@@ -112,10 +112,21 @@ jobs:
               echo "Waiting for \`${EXPECTED_SHA:0:7}\` to be served (up to ${DEPLOY_TIMEOUT_SECONDS}s)..."
               DEADLINE=$((SECONDS + DEPLOY_TIMEOUT_SECONDS))
               DEPLOYED=stale
+              POLL=0
               while [ "$(live_sha)" != "$EXPECTED_SHA" ]; do
                 if [ "$SECONDS" -ge "$DEADLINE" ]; then break; fi
                 sleep 15
+                POLL=$((POLL + 1))
                 code=$(probe_once)
+                # A line per poll, not just at the start and the end: without
+                # this the raw log goes dead for up to ten minutes, which reads
+                # identically to a hung job from anyone watching it run.
+                SEEN=$(live_sha)
+                if [ -n "$SEEN" ]; then
+                  echo "  [${SECONDS}s] poll #$POLL: HTTP $code, serving ${SEEN:0:7} (want ${EXPECTED_SHA:0:7})"
+                else
+                  echo "  [${SECONDS}s] poll #$POLL: HTTP $code, no commit reported yet"
+                fi
               done
               if [ "$(live_sha)" = "$EXPECTED_SHA" ]; then DEPLOYED=current; fi
               echo "Result: $DEPLOYED after ${SECONDS}s."
@@ -209,14 +220,72 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          # Only a push has a specific commit worth watching for. On a schedule
+          # or a manual run nothing new is expected, so this stays the single
+          # snapshot it always was.
+          WAIT_SHA: ${{ github.event_name == 'push' && github.sha || '' }}
+          TIMEOUT_SECONDS: 600
         run: |
           echo "## Deployment" >> "$GITHUB_STEP_SUMMARY"
           echo "state=none" >> "$GITHUB_OUTPUT"
 
+          fetch() {
+            gh api "repos/$REPO/deployments?per_page=5" > deployments.json 2>deployments.err
+          }
+
           # Vercel's GitHub integration writes a Deployment per push and updates
           # its status as the build runs, so this needs no Vercel credentials.
-          if ! gh api "repos/$REPO/deployments?per_page=5" > deployments.json 2>deployments.err; then
-            echo "Could not read deployments: $(head -c 300 deployments.err)" >> "$GITHUB_STEP_SUMMARY"
+          #
+          # On a push, wait for that specific record to appear and reach a
+          # terminal state, echoing every transition and a heartbeat every
+          # minute. Without this the job used to finish in a couple of seconds —
+          # often before Vercel had even registered the deployment — and
+          # answered a question about a build that had not started yet. The
+          # part someone watching this run actually wants to see is exactly the
+          # part that used to be skipped.
+          if [ -n "$WAIT_SHA" ]; then
+            echo "Waiting for a deployment record for \`${WAIT_SHA:0:7}\` (up to ${TIMEOUT_SECONDS}s)..."
+            DEADLINE=$((SECONDS + TIMEOUT_SECONDS))
+            LAST=""
+            POLL=0
+            while :; do
+              POLL=$((POLL + 1))
+              if fetch; then
+                ID=$(jq -r --arg s "$WAIT_SHA" '[.[] | select(.sha == $s)][0].id // empty' deployments.json 2>/dev/null)
+                if [ -n "$ID" ]; then
+                  STATE=$(gh api "repos/$REPO/deployments/$ID/statuses?per_page=1" \
+                    --jq '.[0].state // "queued"' 2>/dev/null || echo queued)
+                else
+                  STATE="not-yet-created"
+                fi
+              else
+                STATE="api-error"
+              fi
+
+              # A line on every state change, and otherwise once a minute — a
+              # transition matters immediately, but "still queued" is worth
+              # repeating occasionally so a long, unchanged wait still reads as
+              # alive rather than stuck.
+              if [ "$STATE" != "$LAST" ] || [ $((POLL % 4)) -eq 0 ]; then
+                echo "  [${SECONDS}s] $STATE"
+                LAST="$STATE"
+              fi
+
+              case "$STATE" in
+                success|failure|error) break ;;
+              esac
+              if [ "$SECONDS" -ge "$DEADLINE" ]; then
+                echo "  [${SECONDS}s] gave up waiting after ${TIMEOUT_SECONDS}s"
+                break
+              fi
+              sleep 15
+            done
+          else
+            fetch || true
+          fi
+
+          if [ ! -s deployments.json ] || ! jq -e . deployments.json >/dev/null 2>&1; then
+            echo "Could not read deployments: $(head -c 300 deployments.err 2>/dev/null)" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
