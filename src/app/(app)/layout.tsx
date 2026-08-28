@@ -1,7 +1,6 @@
 import { requireUser, resolveActiveFarm } from "@/lib/session";
 import { FarmSwitcher } from "@/components/layout/farm-switcher";
 import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
-import { Fab } from "@/components/layout/fab";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
@@ -19,14 +18,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-md flex-1 pb-24">{children}</main>
+      {/* Bottom padding clears the tab bar only — the add button sits inside it
+          now, so no extra room is needed above the bar. */}
+      <main className="mx-auto w-full max-w-md flex-1 pb-20">{children}</main>
 
-      {activeFarm && (
-        <>
-          <BottomTabBar />
-          <Fab />
-        </>
-      )}
+      {activeFarm && <BottomTabBar />}
     </div>
   );
 }

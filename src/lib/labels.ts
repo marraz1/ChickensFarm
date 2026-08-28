@@ -5,6 +5,7 @@ import type {
   LossReasonType,
   ExpenseCategory,
   EggQuality,
+  BirdTransactionType,
 } from "@/generated/prisma/client";
 
 export const birdCategoryLabels: Record<BirdCategory, string> = {
@@ -58,4 +59,16 @@ export const expenseCategoryLabels: Record<ExpenseCategory, string> = {
 export const eggQualityLabels: Record<EggQuality, string> = {
   HEALTHY: "Sveiki",
   BROKEN: "Sudaužyti",
+};
+
+export const birdTransactionTypeLabels: Record<BirdTransactionType, string> = {
+  PURCHASE: "Pirkimas",
+  SALE: "Pardavimas",
+};
+
+// The other party's role depends on the direction: we sell to a buyer and buy
+// from a seller.
+export const birdTransactionCounterpartyLabels: Record<BirdTransactionType, string> = {
+  PURCHASE: "Pardavėjas",
+  SALE: "Pirkėjas",
 };
