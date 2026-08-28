@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 // Imported relatively, not via "@/", so the suite runs with no vitest config:
 // this module deliberately has no internal imports of its own.
 import {
-  LATE_TOLERANCE_MINUTES,
   addLocalDays,
   dateOnlyUtc,
   evaluateDue,
@@ -95,12 +94,16 @@ describe("isDue", () => {
     expect(isDue(setting(), at("2026-07-15T15:45:00Z"))).toBe(false);
   });
 
-  it("fires at the edge of the tolerance window but not past it", () => {
-    const edge = at(
-      `2026-07-15T${String(16 + LATE_TOLERANCE_MINUTES / 60).padStart(2, "0")}:00:00Z`,
-    );
-    expect(isDue(setting(), edge)).toBe(true);
-    expect(isDue(setting(), new Date(edge.getTime() + 60_000))).toBe(false);
+  it("stays due for the rest of the local day, however late the tick is", () => {
+    // 19:00 Vilnius is 16:00Z in summer; 20:59Z is 23:59 local, the last minute
+    // of the same day.
+    expect(isDue(setting(), at("2026-07-15T20:59:00Z"))).toBe(true);
+  });
+
+  it("waits for the next occurrence once the local day has rolled over", () => {
+    // 21:30Z is 00:30 on the 16th local: the 19:00 reminder is no longer this
+    // day's business and must not go out stamped with the wrong day.
+    expect(isDue(setting(), at("2026-07-15T21:30:00Z"))).toBe(false);
   });
 
   it("stays silent once the local day has already been handled", () => {
@@ -131,7 +134,7 @@ describe("isDue", () => {
 
   it("still delivers a reminder set inside the DST spring-forward gap", () => {
     // 2026-03-29: Vilnius jumps 03:00 -> 04:00, so 03:30 local never exists.
-    // 01:10Z is 04:10 local, 40 min "late" — inside the tolerance.
+    // 01:10Z is 04:10 local, 40 min "late" — still the same local day.
     expect(isDue(setting({ sendTime: "03:30" }), at("2026-03-29T01:10:00Z"))).toBe(true);
   });
 
@@ -170,10 +173,13 @@ describe("evaluateDue", () => {
     expect(evaluateDue(candidate, at("2026-07-15T15:30:00Z"))).toBe("beforeTime");
     expect(evaluateDue(candidate, at("2026-07-15T16:00:00Z"))).toBe("due");
     expect(evaluateDue(candidate, at("2026-07-15T19:59:00Z"))).toBe("due");
-    expect(evaluateDue(candidate, at("2026-07-15T20:30:00Z"))).toBe("windowMissed");
+    // Still the same local day (23:30), so still due rather than dropped.
+    expect(evaluateDue(candidate, at("2026-07-15T20:30:00Z"))).toBe("due");
+    // Past local midnight it belongs to the next occurrence.
+    expect(evaluateDue(candidate, at("2026-07-15T21:30:00Z"))).toBe("beforeTime");
   });
 
-  it("separates an already-handled day from a missed window", () => {
+  it("separates an already-handled day from one still waiting", () => {
     const handled = {
       sendTime: "19:00",
       timeZone: VILNIUS,
@@ -201,12 +207,20 @@ describe("evaluateDue", () => {
     }
   });
 
-  it("covers a gap the previous 120-minute window would have dropped", () => {
-    // GitHub throttled the schedule: the tick after 19:00 local landed 3h late.
-    const candidate = { sendTime: "19:00", timeZone: VILNIUS, lastRunOn: null };
-    const threeHoursLate = at("2026-07-15T19:00:00Z"); // 22:00 local
-    expect(LATE_TOLERANCE_MINUTES).toBeGreaterThanOrEqual(180);
-    expect(evaluateDue(candidate, threeHoursLate)).toBe("due");
+  it("survives the real 11-hour scheduler blackout that dropped reminders", () => {
+    // The bug this replaced: GitHub delivered 12% of the ticks the workflow
+    // asked for, and on 2026-08-28 nothing ran between 00:06Z and 11:22Z. A
+    // 07:00 local reminder was 4h22m late by the time a tick arrived — past the
+    // old 240-minute cap, so it was dropped for the day and never sent.
+    const candidate = { sendTime: "07:00", timeZone: VILNIUS, lastRunOn: null };
+    expect(evaluateDue(candidate, at("2026-08-28T00:06:00Z"))).toBe("beforeTime");
+    expect(evaluateDue(candidate, at("2026-08-28T11:22:00Z"))).toBe("due");
+  });
+
+  it("delivers a morning reminder even if the first tick comes that evening", () => {
+    const candidate = { sendTime: "07:00", timeZone: VILNIUS, lastRunOn: null };
+    // 20:00Z is 23:00 local — 16 hours late, and still the same day.
+    expect(evaluateDue(candidate, at("2026-08-28T20:00:00Z"))).toBe("due");
   });
 });
 
@@ -257,11 +271,13 @@ describe("nextSendAt", () => {
     );
   });
 
-  it("rolls to tomorrow once the window has closed", () => {
+  it("still points at today's slot while it is overdue and unsent", () => {
     const candidate = { sendTime: "19:00", timeZone: VILNIUS, lastRunOn: null };
-    // 23:30 local — past 19:00 + 4h.
+    // 23:30 local, four and a half hours late and never sent. The honest answer
+    // is today's instant in the past — it goes out on the next tick — rather
+    // than tomorrow, which would imply today's was written off.
     expect(nextSendAt(candidate, new Date("2026-07-15T20:30:00Z"))?.toISOString()).toBe(
-      "2026-07-16T16:00:00.000Z",
+      "2026-07-15T16:00:00.000Z",
     );
   });
 
@@ -278,10 +294,15 @@ describe("nextSendAt", () => {
   });
 
   it("keeps the chosen wall-clock time across a DST change", () => {
-    const candidate = { sendTime: "19:00", timeZone: VILNIUS, lastRunOn: null };
-    // 23:30 local on the 24th (UTC+3, window closed) rolls to the 25th — the
-    // autumn fall-back day, which runs at UTC+2 by 19:00. Adding a flat 24h to
-    // the previous slot would land an hour early.
+    const candidate = {
+      sendTime: "19:00",
+      timeZone: VILNIUS,
+      // Sent already on the 24th, so the next one is genuinely tomorrow.
+      lastRunOn: dateOnlyUtc("2026-10-24"),
+    };
+    // The 24th runs at UTC+3; the 25th is the autumn fall-back day and is at
+    // UTC+2 by 19:00. Adding a flat 24h to the previous slot would land an hour
+    // early, so the instant is recomputed from the local wall-clock time.
     const next = nextSendAt(candidate, new Date("2026-10-24T20:30:00Z"));
     expect(next?.toISOString()).toBe("2026-10-25T17:00:00.000Z");
     expect(getLocalNow(next!, VILNIUS).minutes).toBe(19 * 60);

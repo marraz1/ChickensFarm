@@ -186,8 +186,11 @@ Delivery is driven by `.github/workflows/reminders.yml`, which POSTs to
 `/api/cron/reminders` every 15 minutes with `Authorization: Bearer $CRON_SECRET`.
 GitHub Actions is used rather than Vercel Cron because Vercel's Hobby plan only
 allows a once-per-day schedule. The schedule runs in UTC; per-user local time is
-resolved by the app, and a reminder is delivered up to 2 hours late to absorb
-scheduler drift, after which it is skipped until the next day.
+resolved by the app. GitHub throttles that schedule hard — measured over 62 h it
+delivered 12% of the requested ticks, with blackouts up to 11 h — so a reminder
+stays deliverable for the rest of its own local day rather than expiring after a
+fixed window. It can therefore arrive late, but it is not silently lost; it never
+crosses local midnight, and `lastRunOn` keeps it to one send per day.
 
 Setup, in order:
 

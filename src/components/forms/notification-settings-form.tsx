@@ -61,10 +61,6 @@ const STATUS_TEXT: Record<NotificationStatusReason, { text: string; tone: "warn"
   },
   alreadyHandled: { text: "Šios dienos priminimas jau apdorotas.", tone: "muted" },
   beforeTime: { text: "Laukiama nustatyto laiko.", tone: "muted" },
-  windowMissed: {
-    text: "Šiandienos laikas praleistas — priminimas bus siunčiamas kitą dieną.",
-    tone: "muted",
-  },
   due: { text: "Priminimas turi būti išsiųstas artimiausiu metu.", tone: "muted" },
 };
 

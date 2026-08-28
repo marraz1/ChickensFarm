@@ -80,7 +80,6 @@ export type NotificationStatusReason =
   | "dataEntered"
   | "alreadyHandled"
   | "beforeTime"
-  | "windowMissed"
   | "due";
 
 export type NotificationStatus = {
