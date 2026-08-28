@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then DATABASE_URL=\"${DIRECT_URL:-$DATABASE_URL}\" prisma migrate deploy; fi && next build",
+    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then ./scripts/prod-migrate.sh; fi && next build",
     "start": "next start",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
