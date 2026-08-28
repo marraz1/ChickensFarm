@@ -38,20 +38,14 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-function TabLink({
-  tab,
-  active,
-}: {
-  tab: (typeof TABS)[number];
-  active: boolean;
-}) {
+function TabLink({ tab, active }: { tab: (typeof TABS)[number]; active: boolean }) {
   const Icon = tab.icon;
   return (
     <Link
       href={tab.href}
       className={cn(
         "flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 py-2 text-muted-foreground",
-        active && "text-primary"
+        active && "text-primary",
       )}
     >
       {/* Fixed-height icon row: the add button's circle is taller than a plain
