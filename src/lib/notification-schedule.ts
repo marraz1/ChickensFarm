@@ -9,23 +9,26 @@ export const DEFAULT_TIME_ZONE = "Europe/Vilnius";
 export const DEFAULT_SEND_TIME = "19:00";
 
 /**
- * How late a reminder may still be delivered, in minutes.
+ * A reminder stays deliverable for the rest of its own local day.
  *
- * Must comfortably exceed (cron interval + worst-case scheduler drift). The
- * workflow asks for every 15 min, but that is a request, not a promise: GitHub
- * throttles scheduled workflows under load, and the observed gaps on this repo
- * run 30–100 min, which left almost no headroom against the original 120. Four
- * hours keeps a missed tick from silently costing the whole day.
+ * There used to be a fixed lateness cap (240 min) as well, on the assumption
+ * that scheduler drift is bounded. It is not. The workflow asks for a tick every
+ * 15 min, but that is a request, not a promise: measured over 62 h of real runs,
+ * GitHub delivered 12% of the ticks it was asked for, with four blackouts of
+ * 5.1 h, 9.5 h, 11.2 h and 11.3 h. A reminder whose time fell inside one of
+ * those was dropped for the whole day and never sent. A reminder that arrives
+ * late is worth more than one that never arrives, so the local day is now the
+ * only bound.
  *
- * It also covers the DST spring-forward gap: on the last Sunday of March,
- * Europe/Vilnius skips 03:00–03:59 entirely, and a reminder set inside that
- * hour only becomes reachable on a later tick.
+ * That bound needs no constant: it is the `late < 0` check in evaluateDue. Past
+ * local midnight the day has rolled over, `late` goes negative, and the reminder
+ * waits for its next occurrence instead of arriving stamped with the wrong day.
+ * Exactly-once per local day comes from the `lastRunOn` compare-and-set.
  *
- * The window still never crosses local midnight — past midnight the local day
- * has rolled over, `late` goes negative, and the reminder waits for tomorrow
- * rather than arriving stamped with the wrong day.
+ * Dropping the cap also removed the DST spring-forward edge case it existed to
+ * cover: on the last Sunday of March Europe/Vilnius skips 03:00–03:59, and a
+ * reminder set inside that hour is simply picked up by a later tick that day.
  */
-export const LATE_TOLERANCE_MINUTES = 240;
 
 export const SEND_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -106,9 +109,7 @@ export type DueReason =
   /** This local day was already sent or deliberately skipped. */
   | "alreadyHandled"
   /** The chosen time has not arrived yet today. */
-  | "beforeTime"
-  /** The chosen time passed more than LATE_TOLERANCE_MINUTES ago. */
-  | "windowMissed";
+  | "beforeTime";
 
 export type DueCandidate = {
   sendTime: string;
@@ -120,12 +121,10 @@ export type DueCandidate = {
 /**
  * Whether a reminder should be acted on right now.
  *
- * The window is bounded on both sides on purpose. An unbounded "now is past the
- * send time" rule delivers a 08:00 reminder at 14:00 after an outage, and — worse
- * — is inconsistent across midnight: a 21:00 reminder still unsent at 01:00 would
- * compare against the *new* day and never fire at all. Requiring 0 <= late <=
- * tolerance makes both cases behave the same way: skip today, fire normally
- * tomorrow.
+ * Due from the chosen time until the end of that local day. The day is the only
+ * bound (see the note above): `late < 0` both defers a time that has not arrived
+ * and, past midnight, keeps a still-unsent 21:00 reminder from firing against
+ * the *new* day stamped with the wrong one — it waits for tonight instead.
  *
  * Returns the reason rather than a boolean so both the cron log and the
  * settings screen can say *why* nothing happened. "Nothing was due" was
@@ -140,10 +139,7 @@ export function evaluateDue(candidate: DueCandidate, now: Date): DueReason {
     return "alreadyHandled";
   }
 
-  const late = localNow.minutes - scheduled;
-  if (late < 0) return "beforeTime";
-  if (late > LATE_TOLERANCE_MINUTES) return "windowMissed";
-  return "due";
+  return localNow.minutes < scheduled ? "beforeTime" : "due";
 }
 
 export function isDue(candidate: DueCandidate, now: Date): boolean {
@@ -239,10 +235,13 @@ export function zonedWallTimeToInstant(
 /**
  * The instant the next reminder is expected, or null when the time is unusable.
  *
- * Today still counts while its delivery window is open; once the window has
- * closed — or the day is already spoken for — the answer is tomorrow at the
- * same wall-clock time. Recomputed per day rather than by adding 24 h, so a DST
- * change keeps the reminder at the time the user actually chose.
+ * Today counts until it has been sent or skipped — matching evaluateDue, whose
+ * only bound is the local day. So an unsent reminder whose time has passed
+ * reports today's instant, in the past: it is genuinely overdue and goes out on
+ * the next tick, which is more honest than pointing at tomorrow. Once the day is
+ * spoken for, the answer is tomorrow at the same wall-clock time. Recomputed per
+ * day rather than by adding 24 h, so a DST change keeps the reminder at the time
+ * the user actually chose.
  */
 export function nextSendAt(candidate: DueCandidate, now: Date): Date | null {
   const scheduled = parseSendTime(candidate.sendTime);
@@ -252,8 +251,7 @@ export function nextSendAt(candidate: DueCandidate, now: Date): Date | null {
   const localNow = getLocalNow(now, zone);
   const handledToday =
     candidate.lastRunOn != null && toLocalDateString(candidate.lastRunOn) >= localNow.date;
-  const todayStillOpen = !handledToday && localNow.minutes <= scheduled + LATE_TOLERANCE_MINUTES;
 
-  const day = todayStillOpen ? localNow.date : addLocalDays(localNow.date, 1);
+  const day = handledToday ? addLocalDays(localNow.date, 1) : localNow.date;
   return zonedWallTimeToInstant(day, scheduled, zone);
 }
