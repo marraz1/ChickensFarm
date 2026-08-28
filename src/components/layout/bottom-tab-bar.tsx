@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Feather, Wallet, Egg } from "lucide-react";
+import { QuickAddButton } from "@/components/layout/quick-add";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -21,7 +22,9 @@ export function BottomTabBar() {
         {TABS.slice(0, 2).map((tab) => (
           <TabLink key={tab.href} tab={tab} active={isActive(pathname, tab.href)} />
         ))}
-        <div className="w-14" aria-hidden />
+        {/* Centre slot: the add button lives in the bar itself, so nothing
+            floats over the page content. */}
+        <QuickAddButton />
         {TABS.slice(2).map((tab) => (
           <TabLink key={tab.href} tab={tab} active={isActive(pathname, tab.href)} />
         ))}
@@ -51,7 +54,11 @@ function TabLink({
         active && "text-primary"
       )}
     >
-      <Icon size={20} aria-hidden />
+      {/* Fixed-height icon row: the add button's circle is taller than a plain
+          icon, and without this the labels would sit at different heights. */}
+      <span className="flex h-7 items-center">
+        <Icon size={20} aria-hidden />
+      </span>
       <span className="text-[11px]">{tab.label}</span>
     </Link>
   );
