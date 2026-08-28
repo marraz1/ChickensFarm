@@ -1,38 +1,35 @@
 import { prisma } from "@/lib/prisma";
 import { getExpensesByCategoryReport } from "@/lib/services/expenses";
+import { getBirdTransactionTotals } from "@/lib/services/bird-transactions";
+import { buildMonthlyTotals, toCents, type MonthlyTotal } from "@/lib/finance-math";
 import type { ExpenseCategory } from "@/generated/prisma/client";
 
 export type ProfitLossRange = { from: Date; to: Date };
 
-export type ProfitLossMonth = {
-  year: number;
-  /** 0-based, matching Date#getUTCMonth and formatMonthLT. */
-  month: number;
-  income: number;
-  expenses: number;
-  profit: number;
-};
+export type ProfitLossMonth = MonthlyTotal;
 
 export type ProfitLossReport = {
-  /** Income currently means egg sales only — there is no other income model. */
+  /** Egg sales plus bird sales. */
   income: number;
+  /** Recorded expenses plus what was paid for bought birds. */
   expenses: number;
   profit: number;
   eggsSold: number;
+  /** The egg-sales share of `income`. */
+  eggSalesIncome: number;
+  /** The bird-sales share of `income`. */
+  birdSalesIncome: number;
+  birdsSold: number;
+  /**
+   * The bird-purchase share of `expenses`. Kept out of `expensesByCategory`,
+   * which only covers Expense rows, so the P&L page can show it as its own row
+   * and the breakdown still adds up to the expense total.
+   */
+  birdPurchaseCost: number;
+  birdsBought: number;
   expensesByCategory: Record<ExpenseCategory, number>;
   monthly: ProfitLossMonth[];
 };
-
-function monthKey(date: Date): string {
-  return `${date.getUTCFullYear()}-${date.getUTCMonth()}`;
-}
-
-// Per-month and per-category buckets accumulate many Decimals, and repeated
-// float addition drifts (0.1 + 0.2). Sum in integer cents and divide once, so
-// the month rows and category rows add up to the totals exactly.
-function toCents(value: unknown): number {
-  return Math.round(Number(value ?? 0) * 100);
-}
 
 export async function getProfitLossReport(
   farmId: string,
@@ -40,72 +37,72 @@ export async function getProfitLossReport(
 ): Promise<ProfitLossReport> {
   const dateFilter = { gte: range.from, lte: range.to };
 
-  const [salesAgg, expensesByCategory, salesByDate, expensesByDate] = await Promise.all([
-    prisma.eggSale.aggregate({
-      where: { farmId, saleDate: dateFilter },
-      _sum: { totalAmount: true, quantity: true },
-    }),
-    getExpensesByCategoryReport(farmId, range),
-    // Grouped by exact date rather than month: Prisma cannot group on a
-    // date_trunc expression, and both tables are indexed on [farmId, <date>],
-    // so this stays one indexed scan per table instead of 12 aggregates.
-    prisma.eggSale.groupBy({
-      by: ["saleDate"],
-      where: { farmId, saleDate: dateFilter },
-      _sum: { totalAmount: true },
-    }),
-    prisma.expense.groupBy({
-      by: ["expenseDate"],
-      where: { farmId, expenseDate: dateFilter },
-      _sum: { amount: true },
-    }),
+  const [salesAgg, expensesByCategory, birdTotals, salesByDate, expensesByDate, birdTxByDate] =
+    await Promise.all([
+      prisma.eggSale.aggregate({
+        where: { farmId, saleDate: dateFilter },
+        _sum: { totalAmount: true, quantity: true },
+      }),
+      getExpensesByCategoryReport(farmId, range),
+      getBirdTransactionTotals(farmId, range),
+      // Grouped by exact date rather than month: Prisma cannot group on a
+      // date_trunc expression, and both tables are indexed on [farmId, <date>],
+      // so this stays one indexed scan per table instead of 12 aggregates.
+      prisma.eggSale.groupBy({
+        by: ["saleDate"],
+        where: { farmId, saleDate: dateFilter },
+        _sum: { totalAmount: true },
+      }),
+      prisma.expense.groupBy({
+        by: ["expenseDate"],
+        where: { farmId, expenseDate: dateFilter },
+        _sum: { amount: true },
+      }),
+      // Both directions in one indexed scan; `type` decides which side of the
+      // month bucket each row lands on.
+      prisma.birdTransaction.groupBy({
+        by: ["transactionDate", "type"],
+        where: { farmId, transactionDate: dateFilter },
+        _sum: { totalAmount: true },
+      }),
+    ]);
+
+  const monthly = buildMonthlyTotals([
+    ...salesByDate.map((row) => ({
+      date: row.saleDate,
+      incomeCents: toCents(row._sum.totalAmount),
+    })),
+    ...expensesByDate.map((row) => ({
+      date: row.expenseDate,
+      expensesCents: toCents(row._sum.amount),
+    })),
+    // Sold birds are income, bought birds an expense — same table, opposite
+    // sides of the month row.
+    ...birdTxByDate.map((row) =>
+      row.type === "SALE"
+        ? { date: row.transactionDate, incomeCents: toCents(row._sum.totalAmount) }
+        : { date: row.transactionDate, expensesCents: toCents(row._sum.totalAmount) },
+    ),
   ]);
 
-  type Bucket = { year: number; month: number; incomeCents: number; expensesCents: number };
-  const buckets = new Map<string, Bucket>();
-  const bucketFor = (date: Date) => {
-    const key = monthKey(date);
-    let bucket = buckets.get(key);
-    if (!bucket) {
-      bucket = {
-        year: date.getUTCFullYear(),
-        month: date.getUTCMonth(),
-        incomeCents: 0,
-        expensesCents: 0,
-      };
-      buckets.set(key, bucket);
-    }
-    return bucket;
-  };
-
-  for (const row of salesByDate) {
-    bucketFor(row.saleDate).incomeCents += toCents(row._sum.totalAmount);
-  }
-  for (const row of expensesByDate) {
-    bucketFor(row.expenseDate).expensesCents += toCents(row._sum.amount);
-  }
-
-  const monthly = [...buckets.values()]
-    .map(({ year, month, incomeCents, expensesCents }) => ({
-      year,
-      month,
-      income: incomeCents / 100,
-      expenses: expensesCents / 100,
-      profit: (incomeCents - expensesCents) / 100,
-    }))
-    .sort((a, b) => a.year - b.year || a.month - b.month);
-
-  const incomeCents = toCents(salesAgg._sum.totalAmount);
-  const expensesCents = Object.values(expensesByCategory).reduce(
-    (sum, value) => sum + toCents(value),
-    0,
-  );
+  const eggIncomeCents = toCents(salesAgg._sum.totalAmount);
+  const birdIncomeCents = toCents(birdTotals.salesAmount);
+  const birdPurchaseCents = toCents(birdTotals.purchaseAmount);
+  const incomeCents = eggIncomeCents + birdIncomeCents;
+  const expensesCents =
+    Object.values(expensesByCategory).reduce((sum, value) => sum + toCents(value), 0) +
+    birdPurchaseCents;
 
   return {
     income: incomeCents / 100,
     expenses: expensesCents / 100,
     profit: (incomeCents - expensesCents) / 100,
     eggsSold: salesAgg._sum.quantity ?? 0,
+    eggSalesIncome: eggIncomeCents / 100,
+    birdSalesIncome: birdIncomeCents / 100,
+    birdsSold: birdTotals.birdsSold,
+    birdPurchaseCost: birdPurchaseCents / 100,
+    birdsBought: birdTotals.birdsBought,
     expensesByCategory,
     monthly,
   };
@@ -116,7 +113,7 @@ export async function getProfitLossReport(
  * Falls back to the current year when the farm has no records yet.
  */
 export async function getEarliestFinanceYear(farmId: string): Promise<number> {
-  const [firstSale, firstExpense] = await Promise.all([
+  const [firstSale, firstExpense, firstBirdTransaction] = await Promise.all([
     prisma.eggSale.findFirst({
       where: { farmId },
       orderBy: { saleDate: "asc" },
@@ -127,9 +124,18 @@ export async function getEarliestFinanceYear(farmId: string): Promise<number> {
       orderBy: { expenseDate: "asc" },
       select: { expenseDate: true },
     }),
+    prisma.birdTransaction.findFirst({
+      where: { farmId },
+      orderBy: { transactionDate: "asc" },
+      select: { transactionDate: true },
+    }),
   ]);
 
-  const years = [firstSale?.saleDate, firstExpense?.expenseDate]
+  const years = [
+    firstSale?.saleDate,
+    firstExpense?.expenseDate,
+    firstBirdTransaction?.transactionDate,
+  ]
     .filter((date): date is Date => date != null)
     .map((date) => date.getUTCFullYear());
 

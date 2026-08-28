@@ -103,10 +103,18 @@ export default async function ProfitLossPage({
   const isDefaultView = !isCustomRange && selectedMonth == null && selectedYear === currentYear;
   const spansMultipleYears = new Set(report.monthly.map((month) => month.year)).size > 1;
 
-  const categories = (
-    Object.entries(expenseCategoryLabels) as [keyof typeof report.expensesByCategory, string][]
-  )
-    .map(([key, label]) => ({ key, label, amount: report.expensesByCategory[key] }))
+  // Bought birds are an expense without an ExpenseCategory, so they join the
+  // breakdown as their own row — otherwise the rows would not add up to the
+  // expense total they are shown as percentages of.
+  const categories = [
+    ...(Object.entries(expenseCategoryLabels) as [string, string][]).map(([key, label]) => ({
+      key,
+      label,
+      amount: report.expensesByCategory[key as keyof typeof report.expensesByCategory],
+    })),
+    { key: "BIRD_PURCHASES", label: "Paukščių pirkimai", amount: report.birdPurchaseCost },
+  ]
+    .filter((row) => row.amount > 0)
     .sort((a, b) => b.amount - a.amount);
   const maxCategoryAmount = categories[0]?.amount ?? 0;
 
@@ -202,6 +210,11 @@ export default async function ProfitLossPage({
             <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
               Parduota {report.eggsSold} kiaušinių
             </p>
+            {report.birdsSold > 0 && (
+              <p className="text-[11px] leading-tight text-muted-foreground">
+                Parduota {report.birdsSold} paukščių · {formatEUR(report.birdSalesIncome)}
+              </p>
+            )}
           </Card>
           <Card className="p-4">
             <p className="text-sm text-muted-foreground">Išlaidos</p>
@@ -209,6 +222,11 @@ export default async function ProfitLossPage({
             <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
               Visos laikotarpio išlaidos
             </p>
+            {report.birdsBought > 0 && (
+              <p className="text-[11px] leading-tight text-muted-foreground">
+                Pirkta {report.birdsBought} paukščių · {formatEUR(report.birdPurchaseCost)}
+              </p>
+            )}
           </Card>
         </div>
 

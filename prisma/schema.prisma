@@ -61,6 +61,16 @@ enum BirdGroupEventType {
   MANUAL_ADJUSTMENT
   LOSS
   INCUBATION_HATCH
+  PURCHASE
+  SALE
+}
+
+// Buying and selling live birds. One enum rather than two models: both sides
+// record the same shape (date, head count, unit price, total, counterparty) and
+// differ only in sign — purchases are money out, sales money in.
+enum BirdTransactionType {
+  PURCHASE
+  SALE
 }
 
 model User {
@@ -165,6 +175,7 @@ model Farm {
   expenses         Expense[]
   incubationCycles IncubationCycle[]
   birdGroupEvents  BirdGroupEvent[]
+  birdTransactions BirdTransaction[]
 
   @@index([ownerId])
   @@map("farms")
@@ -218,6 +229,7 @@ model BirdGroup {
   losses            Loss[]
   eggCollections    EggCollection[]
   events            BirdGroupEvent[]
+  birdTransactions  BirdTransaction[]
   hatchedFromCycles IncubationCycle[] @relation("EggSourceGroup")
   hatchedIntoCycles IncubationCycle[] @relation("ResultingGroup")
 
@@ -353,6 +365,30 @@ model Expense {
   @@index([farmId, expenseDate])
   @@index([farmId, category])
   @@map("expenses")
+}
+
+// Live-bird purchases and sales. Mirrors EggSale's money shape (unitPrice ×
+// quantity → totalAmount, with the total stored so a hand-agreed price survives
+// a later unit-price edit), and Loss's optional birdGroupId link: naming a group
+// moves its head count too, leaving it null records money only.
+model BirdTransaction {
+  id              String              @id @default(cuid())
+  farmId          String
+  farm            Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  birdGroupId     String?
+  birdGroup       BirdGroup?          @relation(fields: [birdGroupId], references: [id], onDelete: SetNull)
+  type            BirdTransactionType
+  transactionDate DateTime            @db.Date
+  quantity        Int
+  unitPrice       Decimal             @db.Decimal(10, 2)
+  totalAmount     Decimal             @db.Decimal(10, 2)
+  counterparty    String? // pirkėjas (sale) arba pardavėjas (purchase)
+  note            String?
+  createdAt       DateTime            @default(now())
+
+  @@index([farmId, transactionDate])
+  @@index([farmId, type])
+  @@map("bird_transactions")
 }
 
 model IncubationCycle {

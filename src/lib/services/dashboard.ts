@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { BirdType } from "@/generated/prisma/client";
 import { birdTypeOrder } from "@/lib/labels";
+import { getBirdTransactionTotals } from "@/lib/services/bird-transactions";
 
 export type ActivityItem = {
   id: string;
@@ -34,6 +35,8 @@ export async function getDashboardData(farmId: string) {
     incomeThisYearAgg,
     expensesThisYearAgg,
     lossesLast30dAgg,
+    birdTotalsThisMonth,
+    birdTotalsThisYear,
     recentCollections,
     recentLosses,
     recentHenLogs,
@@ -81,6 +84,11 @@ export async function getDashboardData(farmId: string) {
       where: { farmId, lossDate: { gte: thirtyDaysAgo } },
       _sum: { quantity: true },
     }),
+    // Bird sales are income and bird purchases are expenses, so the balance
+    // cards fold them in alongside egg sales and recorded expenses. Left open at
+    // the top end like the egg/expense sums right above.
+    getBirdTransactionTotals(farmId, { from: monthStart }),
+    getBirdTransactionTotals(farmId, { from: yearStart }),
     prisma.eggCollection.findMany({
       where: { farmId },
       orderBy: { createdAt: "desc" },
@@ -144,10 +152,14 @@ export async function getDashboardData(farmId: string) {
     eggsThisMonth: eggsThisMonthAgg._sum.quantity ?? 0,
     eggsThisYear: eggsThisYearAgg._sum.quantity ?? 0,
     eggsRemaining,
-    incomeThisMonth: Number(incomeThisMonthAgg._sum.totalAmount ?? 0),
-    expensesThisMonth: Number(expensesThisMonthAgg._sum.amount ?? 0),
-    incomeThisYear: Number(incomeThisYearAgg._sum.totalAmount ?? 0),
-    expensesThisYear: Number(expensesThisYearAgg._sum.amount ?? 0),
+    incomeThisMonth:
+      Number(incomeThisMonthAgg._sum.totalAmount ?? 0) + birdTotalsThisMonth.salesAmount,
+    expensesThisMonth:
+      Number(expensesThisMonthAgg._sum.amount ?? 0) + birdTotalsThisMonth.purchaseAmount,
+    incomeThisYear:
+      Number(incomeThisYearAgg._sum.totalAmount ?? 0) + birdTotalsThisYear.salesAmount,
+    expensesThisYear:
+      Number(expensesThisYearAgg._sum.amount ?? 0) + birdTotalsThisYear.purchaseAmount,
     lossesLast30d: lossesLast30dAgg._sum.quantity ?? 0,
     // Reported alongside the sums so the page labels the very same period the
     // aggregates were built from, instead of re-deriving "now" itself.
