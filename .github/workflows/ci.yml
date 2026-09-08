@@ -104,7 +104,12 @@ jobs:
       - run: npm ci
 
       - name: npm audit (high/critical only)
-        run: npm audit --audit-level=high
+        run: |
+          # Fails the build on any high/critical CVE not explicitly accepted
+          # in check-npm-audit.js (each entry there documents why it's
+          # currently unreachable rather than fixed).
+          npm audit --audit-level=high --json > audit.json || true
+          node .github/scripts/check-npm-audit.mjs audit.json
 
   preview:
     name: Preview build
