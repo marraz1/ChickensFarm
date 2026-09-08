@@ -27,18 +27,18 @@ routes were checked against that convention by direct reading, not by search.
 
 ## Summary
 
-| # | Category | Verdict |
-|---|----------|---------|
-| API1 | Broken Object Level Authorization | Clean |
-| API2 | Broken Authentication | **Finding (High)** |
-| API3 | Broken Object Property Level Authorization | Clean |
-| API4 | Unrestricted Resource Consumption | **Finding (Medium)** — same root cause as API2 |
-| API5 | Broken Function Level Authorization | Clean |
-| API6 | Unrestricted Access to Sensitive Business Flows | **Finding (Medium)** |
-| API7 | Server Side Request Forgery | **Finding (Medium)** |
-| API8 | Security Misconfiguration | Minor note |
-| API9 | Improper Inventory Management | Clean |
-| API10 | Unsafe Consumption of APIs | Clean |
+| #     | Category                                        | Verdict                                        |
+| ----- | ----------------------------------------------- | ---------------------------------------------- |
+| API1  | Broken Object Level Authorization               | Clean                                          |
+| API2  | Broken Authentication                           | **Finding (High)**                             |
+| API3  | Broken Object Property Level Authorization      | Clean                                          |
+| API4  | Unrestricted Resource Consumption               | **Finding (Medium)** — same root cause as API2 |
+| API5  | Broken Function Level Authorization             | Clean                                          |
+| API6  | Unrestricted Access to Sensitive Business Flows | **Finding (Medium)**                           |
+| API7  | Server Side Request Forgery                     | **Finding (Medium)**                           |
+| API8  | Security Misconfiguration                       | Minor note                                     |
+| API9  | Improper Inventory Management                   | Clean                                          |
+| API10 | Unsafe Consumption of APIs                      | Clean                                          |
 
 ---
 
@@ -71,6 +71,7 @@ PR #134's "Farm membership boundary" test group exercises directly.
 `api/auth/*` routes.
 
 Positives:
+
 - Sessions use NextAuth v5 (JWT strategy); the Edge-safe `auth.config.ts` is shared
   between `middleware.ts` and the full config, so route protection and session
   validation use one source of truth.
@@ -91,12 +92,13 @@ CAPTCHA anywhere in the codebase — confirmed by grepping the whole `src/` tree
 `rate` / `ratelimit` (no matches outside comments) and by there being no
 `vercel.json` or middleware-level throttling. Nothing in `next.config.ts` or
 `middleware.ts` limits request rate either. This means:
-  - Credential stuffing / password brute-forcing against `/api/auth/callback/credentials`
-    is unthrottled.
-  - `POST /api/auth/password-reset` can be hit repeatedly for an arbitrary target
-    email, which — since the endpoint always sends the reset email when the account
-    exists — becomes an email-bombing vector against a victim's inbox.
-  - `POST /api/auth/register` can be scripted to create accounts in bulk (see API6).
+
+- Credential stuffing / password brute-forcing against `/api/auth/callback/credentials`
+  is unthrottled.
+- `POST /api/auth/password-reset` can be hit repeatedly for an arbitrary target
+  email, which — since the endpoint always sends the reset email when the account
+  exists — becomes an email-bombing vector against a victim's inbox.
+- `POST /api/auth/register` can be scripted to create accounts in bulk (see API6).
 
 Minor note: `registerSchema.password` requires only 8 characters with no complexity
 rule (`src/lib/validation/auth.ts`). Acceptable under modern length-over-complexity
@@ -196,7 +198,7 @@ never an arbitrary third party.
 `blob/upload` specifically, and any endpoint accepting a URL.
 
 `blob/upload` does not fetch a client-supplied URL — it hands back a signed token for
-the *browser* to upload directly to Vercel Blob, which is the safe direction. No
+the _browser_ to upload directly to Vercel Blob, which is the safe direction. No
 route accepts a webhook-config URL or an "image URL" to fetch server-side.
 
 **Finding (Medium): `POST /api/push/subscribe` accepts an arbitrary,
@@ -228,8 +230,7 @@ of hosts (`fcm.googleapis.com`, `updates.push.services.mozilla.com`,
 - No CORS headers are set anywhere in the app, which is the safe default for a
   same-origin app with no public API consumers — not a finding.
 - `handleApiError` (`src/lib/api-utils.ts`) maps known domain errors
-  (`ForbiddenError` → 403, `ValidationError` → 400, `ConcurrentModificationError` →
-  409) to clean JSON messages and re-throws anything else, which Next.js turns into
+  (`ForbiddenError` → 403, `ValidationError` → 400, `ConcurrentModificationError` → 409) to clean JSON messages and re-throws anything else, which Next.js turns into
   its standard production 500 response — no stack traces or internal details are
   returned to the client for unexpected errors.
 - `api/notifications/test` is reachable in production, but that's by design (it's the
@@ -288,7 +289,7 @@ web-push (`src/lib/push.ts`), and Vercel Blob (`api/blob/upload`).
   response is trusted or acted on beyond that.
 - Vercel Blob: `handleUpload` from `@vercel/blob/client` is used as documented,
   with content-type and size restricted in `onBeforeGenerateToken`; the completed
-  upload's URL is only persisted when the *user's own form* is submitted, not from
+  upload's URL is only persisted when the _user's own form_ is submitted, not from
   the `onUploadCompleted` callback — so a Blob response cannot itself trigger a write
   through this route beyond what the client already validated.
 
@@ -303,11 +304,11 @@ reminder messages), or trusted for authorization decisions.
 
 ## Follow-up issues filed
 
-| Issue | Category | Severity | Title |
-|-------|----------|----------|-------|
-| [#135](https://github.com/marraz1/ChickensFarm/issues/135) | API2 / API4 | High | Add rate limiting / brute-force protection to auth endpoints |
-| [#136](https://github.com/marraz1/ChickensFarm/issues/136) | API6 | Medium | Restrict `/api/notifications/test` to the caller's own address |
-| [#137](https://github.com/marraz1/ChickensFarm/issues/137) | API7 | Medium | Allowlist push subscription endpoint hosts to prevent SSRF |
+| Issue                                                      | Category    | Severity | Title                                                          |
+| ---------------------------------------------------------- | ----------- | -------- | -------------------------------------------------------------- |
+| [#135](https://github.com/marraz1/ChickensFarm/issues/135) | API2 / API4 | High     | Add rate limiting / brute-force protection to auth endpoints   |
+| [#136](https://github.com/marraz1/ChickensFarm/issues/136) | API6        | Medium   | Restrict `/api/notifications/test` to the caller's own address |
+| [#137](https://github.com/marraz1/ChickensFarm/issues/137) | API7        | Medium   | Allowlist push subscription endpoint hosts to prevent SSRF     |
 
 All three are filed as sub-issues of #82.
 
