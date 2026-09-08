@@ -10,3 +10,4 @@ src/generated
 next-env.d.ts
 duomenu_modelio_er_diagrama.html
 mobile_dashboard_mockup.html
+docs/evaluations/*.html
