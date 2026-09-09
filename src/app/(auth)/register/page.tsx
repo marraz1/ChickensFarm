@@ -9,7 +9,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { registerSchema, type RegisterInput } from "@/lib/validation/auth";
+import { registerFormSchema, type RegisterFormInput } from "@/lib/validation/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,14 +19,15 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterInput>({ resolver: zodResolver(registerSchema) });
+  } = useForm<RegisterFormInput>({ resolver: zodResolver(registerFormSchema) });
 
-  async function onSubmit(data: RegisterInput) {
+  async function onSubmit(data: RegisterFormInput) {
     setServerError(null);
+    const { name, email, password } = data;
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ name, email, password }),
     });
 
     if (!res.ok) {
@@ -78,6 +79,23 @@ export default function RegisterPage() {
           {...register("password")}
         />
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-start gap-2">
+          <input
+            id="consent"
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
+            {...register("consent")}
+          />
+          <Label htmlFor="consent" className="text-sm font-normal leading-snug">
+            Sutinku su{" "}
+            <Link href="/privacy#pareiskimas" className="underline hover:no-underline">
+              privatumo ir duomenų saugumo pareiškimu
+            </Link>
+          </Label>
+        </div>
+        {errors.consent && <p className="text-sm text-destructive">{errors.consent.message}</p>}
       </div>
       {serverError && <p className="text-sm text-destructive">{serverError}</p>}
       <Button type="submit" disabled={isSubmitting} className="h-11 mt-2">

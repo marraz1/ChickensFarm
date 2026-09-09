@@ -94,6 +94,21 @@ export default function PrivacyPage() {
                 administratoriumi arba sistemos administratoriumi.
               </p>
             </section>
+
+            <section id="pareiskimas">
+              <h2 className="font-medium">Privatumo ir duomenų saugumo pareiškimas</h2>
+              <p className="mt-2">
+                Aplikacijos kūrėjas deda pastangas užtikrinti duomenų saugumą, tačiau negarantuoja
+                absoliutaus apsaugos nuo trečiųjų šalių įsilaužimų, techninių gedimų ar kitų
+                nenumatytų aplinkybių. Registruodamasis ir naudodamasis paskyra, naudotojas
+                patvirtina, kad supranta su tuo susijusią riziką ir sutinka, kad kūrėjas neprisiima
+                atsakomybės už galimus nuostolius, kilusius dėl duomenų saugumo pažeidimų,
+                nesusijusių su kūrėjo tyčiniais veiksmais ar dideliu aplaidumu. Naudotojas atsisako
+                bet kokių pretenzijų šiuo pagrindu, jei tokia atsakomybė nėra privaloma pagal
+                galiojančius teisės aktus.
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">Pareiškimo versija: 1.0</p>
+            </section>
           </div>
         </div>
       </div>

@@ -7,6 +7,16 @@ export const registerSchema = z.object({
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
+// Extends registerSchema with the registration-only consent checkbox (privacy/data-security
+// disclaimer). Kept separate from registerSchema so the API payload (RegisterInput) never
+// carries a `consent` field the service layer doesn't expect.
+export const registerFormSchema = registerSchema.extend({
+  consent: z.boolean().refine((val) => val === true, {
+    message: "Turite sutikti su pareiškimu, kad galėtumėte registruotis",
+  }),
+});
+export type RegisterFormInput = z.infer<typeof registerFormSchema>;
+
 export const loginSchema = z.object({
   email: z.string().trim().email("Neteisingas el. pašto formatas"),
   password: z.string().min(1, "Įveskite slaptažodį"),
