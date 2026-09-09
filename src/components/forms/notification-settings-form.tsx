@@ -136,10 +136,15 @@ export function NotificationSettingsForm({
   }
 
   /**
-   * Tests whichever channels are currently on, using the message/address the
-   * user has typed right now — not what was last saved. Bypasses the schedule
-   * entirely (the API route never touches lastRunOn), so this can never
-   * accidentally mark today as handled and suppress the real reminder.
+   * Tests whichever channels are currently on, using the message the user has
+   * typed right now — not what was last saved. Bypasses the schedule entirely
+   * (the API route never touches lastRunOn), so this can never accidentally
+   * mark today as handled and suppress the real reminder.
+   *
+   * The email address is deliberately not sent here: the API route ignores
+   * any client-supplied address and always resolves the destination itself
+   * from the caller's account — see issue #136. So an edited-but-not-yet-saved
+   * address in the field above is not what the test send goes to.
    */
   async function onSendTest() {
     setTestResult(null);
@@ -151,7 +156,6 @@ export function NotificationSettingsForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: watch("message"),
-          email: watch("email"),
           emailEnabled: watch("emailEnabled"),
           pushEnabled: watch("pushEnabled"),
         }),

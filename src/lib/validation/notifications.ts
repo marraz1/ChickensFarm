@@ -63,13 +63,17 @@ export const notificationSettingSchema = z
 
 export type NotificationSettingInput = z.infer<typeof notificationSettingSchema>;
 
-// For the "send test now" button: the same message/email/channel fields, but
-// with no sendTime or timeZone — a test bypasses the schedule entirely, it
-// never touches lastRunOn, so there is nothing to be due.
+// For the "send test now" button: the message/channel fields, but with no
+// sendTime or timeZone — a test bypasses the schedule entirely, it never
+// touches lastRunOn, so there is nothing to be due.
+//
+// Deliberately no `email` field: the route resolves the recipient itself from
+// the caller's session (account email or saved NotificationSetting.email) —
+// see issue #136. An arbitrary client-supplied address would turn this
+// endpoint into a send-to-anyone relay through the app's own Resend account.
 export const notificationTestSchema = z
   .object({
     message: messageField,
-    email: emailField,
     emailEnabled: z.boolean(),
     pushEnabled: z.boolean(),
   })
