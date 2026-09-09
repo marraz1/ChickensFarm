@@ -59,12 +59,24 @@ export default function RegisterPage() {
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="email">El. paštas</Label>
-        <Input id="email" type="email" autoComplete="email" className="h-11" {...register("email")} />
+        <Input
+          id="email"
+          type="email"
+          autoComplete="email"
+          className="h-11"
+          {...register("email")}
+        />
         {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="password">Slaptažodis</Label>
-        <Input id="password" type="password" autoComplete="new-password" className="h-11" {...register("password")} />
+        <Input
+          id="password"
+          type="password"
+          autoComplete="new-password"
+          className="h-11"
+          {...register("password")}
+        />
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
       </div>
       {serverError && <p className="text-sm text-destructive">{serverError}</p>}
@@ -75,6 +87,11 @@ export default function RegisterPage() {
         Jau turite paskyrą?{" "}
         <Link href="/login" className="font-medium text-foreground hover:underline">
           Prisijungti
+        </Link>
+      </p>
+      <p className="text-center text-sm text-muted-foreground">
+        <Link href="/privacy" className="hover:underline">
+          Privatumo pranešimas
         </Link>
       </p>
     </form>
