@@ -15,6 +15,24 @@ export function getNotificationSetting(userId: string) {
 }
 
 /**
+ * Where a test notification (POST /api/notifications/test) is allowed to go:
+ * the account's saved NotificationSetting.email if one is set, otherwise the
+ * account's own login email — mirroring the fallback the real reminder batch
+ * uses (see attemptEmail in src/lib/services/reminders.ts).
+ *
+ * Deliberately takes no client-supplied address: the test endpoint used to
+ * accept an arbitrary `email` from the request body, which let any
+ * authenticated user relay attacker-chosen text to anyone through this app's
+ * own Resend account (issue #136).
+ */
+export function resolveTestEmailRecipient(
+  accountEmail: string | null | undefined,
+  savedEmail: string | null | undefined,
+): string | null {
+  return savedEmail ?? accountEmail ?? null;
+}
+
+/**
  * Creates or updates the caller's settings.
  *
  * Switching reminders ON when the chosen time has already passed today stamps

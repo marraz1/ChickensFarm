@@ -4,6 +4,7 @@ import { handleApiError } from "@/lib/api-utils";
 import { notificationTestSchema } from "@/lib/validation/notifications";
 import { isEmailConfigured, sendReminderEmail } from "@/lib/email";
 import { pushPublicKey, reminderPayload, sendPushToUser } from "@/lib/push";
+import { getNotificationSetting, resolveTestEmailRecipient } from "@/lib/services/notifications";
 
 type ChannelResult = {
   attempted: boolean;
@@ -36,8 +37,11 @@ function describeSendError(err: unknown): string {
  *
  * This never touches NotificationSetting.lastRunOn, unlike a real reminder — a
  * test must never accidentally mark today as "handled" and suppress the
- * scheduled send. Takes the current form values directly rather than reading
- * the saved row, so it tests what the user is about to save, before they save it.
+ * scheduled send. Takes the current message/channel toggles directly from the
+ * request body, so it tests what the user is about to save, before they save
+ * it — but the email destination is never one of them: it is always the
+ * caller's own saved NotificationSetting.email or account email, resolved
+ * server-side, never a client-supplied address (issue #136).
  */
 export async function POST(req: Request) {
   try {
@@ -50,14 +54,15 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const { message, email, emailEnabled, pushEnabled } = parsed.data;
+    const { message, emailEnabled, pushEnabled } = parsed.data;
 
     let emailResult: ChannelResult = { attempted: false, sent: false };
     if (emailEnabled) {
       if (!isEmailConfigured()) {
         emailResult = { attempted: true, sent: false, reason: "RESEND_API_KEY nenustatytas" };
       } else {
-        const recipient = email?.trim() || user.email;
+        const setting = await getNotificationSetting(user.id);
+        const recipient = resolveTestEmailRecipient(user.email, setting?.email);
         if (!recipient) {
           emailResult = { attempted: true, sent: false, reason: "nenurodytas adresas" };
         } else {
