@@ -430,5 +430,6 @@ Serve over HTTPS so the app stays installable as a PWA — Vercel does this by d
 
 - [`docs/RELEASE.md`](docs/RELEASE.md) — branch model, how to cut a release, and how to read a failed one
 - [`docs/implementation-plan.md`](docs/implementation-plan.md) — build plan and notes on how the shipped code differs from it
+- [`docs/compliance/gdpr-applicability.md`](docs/compliance/gdpr-applicability.md) — decision record on GDPR applicability given the app's current (public-registration) usage pattern
 - [`Paukstininkyste_reikalavimu_specifikacija.md`](Paukstininkyste_reikalavimu_specifikacija.md) — requirements specification (Lithuanian)
 - [`AGENTS.md`](AGENTS.md) — notes for AI coding agents working in this repo
