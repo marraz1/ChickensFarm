@@ -51,12 +51,24 @@ function LoginForm() {
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="email">El. paštas</Label>
-        <Input id="email" type="email" autoComplete="email" className="h-11" {...register("email")} />
+        <Input
+          id="email"
+          type="email"
+          autoComplete="email"
+          className="h-11"
+          {...register("email")}
+        />
         {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="password">Slaptažodis</Label>
-        <Input id="password" type="password" autoComplete="current-password" className="h-11" {...register("password")} />
+        <Input
+          id="password"
+          type="password"
+          autoComplete="current-password"
+          className="h-11"
+          {...register("password")}
+        />
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
       </div>
       {serverError && <p className="text-sm text-destructive">{serverError}</p>}
@@ -73,6 +85,9 @@ function LoginForm() {
             Registruotis
           </Link>
         </p>
+        <Link href="/privacy" className="hover:underline">
+          Privatumo pranešimas
+        </Link>
       </div>
     </form>
   );
