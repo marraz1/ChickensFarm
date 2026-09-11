@@ -6,8 +6,19 @@ const { auth } = NextAuth(authConfig);
 
 const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
 
+// Unlike PUBLIC_PATHS, these are legitimate to view whether or not the visitor
+// is signed in (an unauthenticated register-screen visitor reads it *before*
+// having a session, but a signed-in user should be able to open it too), so
+// they're exempt from both redirects below rather than only the signed-out one.
+const ALWAYS_ACCESSIBLE_PATHS = ["/privacy"];
+
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+  const isAlwaysAccessible = ALWAYS_ACCESSIBLE_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+  if (isAlwaysAccessible) return;
+
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   if (!req.auth && !isPublic) {
