@@ -1,6 +1,9 @@
+import * as Sentry from "@sentry/nextjs";
+
 // Domain error types shared by the service layer and mapped to HTTP status
-// codes by handleApiError. Kept free of framework imports so services can throw
-// them without pulling in next/server.
+// codes by handleApiError. Kept free of framework imports (Sentry above is
+// used only by logError, further down) so services can throw them without
+// pulling in next/server.
 
 export class ValidationError extends Error {
   constructor(message: string) {
@@ -18,18 +21,21 @@ export class ConcurrentModificationError extends Error {
   }
 }
 
-// Structured error logging (issue #91). There is no logging library in this
-// app — on purpose, for a small solo-maintained project — so this writes one
-// JSON object per line to stderr via console.error. Vercel's log pipeline
+// Structured error logging (issue #91), also forwarded to Sentry for the
+// "unexpected" case (issue #74). There is no logging library in this app —
+// on purpose, for a small solo-maintained project — so this writes one JSON
+// object per line to stderr via console.error. Vercel's log pipeline
 // captures stdout/stderr per invocation and treats a JSON line as structured,
 // making it filterable/queryable in the log explorer, unlike a bare stack
 // trace dump.
 //
 // "expected" is for errors handleApiError already knows how to map to a 4xx
 // response (ValidationError, ForbiddenError, ConcurrentModificationError) —
-// still worth a record, but not an on-call-worthy one. "unexpected" is
-// everything else: the case that previously vanished into Next.js's generic
-// unstructured output with zero structured trace of what happened.
+// still worth a record, but not an on-call-worthy one, so it stays out of
+// Sentry to avoid spending the free tier's event quota on noise. "unexpected"
+// is everything else: the case that previously vanished into Next.js's
+// generic unstructured output with zero structured trace of what happened,
+// and the case an on-call human actually needs an alert for.
 export type ErrorLogSeverity = "expected" | "unexpected";
 
 export interface ErrorLogEntry {
@@ -50,6 +56,10 @@ export interface ErrorLogEntry {
  * @param err The caught value. Non-Error throws are coerced into a message.
  * @param severity "expected" for errors already mapped to a specific HTTP
  *   response, "unexpected" for anything else. Defaults to "unexpected".
+ *   "unexpected" errors are also reported to Sentry via `Sentry.captureException`
+ *   — a no-op when SENTRY_DSN isn't configured (local dev, CI), since
+ *   sentry.server.config.ts/sentry.edge.config.ts set `enabled: false` in
+ *   that case.
  */
 export function logError(
   context: string,
@@ -66,4 +76,8 @@ export function logError(
     ...(error.stack ? { stack: error.stack } : {}),
   };
   console.error(JSON.stringify(entry));
+
+  if (severity === "unexpected") {
+    Sentry.captureException(error, { tags: { context } });
+  }
 }
