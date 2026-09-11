@@ -13,7 +13,7 @@ that work is tracked separately in issues #62 and #64.
 
 | Processor                    | Service Used                 | Data Processed                                                            | DPA Available                                     | DPA Signed Date                                                                               |
 | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| [Resend](https://resend.com) | Transactional email delivery | User email addresses, email content (e.g. notifications, password resets) | Yes — Resend offers a GDPR DPA                    | Not yet signed — see issue #62/#64                                                            |
+| [Resend](https://resend.com) | Transactional email delivery | User email addresses, email content (e.g. notifications, password resets) | N/A — no separate signature flow                  | Auto-incorporated 2026-09-11 (see note below)                                                 |
 | [Neon](https://neon.tech)    | Postgres database hosting    | All application data at rest, including user account and personal data    | Yes, pre-signed by Neon — countersigning optional | Incorporated by reference 2026-09-11; formal countersigned copy not yet done (see note below) |
 | [Vercel](https://vercel.com) | Application hosting          | Request data in transit, logs, environment variables                      | N/A — no separate signature flow                  | Auto-incorporated 2026-09-11 (see note below)                                                 |
 
@@ -27,6 +27,15 @@ only appears on Pro/Enterprise plans — this team is currently on Hobby, so it
 404s; that tab isn't required for compliance, since the DPA already applies
 regardless of plan.
 
+**Resend note:** same pattern as Vercel — Resend's DPA is pre-signed on their
+side and becomes fully executed automatically the moment you sign up for an
+account, since it's incorporated into their standard Terms of Service.
+There's no separate counter-signature step. A copy for records is available
+from the Documents page in the Resend dashboard (requires login) or the
+public reference copy on Resend's legal site. A custom/modified DPA (e.g.
+different sub-processor terms) would require an Enterprise plan and direct
+contact with Resend — not needed here.
+
 **Neon note:** using Neon's platform already legally incorporates its DPA by
 reference into Neon's terms — no action is required for that baseline
 coverage. Neon also offers a standalone, pre-signed PDF
@@ -39,12 +48,19 @@ or listed return address for a countersigned copy — the most likely contact
 points are security@neon.tech or [neon.com/contact-sales](https://neon.com/contact-sales).
 Countersigning has not been done as of this writing.
 
+## Status
+
+All three processors are now covered — none of them require a manual
+signature for baseline GDPR compliance. Vercel and Resend are fully
+resolved (auto-incorporated, no action possible or needed). Neon is also
+auto-incorporated by reference; the only thing left is optional — a formal
+countersigned PDF copy for your own audit trail, which is not required for
+compliance. Issues #62 and #64 ("review and sign") can be considered
+resolved on that basis: reviewing all three confirmed none needed signing,
+Neon's countersigning being the sole optional exception.
+
 ## Keeping this up to date
 
-Vercel is fully resolved (no action needed — see note above). Neon has
-baseline coverage already (incorporated by reference) but a formal
-countersigned copy is still outstanding if wanted for records. Once Resend
-has actually been reviewed and signed, and/or the Neon PDF countersigned
-(issues #62 and #64), update the corresponding "DPA Signed Date" cells above
-with the real date. If a new processor starts handling personal data on
-behalf of this app, add a row for it here as part of that change.
+If Neon's PDF ever gets countersigned, update its "DPA Signed Date" cell
+above with the real date. If a new processor starts handling personal data
+on behalf of this app, add a row for it here as part of that change.
