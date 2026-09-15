@@ -22,6 +22,9 @@ Sentry.init({
   // Kept low on purpose: the free tier's event quota is the limiting
   // resource for a small solo-maintained project, not trace coverage gaps.
   tracesSampleRate: dsn ? 0.1 : 0,
+
+  // See src/sentry.server.config.ts for why this is on for all three levels.
+  integrations: [Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] })],
 });
 
 // Required by the SDK to record App Router navigations as breadcrumbs/spans;
