@@ -1,7 +1,6 @@
 # Review process
 
-> **Status: Proposed** — see the 2026-09-15 entry in
-> [`decisions.md`](decisions.md). Merging the PR that added this file accepts it.
+> Adopted 2026-09-15 — see the entry in [`decisions.md`](decisions.md) for why.
 
 Every pull request into `main` already gets CI (`.github/workflows/ci.yml`) and
 a self-review against [`REVIEW.md`](../REVIEW.md). That is enough for most
