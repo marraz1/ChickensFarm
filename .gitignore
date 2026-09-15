@@ -46,3 +46,6 @@ next-env.d.ts
 
 # claude code runtime artifacts
 .claude/scheduled_tasks.lock
+
+.vercel
+.env*
