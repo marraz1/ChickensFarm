@@ -37,10 +37,10 @@ Snyk would have caught.
 
 ---
 
-## 2026-09-15 — Occasional human co-reviewer for high-risk changes: proposed
+## 2026-09-15 — Occasional human co-reviewer for high-risk changes: adopted
 
-**Status:** Proposed. Merging the PR that adds this entry accepts it; change
-this line to "Accepted" at that point.
+**Status:** Accepted 2026-09-15 (PR #151, issue #73). No co-reviewer has been
+named yet.
 
 **Context:** All knowledge of the codebase sits with one maintainer. Review
 today is CI gates plus the maintainer's own pass over `REVIEW.md`, sometimes
@@ -65,7 +65,7 @@ person who knows the domain asks — "is this the number a farmer expects?",
    signal, but it makes a solo project's velocity depend on a volunteer's free
    time and would block urgent fixes. Disproportionate here.
 
-**Proposed:** Option 2, as written up in
+**Decided:** Option 2, as written up in
 [`review-process.md`](review-process.md): a path-based definition of
 high-risk, a `needs-human-review` label plus a PR-template checkbox, a
 ~3-day turnaround, and — when nobody is available — merge anyway with a note
