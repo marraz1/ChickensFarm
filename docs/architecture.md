@@ -92,7 +92,7 @@ Losses, bird purchases/sales and hatches all move quantities through it.
 route. The pattern is exercised without a database by
 `src/lib/services/multi-tenant-isolation.test.ts`, which runs the real services against
 an in-memory Prisma fake (`src/lib/services/fake-prisma.ts`) that evaluates `where`
-clauses. Reviewers also enforce it via `.coderabbit.yaml`.
+clauses. The review rules in `REVIEW.md` describe the same pattern.
 
 ## Auth flow
 
