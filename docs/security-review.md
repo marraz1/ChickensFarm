@@ -20,7 +20,7 @@ categories.
 **Method:** every one of the 35 `route.ts` files was read in full, along with the
 service functions and validation schemas they call, `git blame`-adjacent reasoning
 from code comments, and the repository's own documented convention in
-`.coderabbit.yaml` (every `route.ts` must open with `requireActiveFarmApi()`,
+`REVIEW.md` (every `route.ts` must open with `requireActiveFarmApi()`,
 `requireFarmAccessApi()`, or `requireUserApi()`, validate its body with zod, delegate
 to `src/lib/services`, and wrap the body in try/catch → `handleApiError`). All 35
 routes were checked against that convention by direct reading, not by search.
@@ -45,7 +45,7 @@ routes were checked against that convention by direct reading, not by search.
 ## API1: Broken Object Level Authorization
 
 **Checked:** All 35 route handlers, cross-referenced against the guard convention in
-`.coderabbit.yaml` and the cross-farm assertions in PR #134.
+`REVIEW.md` and the cross-farm assertions in PR #134.
 
 Every route that touches a farm-scoped resource opens with `requireActiveFarmApi()`
 or `requireFarmAccessApi(farmId)` before doing anything else, and every one of them

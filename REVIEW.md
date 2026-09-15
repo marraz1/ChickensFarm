@@ -1,8 +1,8 @@
 # Review guidelines
 
-These apply to every pull request into `main`. CodeRabbit reads this file
-(see `.coderabbit.yaml` → `knowledge_base.code_guidelines`), and human
-reviewers should work through the same list.
+These apply to every pull request into `main`. Whoever reviews a PR — the
+maintainer self-reviewing, a human co-reviewer, or an AI assistant asked to
+review — should work through this list.
 
 ## Tenant isolation (highest priority)
 
