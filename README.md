@@ -64,21 +64,21 @@ sign in with **demo@chickensfarm.lt** / **password123**.
 
 ### Environment variables
 
-| Variable                | Required | Purpose                                                                                                                                    |
-| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`          | yes      | Neon Postgres connection string. Use the **unpooled/direct** URL so `prisma migrate` works reliably.                                       |
-| `AUTH_SECRET`           | yes      | Auth.js signing secret — generate with `openssl rand -base64 32`.                                                                          |
-| `RESEND_API_KEY`        | no       | Sends password-reset email. Unset in development, reset links are printed to the server console instead.                                   |
-| `EMAIL_FROM`            | no       | Sender address for those emails.                                                                                                           |
-| `BLOB_READ_WRITE_TOKEN` | no       | Vercel Blob token for mother-hen photo upload.                                                                                             |
-| `CRON_SECRET`           | no       | Shared token for `POST /api/cron/reminders`. Unset means the endpoint returns 503 and no reminders are sent.                               |
-| `APP_URL`               | no       | Absolute base URL for links inside reminder emails. Falls back to `VERCEL_PROJECT_PRODUCTION_URL`; if neither is set, the link is omitted. |
-| `VAPID_PUBLIC_KEY`      | no       | Web-push key pair, self-generated (see `.env.example`). Unset means the phone toggle is disabled and no push is sent.                      |
-| `VAPID_PRIVATE_KEY`     | no       | The private half. Never sent to the browser.                                                                                               |
-| `VAPID_SUBJECT`         | no       | Contact URI for the push services — `mailto:` or `https://`. Falls back to `APP_URL` when that is https.                                   |
-| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | no | Error tracking. Unset means Sentry is a no-op. See [`docs/monitoring.md`](docs/monitoring.md). |
-| `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | no | Enables source map upload at build time for readable stack traces. |
-| `SENTRY_ACCESS_TOKEN`   | no       | Auth for the Sentry MCP server (`.mcp.json`) — lets AI coding agents query issues/events. Not used by the app itself.                        |
+| Variable                                              | Required | Purpose                                                                                                                                    |
+| ----------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                        | yes      | Neon Postgres connection string. Use the **unpooled/direct** URL so `prisma migrate` works reliably.                                       |
+| `AUTH_SECRET`                                         | yes      | Auth.js signing secret — generate with `openssl rand -base64 32`.                                                                          |
+| `RESEND_API_KEY`                                      | no       | Sends password-reset email. Unset in development, reset links are printed to the server console instead.                                   |
+| `EMAIL_FROM`                                          | no       | Sender address for those emails.                                                                                                           |
+| `BLOB_READ_WRITE_TOKEN`                               | no       | Vercel Blob token for mother-hen photo upload.                                                                                             |
+| `CRON_SECRET`                                         | no       | Shared token for `POST /api/cron/reminders`. Unset means the endpoint returns 503 and no reminders are sent.                               |
+| `APP_URL`                                             | no       | Absolute base URL for links inside reminder emails. Falls back to `VERCEL_PROJECT_PRODUCTION_URL`; if neither is set, the link is omitted. |
+| `VAPID_PUBLIC_KEY`                                    | no       | Web-push key pair, self-generated (see `.env.example`). Unset means the phone toggle is disabled and no push is sent.                      |
+| `VAPID_PRIVATE_KEY`                                   | no       | The private half. Never sent to the browser.                                                                                               |
+| `VAPID_SUBJECT`                                       | no       | Contact URI for the push services — `mailto:` or `https://`. Falls back to `APP_URL` when that is https.                                   |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`               | no       | Error tracking. Unset means Sentry is a no-op. See [`docs/monitoring.md`](docs/monitoring.md).                                             |
+| `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | no       | Enables source map upload at build time for readable stack traces.                                                                         |
+| `SENTRY_ACCESS_TOKEN`                                 | no       | Auth for the Sentry MCP server (`.mcp.json`) — lets AI coding agents query issues/events. Not used by the app itself.                      |
 
 ### Scripts
 
@@ -431,6 +431,7 @@ Serve over HTTPS so the app stays installable as a PWA — Vercel does this by d
 
 ## Documentation
 
+- [`docs/architecture.md`](docs/architecture.md) — architecture overview: tenancy, auth, push notifications, finance math, and known gaps
 - [`docs/RELEASE.md`](docs/RELEASE.md) — branch model, how to cut a release, and how to read a failed one
 - [`docs/monitoring.md`](docs/monitoring.md) — error tracking (Sentry) and uptime monitoring setup
 - [`docs/implementation-plan.md`](docs/implementation-plan.md) — build plan and notes on how the shipped code differs from it
