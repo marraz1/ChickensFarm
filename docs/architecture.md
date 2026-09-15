@@ -36,18 +36,18 @@ route handlers, then `router.refresh()`.
 
 ```mermaid
 flowchart LR
-  B[Browser / PWA] -->|every request| M[src/middleware.ts<br/>JWT present?]
-  M -->|no session| L[/login redirect/]
-  M -->|page| P["(app) Server Component"]
-  M -->|/api/*| R[route.ts handler]
-  P --> S[session.ts<br/>requireActiveFarm]
-  R --> SA[session.ts<br/>requireActiveFarmApi + Zod]
-  S --> SV[lib/services/* <br/>where: farmId]
+  B["Browser / PWA"] -->|"every request"| M["src/middleware.ts<br/>JWT present?"]
+  M -->|"no session"| L["redirect to /login"]
+  M -->|"page"| P["(app) Server Component"]
+  M -->|"/api/*"| R["route.ts handler"]
+  P --> S["session.ts<br/>requireActiveFarm"]
+  R --> SA["session.ts<br/>requireActiveFarmApi + Zod"]
+  S --> SV["lib/services/*<br/>where: farmId"]
   SA --> SV
-  SV --> DB[(Neon Postgres<br/>via Prisma)]
-  GH[GitHub Actions<br/>reminders.yml] -->|POST + CRON_SECRET| C[/api/cron/reminders/]
+  SV --> DB[("Neon Postgres<br/>via Prisma")]
+  GH["GitHub Actions<br/>reminders.yml"] -->|"POST + CRON_SECRET"| C["/api/cron/reminders"]
   C --> SV
-  C --> WP[web-push / Resend] --> B
+  C --> WP["web-push / Resend"] --> B
 ```
 
 ## Multi-tenant data model
