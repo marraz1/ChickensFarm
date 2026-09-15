@@ -42,8 +42,10 @@ Snyk would have caught.
 **Status:** Proposed. Merging the PR that adds this entry accepts it; change
 this line to "Accepted" at that point.
 
-**Context:** All knowledge of the codebase sits with one maintainer, and every
-review today is automated — CI gates plus CodeRabbit against `REVIEW.md`. The
+**Context:** All knowledge of the codebase sits with one maintainer. Review
+today is CI gates plus the maintainer's own pass over `REVIEW.md`, sometimes
+with an AI assistant (a CodeRabbit config existed but the app was never
+installed, and it was removed because it has no free plan). The
 2026-09-07 risk evaluation rates "Solo Maintainer Knowledge Concentration" as
 the top maintainability risk (focus 12.0) and notes there is no human peer
 review at all. AI review is good at pattern violations it has been told about
@@ -53,7 +55,7 @@ person who knows the domain asks — "is this the number a farmer expects?",
 
 **Considered:**
 
-1. _AI-only review (status quo)._ Zero cost, never blocks. Leaves the blind
+1. _Self-review plus ad-hoc AI review (status quo)._ Zero cost, never blocks. Leaves the blind
    spots above, and nobody else ever sees the riskiest code.
 2. _An occasional human co-reviewer for flagged high-risk changes only._ One
    friend or colleague, asked asynchronously when a PR touches auth, tenant

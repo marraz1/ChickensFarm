@@ -4,7 +4,7 @@
 > [`decisions.md`](decisions.md). Merging the PR that added this file accepts it.
 
 Every pull request into `main` already gets CI (`.github/workflows/ci.yml`) and
-a CodeRabbit review against [`REVIEW.md`](../REVIEW.md). That is enough for most
+a self-review against [`REVIEW.md`](../REVIEW.md). That is enough for most
 changes. For the small set of changes where a mistake leaks one farm's data,
 corrupts money figures, or cannot be rolled back, we additionally ask **one
 human co-reviewer** to look — occasionally, asynchronously, and without ever
@@ -47,8 +47,8 @@ existing service and route patterns are **not** high-risk.
    30 minutes. Split the PR if it can't.
 
 The co-reviewer is looking for the specific risk — a missing `farmId`, a
-rounding error, a destructive migration — not style. CodeRabbit covers the
-rest.
+rounding error, a destructive migration — not style. CI and the maintainer's
+own review cover the rest.
 
 **Expected turnaround:** within 3 days. This is a favour, not an SLA.
 
@@ -72,7 +72,7 @@ For an urgent production fix, merge first and ask for the review afterwards.
 ### Self-review checklist
 
 - [ ] Re-read the full diff on GitHub after a break (next day, if it can wait)
-- [ ] Every CodeRabbit comment is resolved or answered
+- [ ] Worked through every section of [`REVIEW.md`](../REVIEW.md) against the diff
 - [ ] **Tenant scoping:** every new query matches one of the two patterns in
       `REVIEW.md`; a new farm-owned model has cases in
       `src/lib/services/multi-tenant-isolation.test.ts`
