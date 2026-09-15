@@ -22,4 +22,13 @@ Sentry.init({
   // Kept low on purpose: the free tier's event quota is the limiting
   // resource for a small solo-maintained project, not trace coverage gaps.
   tracesSampleRate: dsn ? 0.1 : 0,
+
+  // Forwards every console.log/warn/error call as a Sentry Log (Explore ->
+  // Logs), not just captured exceptions. Note this duplicates logError()'s
+  // unexpected-severity errors (already sent via captureException) as Logs
+  // too, and also sends "expected" errors' console.error output that
+  // captureException deliberately skips (see docs/monitoring.md) — a
+  // conscious tradeoff for full console visibility over the quota-conscious
+  // filtering used elsewhere in this file.
+  integrations: [Sentry.consoleLoggingIntegration({ levels: ["log", "warn", "error"] })],
 });
