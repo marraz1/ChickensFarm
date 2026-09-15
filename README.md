@@ -76,6 +76,9 @@ sign in with **demo@chickensfarm.lt** / **password123**.
 | `VAPID_PUBLIC_KEY`      | no       | Web-push key pair, self-generated (see `.env.example`). Unset means the phone toggle is disabled and no push is sent.                      |
 | `VAPID_PRIVATE_KEY`     | no       | The private half. Never sent to the browser.                                                                                               |
 | `VAPID_SUBJECT`         | no       | Contact URI for the push services — `mailto:` or `https://`. Falls back to `APP_URL` when that is https.                                   |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | no | Error tracking. Unset means Sentry is a no-op. See [`docs/monitoring.md`](docs/monitoring.md). |
+| `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | no | Enables source map upload at build time for readable stack traces. |
+| `SENTRY_ACCESS_TOKEN`   | no       | Auth for the Sentry MCP server (`.mcp.json`) — lets AI coding agents query issues/events. Not used by the app itself.                        |
 
 ### Scripts
 
@@ -429,6 +432,7 @@ Serve over HTTPS so the app stays installable as a PWA — Vercel does this by d
 ## Documentation
 
 - [`docs/RELEASE.md`](docs/RELEASE.md) — branch model, how to cut a release, and how to read a failed one
+- [`docs/monitoring.md`](docs/monitoring.md) — error tracking (Sentry) and uptime monitoring setup
 - [`docs/implementation-plan.md`](docs/implementation-plan.md) — build plan and notes on how the shipped code differs from it
 - [`docs/compliance/gdpr-applicability.md`](docs/compliance/gdpr-applicability.md) — decision record on GDPR applicability given the app's current (public-registration) usage pattern
 - [`Paukstininkyste_reikalavimu_specifikacija.md`](Paukstininkyste_reikalavimu_specifikacija.md) — requirements specification (Lithuanian)

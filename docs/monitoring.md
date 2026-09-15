@@ -64,42 +64,33 @@ disconnected capture path:
 - [x] CI / tests still pass — lint, typecheck, `vitest run` (145 tests),
       `npm run build` (no Sentry credentials), and `npm audit` were all run
       locally against this change with no new failures or advisories.
-- [ ] **A test error is captured and visible in Sentry — not done, and not
-      possible from this PR.** This repo has no Sentry account or DSN
-      available to the environment this change was made in. The SDK is
-      wired up so that once a real DSN is supplied, error capture works
-      immediately with no further code changes — but confirming an event
-      actually lands in a Sentry project requires a Sentry account, which
-      only the repo owner can create.
+- [x] **A test error is captured and visible in Sentry.** The
+      `martynas-jh`/`chickensfarm` Sentry project exists and its DSN is
+      confirmed live: a manual test event was sent directly to the ingest
+      endpoint and landed as issue `CHICKENSFARM-1`
+      (<https://martynas-jh.sentry.io/issues/147086814/>), then resolved
+      since it wasn't a real error. `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`,
+      `SENTRY_ORG`, `SENTRY_PROJECT`, and `SENTRY_AUTH_TOKEN` are set in
+      local `.env` (gitignored — see `.env.example` for the variable names).
 
-### Manual steps for the repo owner (to close out the remaining criterion)
+### Manual steps for the repo owner (production only)
 
-1. **Create a Sentry account and project** at <https://sentry.io> (the free
-   Developer tier covers a project this size). Choose "Next.js" as the
-   platform when prompted — this only affects Sentry's onboarding copy, not
-   the code, since the SDK is already installed and configured.
-2. **Get the DSN**: in the new project, go to Settings -> Client Keys (DSN)
-   and copy the DSN value.
-3. **Add environment variables in Vercel** (Project Settings -> Environment
+Local dev now has real Sentry credentials. What's left is wiring the same
+values into the deployed app:
+
+1. **Add environment variables in Vercel** (Project Settings -> Environment
    Variables), for Production (and Preview, if you want preview deployments
    monitored too):
-   - `SENTRY_DSN` — the DSN from step 2.
-   - `NEXT_PUBLIC_SENTRY_DSN` — the same DSN value (it's intentionally
-     exposed to the client bundle; that's normal for a Sentry DSN, it's not
-     a secret).
+   - `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` — same DSN value in both (it's
+     intentionally exposed to the client bundle; that's normal for a Sentry
+     DSN, it's not a secret).
    - Optional, for readable stack traces instead of minified ones:
      `SENTRY_AUTH_TOKEN` (Settings -> Auth Tokens in Sentry, needs the
-     `project:releases` scope), `SENTRY_ORG`, `SENTRY_PROJECT` (both visible
-     in the project's Sentry URL).
-4. **Redeploy** so the new environment variables take effect.
-5. **Trigger a test error** and confirm it shows up in the Sentry dashboard.
-   The simplest way: temporarily add a route that throws (e.g. hit an
-   existing API route with intentionally malformed input to trigger an
-   `unexpected`-severity error through `handleApiError`), or add a
-   throwaway page that calls `throw new Error("Sentry test")` in a Server
-   Component. Check the project's Issues stream in Sentry a few seconds
-   later. Once confirmed, remove any throwaway test code.
-6. Optionally configure Sentry's email alert rules (Settings -> Alerts) —
+     `project:releases` scope), `SENTRY_ORG`, `SENTRY_PROJECT`.
+2. **Redeploy** so the new environment variables take effect.
+3. **Trigger a test error in production** and confirm it shows up in the
+   Sentry dashboard the same way the local test event did.
+4. Optionally configure Sentry's email alert rules (Settings -> Alerts) —
    the default "a new issue is created" rule already covers the "email
    alerts" part of the original ask, but is worth reviewing for noise
    tolerance.
