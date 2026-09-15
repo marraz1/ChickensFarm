@@ -6,7 +6,7 @@ import type { Session } from "next-auth";
 // Every farmId-scoped resource in this app is guarded the same way in
 // src/lib/services/*.ts: a `findFirst({ where: { id, farmId } })` (or an
 // `updateMany`/`findFirst`-then-mutate pair) before any read or write reaches
-// it. CodeRabbit enforces that pattern in review, but nothing previously
+// it. REVIEW.md documents that pattern for review, but nothing previously
 // exercised it at runtime — a single accidental `where: { id }` (farmId
 // dropped) would silently let a Farm A user read, edit, or delete Farm B's
 // eggs, birds, money, or personal data, and nothing would fail.
