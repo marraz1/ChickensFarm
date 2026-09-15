@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 import type { CreateEggCollectionInput } from "@/lib/validation/egg-collections";
@@ -23,7 +24,7 @@ export async function createEggCollection(farmId: string, input: CreateEggCollec
     if (!group) throw new ValidationError("Pasirinkta paukščių grupė nerasta");
   }
 
-  return prisma.eggCollection.create({
+  const collection = await prisma.eggCollection.create({
     data: {
       farmId,
       collectionDate: new Date(input.collectionDate),
@@ -32,12 +33,21 @@ export async function createEggCollection(farmId: string, input: CreateEggCollec
       quality: input.quality,
     },
   });
+
+  Sentry.logger.info("Wrote to database", {
+    table: "eggCollection",
+    operation: "insert",
+    farmId,
+    quantity: collection.quantity,
+  });
+
+  return collection;
 }
 
 export async function updateEggCollection(
   farmId: string,
   id: string,
-  input: CreateEggCollectionInput
+  input: CreateEggCollectionInput,
 ) {
   const existing = await prisma.eggCollection.findFirst({ where: { id, farmId } });
   if (!existing) throw new ValidationError("Įrašas nerastas");

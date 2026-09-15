@@ -73,20 +73,39 @@ disconnected capture path:
       `SENTRY_ORG`, `SENTRY_PROJECT`, and `SENTRY_AUTH_TOKEN` are set in
       local `.env` (gitignored — see `.env.example` for the variable names).
 
+### Structured logging (Sentry Logs)
+
+Separate from error tracking: Sentry's Explore -> Logs view
+(`martynas-jh.sentry.io/explore/logs/`) shows structured log lines sent via
+`Sentry.logger.*`, searchable and filterable by whatever attributes you pass
+— distinct from the Issues stream above, which is only unhandled/captured
+errors. No `enableLogs` flag is needed in `Sentry.init()`: SDK versions
+10.71.0+ (this project is on 10.74.0) send logs by default.
+
+`createEggCollection` (`src/lib/services/egg-collections.ts`) has a
+representative call:
+
+```typescript
+Sentry.logger.info("Wrote to database", {
+  table: "eggCollection",
+  operation: "insert",
+  farmId,
+  quantity: collection.quantity,
+});
+```
+
+This is deliberately not applied to every write path in the app — add the
+same pattern (`Sentry.logger.info` / `.warn` / `.error`, with whatever
+attributes are useful to filter by) at other call sites as the need for that
+visibility actually comes up, rather than instrumenting everything upfront.
+
 ### Manual steps for the repo owner (production only)
 
-Local dev now has real Sentry credentials. What's left is wiring the same
-values into the deployed app:
-
-1. **Add environment variables in Vercel** (Project Settings -> Environment
-   Variables), for Production (and Preview, if you want preview deployments
-   monitored too):
-   - `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` — same DSN value in both (it's
-     intentionally exposed to the client bundle; that's normal for a Sentry
-     DSN, it's not a secret).
-   - Optional, for readable stack traces instead of minified ones:
-     `SENTRY_AUTH_TOKEN` (Settings -> Auth Tokens in Sentry, needs the
-     `project:releases` scope), `SENTRY_ORG`, `SENTRY_PROJECT`.
+1. ~~Add environment variables in Vercel~~ — done: `SENTRY_DSN`,
+   `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, and
+   `SENTRY_AUTH_TOKEN` are set for both Production and Preview on
+   `mr-hobby/chickensfarm` (`NEXT_PUBLIC_SENTRY_DSN` as public Config, since
+   a DSN isn't a secret; the rest as Secret).
 2. **Redeploy** so the new environment variables take effect.
 3. **Trigger a test error in production** and confirm it shows up in the
    Sentry dashboard the same way the local test event did.
