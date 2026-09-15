@@ -69,5 +69,8 @@ and the standalone `.html` mockups at the repo root.
 ## What is automated vs. not
 
 CI (`.github/workflows/ci.yml`) enforces formatting, ESLint, TypeScript and
-tests only. Everything above — especially tenant isolation — is checked by
-CodeRabbit and by human judgment.
+tests only. Everything above — especially tenant isolation — relies on
+review judgment, not tooling.
+
+High-risk changes (auth, tenant scoping, money, migrations, secrets) can also
+get a human co-review — see [docs/review-process.md](docs/review-process.md).
