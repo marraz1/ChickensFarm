@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { readFileSync } from "node:fs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 /**
  * The released version, taken from package.json at build time.
@@ -48,4 +49,26 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Wraps the config for source map upload and build-time error/performance
+// instrumentation (issue #74). `org`/`project`/`authToken` fall back to the
+// SENTRY_ORG / SENTRY_PROJECT / SENTRY_AUTH_TOKEN env vars automatically —
+// they're passed explicitly here only so the `disable` line below can react
+// to the same token. None of these are set in local dev or CI, so
+// `sourcemaps.disable` is `true` there: the plugin does no network I/O and
+// the build succeeds exactly as it did before Sentry was added. Only a
+// deployment with SENTRY_AUTH_TOKEN configured (i.e. Vercel, once the repo
+// owner adds it) uploads source maps.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  widenClientFileUpload: true,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+    automaticVercelMonitors: false,
+  },
+});
