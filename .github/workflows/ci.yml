@@ -301,9 +301,12 @@ jobs:
           if [ -n "$VERCEL_AUTOMATION_BYPASS_SECRET" ]; then
             ARGS=(-H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET")
           fi
-          CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${ARGS[@]}" "$PLAYWRIGHT_BASE_URL/login" || echo 000)
-          echo "GET /login -> $CODE"
-          if [ "$CODE" = "401" ] || [ "$CODE" = "403" ]; then
+          OUT=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 "${ARGS[@]}" "$PLAYWRIGHT_BASE_URL/login" || echo "000 ")
+          CODE=${OUT%% *}
+          REDIRECT=${OUT#* }
+          echo "GET /login -> $CODE ${REDIRECT:+(redirect: $REDIRECT)}"
+          # Deployment Protection answers 401/403, or 302s to vercel.com/login (SSO).
+          if [ "$CODE" = "401" ] || [ "$CODE" = "403" ] || [[ "$REDIRECT" == https://vercel.com/* ]]; then
             echo "::warning::Preview is behind Vercel Deployment Protection; add a VERCEL_AUTOMATION_BYPASS_SECRET secret to run the E2E smoke test. Skipping."
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
