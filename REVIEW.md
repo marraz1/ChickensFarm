@@ -74,3 +74,6 @@ review judgment, not tooling.
 
 High-risk changes (auth, tenant scoping, money, migrations, secrets) can also
 get a human co-review — see [docs/review-process.md](docs/review-process.md).
+
+For what the test suite does and does not cover, and why, see
+[docs/testing.md](docs/testing.md).
