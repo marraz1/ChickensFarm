@@ -7,10 +7,10 @@ name: PROD_deployment
 # watches Vercel build and deploy the result until a health check confirms that
 # the exact version published is the one being served.
 #
-# Split into five sequential jobs so the run graph *is* the release pipeline and
+# Split into sequential jobs so the run graph *is* the release pipeline and
 # each stage is visible while it happens rather than only once it ends.
 #
-#   preflight -> release -> deploy -> verify -> summary
+#   preflight -> release -> deploy -> verify -> e2e -> summary
 #
 # This workflow does not build anything itself. Vercel builds and deploys
 # `release` through its Git integration; everything here either prepares that
@@ -797,10 +797,48 @@ jobs:
             exit 1
           fi
 
+  e2e:
+    name: E2E smoke (production)
+    runs-on: ubuntu-latest
+    needs: [release, verify]
+    # The curl checks in verify prove URLs answer with the right status and
+    # type; this proves the pages actually render and auth redirects in a real
+    # browser. Only once verify confirmed the new version is live, so a failure
+    # here is about this release and not a stale instance. Skipped on dry runs
+    # because release (and so verify) is.
+    env:
+      PLAYWRIGHT_BASE_URL: ${{ vars.APP_URL }}
+    steps:
+      # The suite as it was released, so tests and served code match.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright smoke test
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-production
+          path: playwright-report/
+          retention-days: 14
+
   summary:
     name: Release summary
     runs-on: ubuntu-latest
-    needs: [preflight, lint, typecheck, test, build, schema, release, deploy, verify]
+    needs: [preflight, lint, typecheck, test, build, schema, release, deploy, verify, e2e]
     if: always()
     steps:
       - name: Draw the release
@@ -822,6 +860,7 @@ jobs:
           SHA: ${{ needs.release.outputs.sha }}
           URL: ${{ needs.deploy.outputs.url }}
           MIGRATED: ${{ needs.verify.outputs.migrated }}
+          E2E: ${{ needs.e2e.result }}
           DRY: ${{ inputs.dry_run }}
         run: |
           # Same visual language as ci.yml and status.yml, so all three read as
@@ -847,12 +886,13 @@ jobs:
           BUILD="${BUILD:-unknown}"
           SCHEMA="${SCHEMA:-unknown}"
           SMOKE="${SMOKE:-$VER_JOB}"; SMOKE="${SMOKE:-unknown}"
+          E2E="${E2E:-unknown}"
           REL="${REL:-unknown}"
           DEP="${DEP:-$DEP_JOB}"; DEP="${DEP:-unknown}"
           VER="${VER:-$VER_JOB}"; VER="${VER:-unknown}"
           MIG="$MIGRATED"
           if [ -z "$MIG" ] || [ "$MIG" = "0" ]; then MIG="none"; else MIG="$MIG applied"; fi
-          if [ "$DRY" = "true" ]; then REL="dry-run"; DEP="dry-run"; VER="dry-run"; SMOKE="dry-run"; fi
+          if [ "$DRY" = "true" ]; then REL="dry-run"; DEP="dry-run"; VER="dry-run"; SMOKE="dry-run"; E2E="dry-run"; fi
 
           {
             echo "## Release"
@@ -870,12 +910,13 @@ jobs:
             echo "  M[\"Migrations<br/>$MIG\"]:::skip"
             echo "  H[\"Health<br/>$(icon "$VER") $VER\"]:::$(node_class "$VER")"
             echo "  K[\"Smoke<br/>$(icon "$SMOKE") $SMOKE\"]:::$(node_class "$SMOKE")"
+            echo "  E[\"E2E<br/>$(icon "$E2E") $E2E\"]:::$(node_class "$E2E")"
             echo "  P --> L --> V"
             echo "  P --> T --> V"
             echo "  P --> S --> V"
             echo "  P --> U --> V"
             echo "  P --> X --> V"
-            echo "  V --> D --> M --> H --> K"
+            echo "  V --> D --> M --> H --> K --> E"
             echo "  classDef ok fill:#1a7f37,stroke:#1a7f37,color:#ffffff"
             echo "  classDef bad fill:#cf222e,stroke:#cf222e,color:#ffffff"
             echo "  classDef warn fill:#9a6700,stroke:#9a6700,color:#ffffff"
@@ -890,6 +931,7 @@ jobs:
             if [ -n "$VERSION" ]; then echo "| Tag | \`v$VERSION\` |"; fi
             echo "| Migrations | $MIG |"
             echo "| Smoke | $(icon "$SMOKE") $SMOKE |"
+            echo "| E2E | $(icon "$E2E") $E2E |"
             if [ -n "$URL" ]; then echo "| Production | <$URL> |"; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -900,6 +942,7 @@ jobs:
           REL: ${{ needs.release.result }}
           DEP: ${{ needs.deploy.result }}
           VER: ${{ needs.verify.result }}
+          E2E: ${{ needs.e2e.result }}
           DRY: ${{ inputs.dry_run }}
         run: |
           # A dry run still has to prove the gates: that is what it is for.
@@ -914,10 +957,10 @@ jobs:
             done
             exit 0
           fi
-          echo "preflight=$PRE gates=$GATES release=$REL deploy=$DEP verify=$VER"
-          for r in "$PRE" $GATES "$REL" "$DEP" "$VER"; do
+          echo "preflight=$PRE gates=$GATES release=$REL deploy=$DEP verify=$VER e2e=$E2E"
+          for r in "$PRE" $GATES "$REL" "$DEP" "$VER" "$E2E"; do
             if [ "$r" != "success" ]; then
-              echo "::error::Release did not complete (preflight=$PRE release=$REL deploy=$DEP verify=$VER)."
+              echo "::error::Release did not complete (preflight=$PRE release=$REL deploy=$DEP verify=$VER e2e=$E2E)."
               exit 1
             fi
           done

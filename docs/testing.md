@@ -23,7 +23,10 @@ CI ([ci.yml](../.github/workflows/ci.yml)) runs on PRs and pushes to `develop`,
 `main` and `release`, as separate parallel jobs: Prettier on changed files and
 ESLint (`Lint`), `npm run typecheck`, `npm test` (`Test`), `npm audit` for
 high/critical CVEs, and a Vercel preview build on PRs. `prod-deployment.yml`
-also runs lint, typecheck and tests before promotion.
+also runs lint, typecheck and tests before promotion. The Playwright smoke suite
+(`e2e/`, `npm run test:e2e`) runs against the Vercel preview in CI (skipped while
+preview Deployment Protection has no bypass secret) and against production in
+`prod-deployment.yml` once the new version is live.
 
 ## What is tested, and why
 
@@ -48,9 +51,10 @@ behaviour.
 
 ## What is not tested, and why
 
-- **No end-to-end or browser tests.** Playwright E2E is tracked in #95 and is
-  in progress; it is not part of the repo or CI yet, so treat every UI flow as
-  manually verified.
+- **Only smoke-level browser tests.** Playwright covers the signed-out pages
+  (login form, auth redirect, privacy notice) on preview and production. No
+  signed-in flow is tested end to end, because that needs a seeded user and
+  database; treat those UI flows as manually verified.
 - **No component or UI tests.** There are no React Testing Library or jsdom
   tests for `src/components/**` or pages. The UI is mostly thin forms over the
   API; the effort went to the data layer first.
@@ -78,6 +82,6 @@ behaviour.
 
 ## Likely next steps
 
-Playwright smoke tests for login and the main record flows (#95); route-level
+Playwright tests for the signed-in record flows (needs a seeded test user); route-level
 tests for the guard/400/error contract; a coverage report to make the gaps
 above measurable.
