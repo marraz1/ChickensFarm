@@ -49,3 +49,8 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
