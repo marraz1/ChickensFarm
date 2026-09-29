@@ -117,6 +117,7 @@ Two ways forward:
 | **Version**   | `package.json` bumped and committed to `main`, `release` fast-forwarded, tag `vX.Y.Z` pushed. The push to `release` is what starts Vercel.                                                                            |
 | **Build**     | Watches Vercel's deployment state as it changes, and prints the build output. Fails the release if the build fails.                                                                                                   |
 | **Verify**    | Polls `/api/health` until both the **version** and the **commit** match what was just published, reports exactly which migrations were applied, then smoke-tests `/login`, `/manifest.webmanifest`, `/sw.js` and `/`. |
+| **E2E**       | Runs the Playwright smoke suite (`e2e/`, checked out at the release commit) in Chromium against `APP_URL`: login renders, signed-out `/` redirects to login, `/privacy` is public. Skipped on dry runs.               |
 | **Summary**   | The release drawn as a diagram, plus old → new version, tag, commit and production URL.                                                                                                                               |
 
 A release is only successful if every one of them is.
@@ -153,6 +154,14 @@ The deployment is live but not serving correctly. A `/sw.js` that returns 200
 with an HTML content-type is the classic one: it means something is redirecting
 it, and the browser will refuse to register the service worker, silently
 breaking push notifications for installed apps.
+
+### E2E — a Playwright smoke test failed
+
+The new version is live and answers the curl checks, but a page does not render
+or behave as expected in a real browser. Download the `playwright-report-production`
+artifact from the run (it has a trace for the retried test) and reproduce locally with
+`PLAYWRIGHT_BASE_URL=<APP_URL> npm run test:e2e`. The deployment is already
+live, so roll back in Vercel if users are affected.
 
 ### Build — "No deployment record appeared"
 
