@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,6 +11,8 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 // alias (matching tsconfig's `paths`) — Vitest/Vite does not read tsconfig
 // paths on its own, so this is the minimal config needed to resolve them.
 export default defineConfig({
+  // Playwright specs live in e2e/ and run under `npm run test:e2e`, not Vitest.
+  test: { exclude: [...configDefaults.exclude, "e2e/**"] },
   resolve: {
     alias: {
       "@": path.resolve(dirname, "./src"),
