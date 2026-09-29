@@ -66,6 +66,11 @@ password reset, and the NextAuth handler have no guard by design.
 Don't review: `prisma/migrations/`, `src/generated/`, `package-lock.json`,
 and the standalone `.html` mockups at the repo root.
 
+## PR description
+
+Feature PRs state a one-sentence hypothesis / expected outcome (prompted by the PR
+template); chores and dependency bumps may skip it.
+
 ## What is automated vs. not
 
 CI (`.github/workflows/ci.yml`) enforces formatting, ESLint, TypeScript and
