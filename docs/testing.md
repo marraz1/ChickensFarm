@@ -15,6 +15,9 @@ else is covered by review ([REVIEW.md](../REVIEW.md),
 
 Tooling: [Vitest](../vitest.config.mts) (`npm test`, node environment, `@`
 alias only). No coverage tool and no coverage threshold are configured.
+`npm test` runs `vitest run` without `--passWithNoTests`, so the Test gate
+fails (exit code 1) if no test files are found. Deleting the suites does not
+leave CI green.
 
 CI ([ci.yml](../.github/workflows/ci.yml)) runs on PRs and pushes to `develop`,
 `main` and `release`, as separate parallel jobs: Prettier on changed files and
