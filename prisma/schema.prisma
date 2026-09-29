@@ -88,6 +88,7 @@ model User {
   birdGroupEvents     BirdGroupEvent[]     @relation("EventCreatedBy")
   notificationSetting NotificationSetting?
   pushSubscriptions   PushSubscription[]
+  feedback            Feedback[]
 
   @@map("users")
 }
@@ -145,6 +146,28 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
+// In-app feedback ("Siųsti atsiliepimą", issue #98). Owned by the user who sent
+// it; farmId records which farm was active at the time, for context only — it
+// is resolved on the server from the caller's own memberships, never taken
+// from the request. SetNull rather than Cascade on the farm so feedback about a
+// farm that was later deleted is still there to triage. Read directly from the
+// database (Neon console / `prisma studio`); there is no in-app admin view.
+model Feedback {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farmId     String?
+  farm       Farm?    @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  message    String   @db.VarChar(2000)
+  // APP_VERSION at submit time, so a report can be matched to a release.
+  appVersion String?  @db.VarChar(32)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("feedback")
+}
+
 model PasswordResetToken {
   id        String    @id @default(cuid())
   userId    String
@@ -180,6 +203,7 @@ model Farm {
   birdGroupEvents  BirdGroupEvent[]
   birdTransactions BirdTransaction[]
   birdConsumptions BirdConsumption[]
+  feedback         Feedback[]
 
   @@index([ownerId])
   @@map("farms")
