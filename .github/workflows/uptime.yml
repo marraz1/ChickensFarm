@@ -1,0 +1,61 @@
+name: Uptime
+
+# Backup uptime probe for /api/health. The primary monitor is UptimeRobot (see
+# docs/monitoring.md); this one lives in the repo so it needs no third-party
+# account. A failed run makes GitHub email the workflow's last committer /
+# whoever last edited its cron schedule, and shows red in the Actions tab.
+#
+# The request is deliberately unauthenticated: it must only ever see the
+# liveness shape (200 ok / 503 degraded), never the detailed body.
+
+on:
+  schedule:
+    # Every 15 minutes, off the top of the hour. GitHub may delay scheduled runs
+    # under load, so this is a backstop, not a precise SLA.
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: "Probe an unresolvable host to prove a failure turns the run red (alert verification)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Probe /api/health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          SIMULATE_FAILURE: ${{ inputs.simulate_failure && 'true' || 'false' }}
+        run: |
+          if [ "$SIMULATE_FAILURE" = "true" ]; then
+            BASE="https://this-does-not-resolve.invalid"
+            echo "::notice::Simulating a failed health check against $BASE"
+          elif [ -z "$APP_URL" ]; then
+            echo "::error::Repository variable APP_URL is not set; nothing to probe."
+            exit 1
+          else
+            BASE=$(printf '%s' "$APP_URL" | sed 's:/*$::')
+          fi
+
+          # Retry transient network blips; a real outage still fails all attempts.
+          # No --location: a redirect is not a healthy answer from this route.
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --max-time 30 --retry 2 --retry-delay 5 --retry-all-errors \
+            "$BASE/api/health" || echo 000)
+
+          echo "GET $BASE/api/health -> $code" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$code" != "200" ]; then
+            echo "::error::Health check failed with HTTP $code"
+            exit 1
+          fi

@@ -225,6 +225,30 @@ Either way:
    dead host or an impossible keyword is a monitor that will never tell you
    anything useful again.
 
+### In-repo backup probe (GitHub Actions)
+
+`.github/workflows/uptime.yml` probes `<APP_URL>/api/health` every 15 minutes
+(unauthenticated, no redirect following) and fails the run on anything other
+than HTTP 200. A failed scheduled run shows red in the Actions tab and
+triggers GitHub's workflow-failure notification email. It needs only the
+existing `APP_URL` repository variable. GitHub cron can be delayed, so this
+complements UptimeRobot rather than replacing it.
+
+**Simulating a failure (verifies the alert path, no production impact):**
+Actions -> Uptime -> **Run workflow** with `simulate_failure` ticked. The job
+probes an unresolvable host, exits non-zero, and the run turns red. Run it
+once without the box ticked to confirm it goes green again.
+
+### Status of the acceptance criteria
+
+- [x] `/api/health` returns 200/503 correctly (covered by `route.test.ts`).
+- [x] In-repo probe workflow added (`uptime.yml`).
+- [x] CI / tests still pass.
+- [ ] **Manual (needs account access):** create the UptimeRobot monitor per
+      the steps above, and run the failure simulation (UptimeRobot Option A/B,
+      and/or the `simulate_failure` workflow run) to confirm the alert email
+      arrives. These cannot be done from code.
+
 ### What uptime monitoring does _not_ cover
 
 - **Correctness/rendering** — `/api/health` proves the server answers and the
