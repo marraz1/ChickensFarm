@@ -13,6 +13,7 @@ import {
   Utensils,
   Bird,
   PiggyBank,
+  Drumstick,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
@@ -28,6 +29,7 @@ const BIRDS_ACTIONS: QuickAction[] = [
   { href: "/birds/sales/new", label: "Parduoti paukščių", icon: Bird },
   { href: "/eggs/collections/new", label: "Surinkti kiaušinius", icon: Egg },
   { href: "/eggs/consumptions/new", label: "Suvartoti kiaušinius", icon: Utensils },
+  { href: "/birds/consumptions/new", label: "Suvartoti paukščius mėsai", icon: Drumstick },
   { href: "/losses/new", label: "Registruoti nuostolį", icon: AlertTriangle },
   { href: "/mother-hens/new", label: "Nauja perekšlė", icon: Heart },
 ];

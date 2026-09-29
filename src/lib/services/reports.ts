@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { getExpensesByCategoryReport } from "@/lib/services/expenses";
 import { getBirdTransactionTotals } from "@/lib/services/bird-transactions";
+import { getLossesByReasonReport } from "@/lib/services/losses";
+import { getBirdConsumptionTotal } from "@/lib/services/bird-consumptions";
 import { buildMonthlyTotals, toCents, type MonthlyTotal } from "@/lib/finance-math";
-import type { ExpenseCategory } from "@/generated/prisma/client";
+import type { ExpenseCategory, LossReasonType } from "@/generated/prisma/client";
 
 export type ProfitLossRange = { from: Date; to: Date };
 
@@ -140,4 +142,44 @@ export async function getEarliestFinanceYear(farmId: string): Promise<number> {
     .map((date) => date.getUTCFullYear());
 
   return years.length > 0 ? Math.min(...years) : new Date().getUTCFullYear();
+}
+
+export type FlockReductionsReport = {
+  /** Deaths only, by reason — exactly what getLossesByReasonReport counts. */
+  losses: Record<LossReasonType, number>;
+  lossesTotal: number;
+  /** Birds sold on (head count, not money). */
+  sold: number;
+  /** Birds taken for the household's own meat/food. */
+  meatUse: number;
+  total: number;
+};
+
+/**
+ * Every way the flock shrank over a period, each cause on its own line.
+ *
+ * Meat/food use is its own figure rather than a share of `losses`: it comes from
+ * BirdConsumption, which getLossesByReasonReport never reads, so a planned
+ * slaughter can never land in the DISEASE/PREDATOR/OTHER buckets or in any
+ * mortality total derived from them.
+ */
+export async function getFlockReductionsReport(
+  farmId: string,
+  range: ProfitLossRange,
+): Promise<FlockReductionsReport> {
+  const [losses, birdTotals, meatUse] = await Promise.all([
+    getLossesByReasonReport(farmId, range),
+    getBirdTransactionTotals(farmId, range),
+    getBirdConsumptionTotal(farmId, range),
+  ]);
+
+  const lossesTotal = losses.DISEASE + losses.PREDATOR + losses.OTHER;
+
+  return {
+    losses,
+    lossesTotal,
+    sold: birdTotals.birdsSold,
+    meatUse,
+    total: lossesTotal + birdTotals.birdsSold + meatUse,
+  };
 }

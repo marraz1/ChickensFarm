@@ -63,6 +63,9 @@ enum BirdGroupEventType {
   INCUBATION_HATCH
   PURCHASE
   SALE
+  // Birds deliberately slaughtered for the household's own table. Its own value
+  // rather than a LOSS or a note on one, so mortality figures never include it.
+  MEAT_USE
 }
 
 // Buying and selling live birds. One enum rather than two models: both sides
@@ -176,6 +179,7 @@ model Farm {
   incubationCycles IncubationCycle[]
   birdGroupEvents  BirdGroupEvent[]
   birdTransactions BirdTransaction[]
+  birdConsumptions BirdConsumption[]
 
   @@index([ownerId])
   @@map("farms")
@@ -230,6 +234,7 @@ model BirdGroup {
   eggCollections    EggCollection[]
   events            BirdGroupEvent[]
   birdTransactions  BirdTransaction[]
+  birdConsumptions  BirdConsumption[]
   hatchedFromCycles IncubationCycle[] @relation("EggSourceGroup")
   hatchedIntoCycles IncubationCycle[] @relation("ResultingGroup")
 
@@ -389,6 +394,33 @@ model BirdTransaction {
   @@index([farmId, transactionDate])
   @@index([farmId, type])
   @@map("bird_transactions")
+}
+
+// Birds taken out of a group for the household's own meat/food, mirroring how
+// EggConsumption sits beside EggSale: stock leaves, no money moves. Deliberately
+// not a Loss — `getLossesByReasonReport` counts every Loss row as mortality, so
+// recording a planned slaughter there would inflate the "Kita" bucket.
+//
+// birdGroupId is required, unlike Loss's and BirdTransaction's optional link: a
+// loss can be known without knowing the group and a transaction can record money
+// alone, but "used for meat" with no group would move nothing and mean nothing.
+// Restrict (rather than SetNull) therefore keeps the link from being orphaned;
+// deleteBirdGroup counts these rows and refuses with a readable message first.
+model BirdConsumption {
+  id              String    @id @default(cuid())
+  farmId          String
+  farm            Farm      @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  birdGroupId     String
+  birdGroup       BirdGroup @relation(fields: [birdGroupId], references: [id], onDelete: Restrict)
+  consumptionDate DateTime  @db.Date
+  quantity        Int
+  note            String?
+  createdAt       DateTime  @default(now())
+
+  @@index([farmId, consumptionDate])
+  // Supports the reference count deleteBirdGroup runs before removing a group.
+  @@index([birdGroupId])
+  @@map("bird_consumptions")
 }
 
 model IncubationCycle {

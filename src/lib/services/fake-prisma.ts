@@ -1,5 +1,6 @@
-// A minimal in-memory stand-in for the generated Prisma Client, used only by
-// multi-tenant-isolation.test.ts.
+// A minimal in-memory stand-in for the generated Prisma Client, used by the
+// service-layer suites that cannot reach a database: multi-tenant-isolation,
+// bird-consumptions and flock-reductions.
 //
 // Why this exists: CI has no reachable Postgres/Neon database (see ci.yml —
 // DATABASE_URL is a placeholder used only so `prisma generate` succeeds), so a
@@ -16,13 +17,24 @@
 // It implements only the query shapes actually used by src/lib/services/*.ts
 // and src/lib/session.ts, verified by reading every service file:
 // findMany/findFirst/findFirstOrThrow/findUnique/create/update/updateMany/
-// delete/deleteMany/count, one relation filter (Farm.farmUsers.some, the
-// membership check requireFarmAccessApi runs), and $transaction (invokes the
-// callback with the same client — there is no real atomicity to fake, and
-// none of these tests depend on it). `where` matching is flat equality per
-// key, which covers every call site in this codebase. aggregate/groupBy/
-// upsert are intentionally unimplemented (they throw) rather than silently
-// returning a wrong answer, since nothing under test needs them.
+// delete/deleteMany/count/aggregate/groupBy, one relation filter
+// (Farm.farmUsers.some, the membership check requireFarmAccessApi runs), and
+// $transaction (invokes the callback with the same client — there is no real
+// atomicity to fake, and none of these tests depend on it). `where` matching
+// is equality per key plus the scalar operators the report queries use
+// (gte/lte/gt/lt/equals/in/not). `upsert` is intentionally unimplemented (it
+// throws) rather than silently returning a wrong answer, since nothing under
+// test needs it.
+//
+// aggregate/groupBy support `_sum` only, and match Prisma in returning `null`
+// for a summed field when no row matched — the services under test rely on
+// that (`_sum.quantity ?? 0`), so faking a 0 would leave the fallback
+// untested. They exist because the flock-reduction report (reports.ts) is
+// what proves meat/food use never lands in the loss-by-reason buckets, and
+// that report cannot run without them.
+//
+// `include`/`select`/`orderBy` are ignored: rows come back whole and in
+// insertion order. Assert on ids and scalars, not on nested relations.
 
 import { randomUUID } from "node:crypto";
 
@@ -43,6 +55,7 @@ const MODEL_NAMES = [
   "loss",
   "expense",
   "birdTransaction",
+  "birdConsumption",
   "incubationCycle",
   "incubationGrowthLog",
 ] as const;
@@ -95,9 +108,86 @@ function matchesWhere(model: ModelName, where: Where | undefined, row: Row): boo
       if (!related.some((r) => matchesWhere(relation.model, cond.some, r))) return false;
       continue;
     }
-    if (row[key] !== cond) return false;
+    if (isOperatorFilter(cond)) {
+      if (!matchesOperators(row[key], cond)) return false;
+      continue;
+    }
+    if (!valuesEqual(row[key], cond)) return false;
   }
   return true;
+}
+
+// The scalar filter operators used by src/lib/services/*.ts — the report
+// queries bound a date column with gte/lte, data-presence uses `in`. A filter
+// object counts as one only when *every* key is an operator, so a nested
+// relation filter still raises the "no relation registered" error above
+// instead of being silently treated as a comparison.
+const OPERATORS = ["equals", "gt", "gte", "lt", "lte", "in", "not"] as const;
+
+function isOperatorFilter(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  if (value instanceof Date || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length > 0 && keys.every((k) => (OPERATORS as readonly string[]).includes(k));
+}
+
+/** Dates compare by instant, not by reference — `new Date(x) !== new Date(x)`. */
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  return a === b;
+}
+
+function compareValues(a: unknown, b: unknown): number {
+  const left = a instanceof Date ? a.getTime() : a;
+  const right = b instanceof Date ? b.getTime() : b;
+  if (typeof left === "number" && typeof right === "number") return left - right;
+  if (typeof left === "string" && typeof right === "string") {
+    return left < right ? -1 : left > right ? 1 : 0;
+  }
+  throw new Error(`fake-prisma: cannot order ${typeof left} against ${typeof right}`);
+}
+
+function matchesOperators(value: unknown, filter: Record<string, unknown>): boolean {
+  for (const [op, operand] of Object.entries(filter)) {
+    switch (op) {
+      case "equals":
+        if (!valuesEqual(value, operand)) return false;
+        break;
+      case "not":
+        if (valuesEqual(value, operand)) return false;
+        break;
+      case "in":
+        if (!(operand as unknown[]).some((o) => valuesEqual(value, o))) return false;
+        break;
+      // A null column never satisfies a range bound, same as SQL.
+      case "gt":
+        if (value == null || compareValues(value, operand) <= 0) return false;
+        break;
+      case "gte":
+        if (value == null || compareValues(value, operand) < 0) return false;
+        break;
+      case "lt":
+        if (value == null || compareValues(value, operand) >= 0) return false;
+        break;
+      case "lte":
+        if (value == null || compareValues(value, operand) > 0) return false;
+        break;
+    }
+  }
+  return true;
+}
+
+/**
+ * `_sum` over the matched rows. Prisma returns null for a summed field when the
+ * matched set is empty, and every caller in this codebase writes
+ * `_sum.x ?? 0` — returning 0 here would make that fallback untested.
+ */
+function sumFields(rows: Row[], select: Record<string, boolean> | undefined) {
+  const sums: Record<string, number | null> = {};
+  for (const field of Object.keys(select ?? {})) {
+    sums[field] = rows.length === 0 ? null : rows.reduce((t, r) => t + Number(r[field] ?? 0), 0);
+  }
+  return sums;
 }
 
 function notImplemented(model: ModelName, method: string) {
@@ -155,8 +245,36 @@ function createModelClient(model: ModelName) {
     async count(args: { where?: Where } = {}): Promise<number> {
       return rowsOf(model).filter((r) => matchesWhere(model, args.where, r)).length;
     },
-    aggregate: notImplemented(model, "aggregate"),
-    groupBy: notImplemented(model, "groupBy"),
+    async aggregate(
+      args: { where?: Where; _sum?: Record<string, boolean> } = {},
+    ): Promise<{ _sum: Record<string, number | null> }> {
+      const matched = rowsOf(model).filter((r) => matchesWhere(model, args.where, r));
+      return { _sum: sumFields(matched, args._sum) };
+    },
+    async groupBy(args: {
+      by: string[];
+      where?: Where;
+      _sum?: Record<string, boolean>;
+    }): Promise<Row[]> {
+      const matched = rowsOf(model).filter((r) => matchesWhere(model, args.where, r));
+      const buckets = new Map<string, Row[]>();
+      for (const row of matched) {
+        const key = JSON.stringify(
+          args.by.map((field) => {
+            const value = row[field];
+            return value instanceof Date ? value.getTime() : value;
+          }),
+        );
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key)!.push(row);
+      }
+      return [...buckets.values()].map((groupRows) => {
+        const group: Row = {};
+        for (const field of args.by) group[field] = groupRows[0][field];
+        group._sum = sumFields(groupRows, args._sum);
+        return group;
+      });
+    },
     upsert: notImplemented(model, "upsert"),
   };
 }

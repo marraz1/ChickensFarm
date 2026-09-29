@@ -4,11 +4,12 @@ import { getDashboardData } from "@/lib/services/dashboard";
 import { Card } from "@/components/ui/card";
 import { formatEUR, formatMonthLT, formatRelativeLT } from "@/lib/format";
 import { birdTypeLabels } from "@/lib/labels";
-import { Egg, AlertTriangle, Heart } from "lucide-react";
+import { Egg, AlertTriangle, Heart, Drumstick } from "lucide-react";
 
 const ACTIVITY_ICONS = {
   EGG_COLLECTION: Egg,
   LOSS: AlertTriangle,
+  MEAT_USE: Drumstick,
   MOTHER_HEN_LOG: Heart,
 } as const;
 

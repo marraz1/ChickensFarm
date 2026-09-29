@@ -71,6 +71,13 @@ import {
   updateBirdTransaction,
 } from "@/lib/services/bird-transactions";
 import {
+  createBirdConsumption,
+  deleteBirdConsumption,
+  getBirdConsumption,
+  listBirdConsumptions,
+  updateBirdConsumption,
+} from "@/lib/services/bird-consumptions";
+import {
   createEggCollection,
   deleteEggCollection,
   getEggCollection,
@@ -296,6 +303,85 @@ describe("bird transactions", () => {
     });
     await expect(
       createBirdTransaction(FARM_B_ID, USER_B_ID, { ...validInput, birdGroupId: "group-a" }),
+    ).rejects.toThrow(ValidationError);
+  });
+});
+
+describe("bird consumptions (used for meat/food)", () => {
+  beforeEach(async () => {
+    await seedTwoFarms();
+    await fakePrisma.birdGroup.create({
+      data: {
+        id: "group-a",
+        farmId: FARM_A_ID,
+        breedId: "breed-a",
+        sex: "FEMALE",
+        category: "LAYER",
+        quantity: 10,
+        birthOrAcquiredDate: new Date("2025-01-01"),
+      },
+    });
+    await fakePrisma.birdConsumption.create({
+      data: {
+        id: "cons-a",
+        farmId: FARM_A_ID,
+        birdGroupId: "group-a",
+        consumptionDate: new Date("2025-01-01"),
+        quantity: 2,
+      },
+    });
+  });
+
+  const validInput = {
+    consumptionDate: "2025-02-01",
+    birdGroupId: "group-a",
+    quantity: 1,
+  };
+
+  it("does not return another farm's record", async () => {
+    await expect(getBirdConsumption(FARM_B_ID, "cons-a")).resolves.toBeNull();
+  });
+
+  it("does not list another farm's records", async () => {
+    await expect(listBirdConsumptions(FARM_B_ID)).resolves.toEqual([]);
+  });
+
+  it("refuses to update another farm's record", async () => {
+    await expect(updateBirdConsumption(FARM_B_ID, "cons-a", USER_B_ID, validInput)).rejects.toThrow(
+      ValidationError,
+    );
+  });
+
+  it("refuses to delete another farm's record", async () => {
+    await expect(deleteBirdConsumption(FARM_B_ID, "cons-a", USER_B_ID)).rejects.toThrow(
+      ValidationError,
+    );
+    await expect(getBirdConsumption(FARM_A_ID, "cons-a")).resolves.not.toBeNull();
+  });
+
+  it("refuses to link a record to another farm's bird group", async () => {
+    await expect(createBirdConsumption(FARM_B_ID, USER_B_ID, validInput)).rejects.toThrow(
+      ValidationError,
+    );
+  });
+
+  it("refuses to move a record onto another farm's bird group", async () => {
+    await fakePrisma.birdGroup.create({
+      data: {
+        id: "group-b",
+        farmId: FARM_B_ID,
+        breedId: "breed-b",
+        sex: "FEMALE",
+        category: "LAYER",
+        quantity: 5,
+        birthOrAcquiredDate: new Date("2025-01-01"),
+      },
+    });
+    await expect(
+      updateBirdConsumption(FARM_A_ID, "cons-a", USER_A_ID, {
+        ...validInput,
+        birdGroupId: "group-b",
+      }),
     ).rejects.toThrow(ValidationError);
   });
 });

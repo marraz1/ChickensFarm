@@ -13,6 +13,9 @@ const EVENT_LABELS: Record<string, string> = {
   MANUAL_ADJUSTMENT: "Rankinė korekcija",
   LOSS: "Nuostolis",
   INCUBATION_HATCH: "Išsiritimas",
+  PURCHASE: "Pirkimas",
+  SALE: "Pardavimas",
+  MEAT_USE: "Suvartota mėsai",
 };
 
 export default async function BirdGroupDetailPage({
@@ -45,9 +48,7 @@ export default async function BirdGroupDetailPage({
             <p className="text-sm text-muted-foreground">Dabartinis kiekis</p>
             <p className="text-2xl font-semibold">{group.quantity}</p>
           </div>
-          {group.name && (
-            <p className="mt-2 text-sm font-medium">{group.breed.name}</p>
-          )}
+          {group.name && <p className="mt-2 text-sm font-medium">{group.breed.name}</p>}
           <p className="mt-2 text-sm text-muted-foreground">
             {birdCategoryLabels[group.category]} · {birdTypeLabels[group.breed.birdType]} ·{" "}
             {sexLabels[group.sex]}
@@ -62,17 +63,24 @@ export default async function BirdGroupDetailPage({
           <p className="mb-2 text-sm font-medium text-muted-foreground">Istorija</p>
           <div className="flex flex-col">
             {group.events.map((event) => (
-              <div key={event.id} className="flex items-center gap-3 border-t py-3 first:border-t-0">
+              <div
+                key={event.id}
+                className="flex items-center gap-3 border-t py-3 first:border-t-0"
+              >
                 <div className="flex-1">
                   <p className="text-sm">
                     {EVENT_LABELS[event.eventType] ?? event.eventType}{" "}
-                    <span className={event.quantityDelta >= 0 ? "text-emerald-600" : "text-destructive"}>
+                    <span
+                      className={event.quantityDelta >= 0 ? "text-emerald-600" : "text-destructive"}
+                    >
                       {event.quantityDelta >= 0 ? "+" : ""}
                       {event.quantityDelta}
                     </span>
                   </p>
                   {event.note && <p className="text-sm text-muted-foreground">{event.note}</p>}
-                  <p className="text-xs text-muted-foreground">{formatRelativeLT(event.createdAt)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatRelativeLT(event.createdAt)}
+                  </p>
                 </div>
                 <p className="text-sm text-muted-foreground">{event.quantityAfter}</p>
               </div>

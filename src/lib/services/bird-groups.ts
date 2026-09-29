@@ -14,10 +14,13 @@ export class NegativeQuantityError extends Error {
 }
 
 // Raised when a delete is blocked because the group is still referenced by
-// historical records (losses, egg collections, mother hens, incubation cycles).
+// historical records (losses, egg collections, meat/food use, mother hens,
+// incubation cycles).
 export class GroupHasReferencesError extends ValidationError {
   constructor() {
-    super("Grupė susieta su įrašais (nuostoliais, kiaušiniais, inkubacija ar perekšlėmis), todėl jos ištrinti negalima");
+    super(
+      "Grupė susieta su įrašais (nuostoliais, kiaušiniais, mėsai suvartotais paukščiais, inkubacija ar perekšlėmis), todėl jos ištrinti negalima",
+    );
     this.name = "GroupHasReferencesError";
   }
 }
@@ -35,7 +38,7 @@ export async function adjustBirdGroupQuantityTx(
     sourceId?: string;
     note?: string;
     userId: string;
-  }
+  },
 ) {
   const group = await tx.birdGroup.findFirst({
     where: { id: params.birdGroupId, farmId: params.farmId },
@@ -89,10 +92,25 @@ export async function getFlockComposition(farmId: string) {
   });
 
   type CategoryEntry = { category: (typeof birdCategoryOrder)[number]; quantity: number };
-  type BreedEntry = { breedId: string; breedName: string; total: number; categories: CategoryEntry[] };
-  type TypeEntry = { birdType: (typeof birdTypeOrder)[number]; total: number; breeds: BreedEntry[] };
+  type BreedEntry = {
+    breedId: string;
+    breedName: string;
+    total: number;
+    categories: CategoryEntry[];
+  };
+  type TypeEntry = {
+    birdType: (typeof birdTypeOrder)[number];
+    total: number;
+    breeds: BreedEntry[];
+  };
 
-  const byType = new Map<string, { total: number; breeds: Map<string, { name: string; total: number; categories: Map<string, number> }> }>();
+  const byType = new Map<
+    string,
+    {
+      total: number;
+      breeds: Map<string, { name: string; total: number; categories: Map<string, number> }>;
+    }
+  >();
 
   for (const g of groups) {
     const type = g.breed.birdType;
@@ -105,7 +123,10 @@ export async function getFlockComposition(farmId: string) {
     }
     const breedBucket = typeBucket.breeds.get(g.breedId)!;
     breedBucket.total += g.quantity;
-    breedBucket.categories.set(g.category, (breedBucket.categories.get(g.category) ?? 0) + g.quantity);
+    breedBucket.categories.set(
+      g.category,
+      (breedBucket.categories.get(g.category) ?? 0) + g.quantity,
+    );
   }
 
   const composition: TypeEntry[] = birdTypeOrder
@@ -191,7 +212,7 @@ export async function updateBirdGroup(
   farmId: string,
   birdGroupId: string,
   userId: string,
-  input: UpdateBirdGroupInput
+  input: UpdateBirdGroupInput,
 ) {
   return prisma.$transaction(async (tx) => {
     const group = await tx.birdGroup.findFirst({ where: { id: birdGroupId, farmId } });
@@ -235,20 +256,27 @@ export async function updateBirdGroup(
 // Deletes a group only when nothing else references it. History (BirdGroupEvent)
 // cascades away with the group; losses/eggs/incubation/mother-hens would merely
 // have their link nulled, silently detaching real records — so we block instead.
+// Meat/food-use records point at the group with a NOT NULL, Restrict link, so
+// they are counted here too and get the same readable error.
 export async function deleteBirdGroup(farmId: string, birdGroupId: string) {
   return prisma.$transaction(async (tx) => {
     const group = await tx.birdGroup.findFirst({ where: { id: birdGroupId, farmId } });
     if (!group) throw new ValidationError("Paukščių grupė nerasta");
 
-    const [motherHens, losses, eggCollections, sourceCycles, resultCycles] = await Promise.all([
-      tx.motherHen.count({ where: { birdGroupId } }),
-      tx.loss.count({ where: { birdGroupId } }),
-      tx.eggCollection.count({ where: { birdGroupId } }),
-      tx.incubationCycle.count({ where: { eggSourceGroupId: birdGroupId } }),
-      tx.incubationCycle.count({ where: { resultingGroupId: birdGroupId } }),
-    ]);
+    const [motherHens, losses, eggCollections, birdConsumptions, sourceCycles, resultCycles] =
+      await Promise.all([
+        tx.motherHen.count({ where: { birdGroupId } }),
+        tx.loss.count({ where: { birdGroupId } }),
+        tx.eggCollection.count({ where: { birdGroupId } }),
+        // Unlike the others this link is NOT NULL with onDelete: Restrict, so
+        // without this count the delete would surface as an opaque FK 500
+        // instead of the readable message below.
+        tx.birdConsumption.count({ where: { birdGroupId } }),
+        tx.incubationCycle.count({ where: { eggSourceGroupId: birdGroupId } }),
+        tx.incubationCycle.count({ where: { resultingGroupId: birdGroupId } }),
+      ]);
 
-    if (motherHens + losses + eggCollections + sourceCycles + resultCycles > 0) {
+    if (motherHens + losses + eggCollections + birdConsumptions + sourceCycles + resultCycles > 0) {
       throw new GroupHasReferencesError();
     }
 

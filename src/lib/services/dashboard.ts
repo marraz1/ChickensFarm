@@ -5,7 +5,7 @@ import { getBirdTransactionTotals } from "@/lib/services/bird-transactions";
 
 export type ActivityItem = {
   id: string;
-  type: "EGG_COLLECTION" | "LOSS" | "MOTHER_HEN_LOG";
+  type: "EGG_COLLECTION" | "LOSS" | "MEAT_USE" | "MOTHER_HEN_LOG";
   summary: string;
   createdAt: Date;
 };
@@ -39,6 +39,7 @@ export async function getDashboardData(farmId: string) {
     birdTotalsThisYear,
     recentCollections,
     recentLosses,
+    recentMeatUse,
     recentHenLogs,
   ] = await Promise.all([
     prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
@@ -100,6 +101,13 @@ export async function getDashboardData(farmId: string) {
       take: 5,
       include: { birdGroup: { include: { breed: true } } },
     }),
+    // Listed alongside losses, never merged into them: a bird eaten at home is
+    // not a loss, and the feed says so in its own words.
+    prisma.birdConsumption.findMany({
+      where: { farmId },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
     prisma.motherHenLog.findMany({
       where: { motherHen: { farmId } },
       orderBy: { createdAt: "desc" },
@@ -125,6 +133,12 @@ export async function getDashboardData(farmId: string) {
       type: "LOSS" as const,
       summary: `Nuostolis: ${l.reasonType === "PREDATOR" ? "plėšrūnas" : l.reasonType === "DISEASE" ? "liga" : "kita"}, ${l.quantity} vnt.`,
       createdAt: l.createdAt,
+    })),
+    ...recentMeatUse.map((c) => ({
+      id: c.id,
+      type: "MEAT_USE" as const,
+      summary: `Suvartota mėsai: ${c.quantity} vnt.`,
+      createdAt: c.createdAt,
     })),
     ...recentHenLogs.map((log) => ({
       id: log.id,

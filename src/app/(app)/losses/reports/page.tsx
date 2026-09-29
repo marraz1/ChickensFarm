@@ -1,5 +1,5 @@
 import { requireActiveFarm } from "@/lib/session";
-import { getLossesByReasonReport } from "@/lib/services/losses";
+import { getFlockReductionsReport } from "@/lib/services/reports";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { lossReasonLabels } from "@/lib/labels";
@@ -19,8 +19,7 @@ export default async function LossesReportsPage({
     to: to ? new Date(to) : now,
   };
 
-  const totals = await getLossesByReasonReport(farm.id, range);
-  const total = totals.DISEASE + totals.PREDATOR + totals.OTHER;
+  const report = await getFlockReductionsReport(farm.id, range);
 
   return (
     <div>
@@ -44,15 +43,40 @@ export default async function LossesReportsPage({
       </form>
       <div className="flex flex-col gap-3 px-4">
         <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Iš viso prarasta</p>
-          <p className="text-2xl font-semibold">{total}</p>
+          <p className="text-sm text-muted-foreground">Iš viso prarasta (nugaišo)</p>
+          <p className="text-2xl font-semibold">{report.lossesTotal}</p>
         </Card>
-        {(Object.entries(lossReasonLabels) as [keyof typeof totals, string][]).map(([key, label]) => (
-          <Card key={key} className="flex flex-row items-center justify-between p-4">
-            <span>{label}</span>
-            <span className="text-lg font-semibold">{totals[key]}</span>
-          </Card>
-        ))}
+        {(Object.entries(lossReasonLabels) as [keyof typeof report.losses, string][]).map(
+          ([key, label]) => (
+            <Card key={key} className="flex flex-row items-center justify-between p-4">
+              <span>{label}</span>
+              <span className="text-lg font-semibold">{report.losses[key]}</span>
+            </Card>
+          ),
+        )}
+
+        {/* Every cause of a smaller flock, each on its own line. Sold birds and
+            birds eaten at home are not losses, so they are listed here rather
+            than folded into the mortality figures above. */}
+        <p className="pt-3 text-sm font-medium text-muted-foreground">
+          Paukščių sumažėjimas pagal priežastį
+        </p>
+        <Card className="flex flex-row items-center justify-between p-4">
+          <span>Nugaišo</span>
+          <span className="text-lg font-semibold">{report.lossesTotal}</span>
+        </Card>
+        <Card className="flex flex-row items-center justify-between p-4">
+          <span>Parduota</span>
+          <span className="text-lg font-semibold">{report.sold}</span>
+        </Card>
+        <Card className="flex flex-row items-center justify-between p-4">
+          <span>Suvartota mėsai</span>
+          <span className="text-lg font-semibold">{report.meatUse}</span>
+        </Card>
+        <Card className="flex flex-row items-center justify-between p-4">
+          <span className="font-medium">Iš viso</span>
+          <span className="text-lg font-semibold">{report.total}</span>
+        </Card>
       </div>
     </div>
   );
