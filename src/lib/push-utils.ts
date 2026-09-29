@@ -28,7 +28,16 @@ export function isGoneStatus(statusCode: number | undefined): boolean {
   return statusCode === 404 || statusCode === 410;
 }
 
-export type PushSupport = "supported" | "ios-needs-install" | "unsupported";
+export type PushSupport = "supported" | "ios-needs-install" | "ios-needs-update" | "unsupported";
+
+/**
+ * iPhone, iPod or iPad. iPadOS 13+ reports itself as "Macintosh"; the touch-point
+ * count is what separates an iPad from a real Mac, and a Mac in Safari 16+
+ * supports push without installing anything.
+ */
+export function isIosDevice(userAgent: string, maxTouchPoints: number): boolean {
+  return /iPad|iPhone|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1);
+}
 
 /**
  * Pure so the fiddly part — telling "iOS that just needs installing" apart from
@@ -39,6 +48,10 @@ export type PushSupport = "supported" | "ios-needs-install" | "unsupported";
  * (16.4+), so feature detection alone cannot distinguish the two, and telling an
  * iPhone user "unsupported" when they simply have not installed the app yet is
  * the single most confusing thing this feature could do.
+ *
+ * An iOS device that *is* running from the home screen but still lacks the APIs
+ * is on a release older than 16.4 — installing again will not help, updating
+ * iOS will.
  */
 export function classifyPushSupport(env: {
   hasServiceWorker: boolean;
@@ -49,15 +62,8 @@ export function classifyPushSupport(env: {
   standalone: boolean;
 }): PushSupport {
   if (env.hasServiceWorker && env.hasPushManager && env.hasNotification) return "supported";
-
-  // iPadOS 13+ reports itself as "Macintosh"; the touch-point count is what
-  // separates an iPad from a real Mac, and a Mac in Safari 16+ supports push.
-  const isIos =
-    /iPad|iPhone|iPod/.test(env.userAgent) ||
-    (/Macintosh/.test(env.userAgent) && env.maxTouchPoints > 1);
-
-  if (isIos && !env.standalone) return "ios-needs-install";
-  return "unsupported";
+  if (!isIosDevice(env.userAgent, env.maxTouchPoints)) return "unsupported";
+  return env.standalone ? "ios-needs-update" : "ios-needs-install";
 }
 
 export type ChannelAttempt = "not-attempted" | "delivered" | "failed";

@@ -6,6 +6,7 @@ import {
   buildPushPayload,
   classifyPushSupport,
   isGoneStatus,
+  isIosDevice,
   resolveDeliveryOutcome,
   safeNotificationPath,
   urlBase64ToUint8Array,
@@ -89,10 +90,44 @@ describe("classifyPushSupport", () => {
     expect(classifyPushSupport({ ...base, userAgent: MAC, maxTouchPoints: 0 })).toBe("unsupported");
   });
 
+  it("tells an installed iPhone without the APIs to update iOS, not to install again", () => {
+    // Home-screen app on iOS < 16.4: re-installing cannot help.
+    expect(classifyPushSupport({ ...base, userAgent: IPHONE, standalone: true })).toBe(
+      "ios-needs-update",
+    );
+  });
+
+  it("does not ask an Android phone to install first", () => {
+    // Android Chrome supports push in a normal tab; only iOS gates it on install.
+    const ANDROID = "Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/126.0 Mobile Safari/537.36";
+    expect(classifyPushSupport({ ...base, userAgent: ANDROID, maxTouchPoints: 5 })).toBe(
+      "unsupported",
+    );
+  });
+
   it("reports unsupported for a browser missing the APIs", () => {
     expect(classifyPushSupport({ ...base, userAgent: "Mozilla/5.0 (X11; Linux)" })).toBe(
       "unsupported",
     );
+  });
+});
+
+describe("isIosDevice", () => {
+  it("recognises iPhone, iPod and iPad user agents", () => {
+    expect(isIosDevice("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", 5)).toBe(true);
+    expect(isIosDevice("Mozilla/5.0 (iPod touch; CPU iPhone OS 15_0 like Mac OS X)", 5)).toBe(true);
+    expect(isIosDevice("Mozilla/5.0 (iPad; CPU OS 12_0 like Mac OS X)", 5)).toBe(true);
+  });
+
+  it("treats a touch-capable Macintosh as an iPad and a plain Mac as a Mac", () => {
+    const MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)";
+    expect(isIosDevice(MAC, 5)).toBe(true);
+    expect(isIosDevice(MAC, 0)).toBe(false);
+  });
+
+  it("ignores Android and desktop browsers", () => {
+    expect(isIosDevice("Mozilla/5.0 (Linux; Android 14; Pixel 8)", 5)).toBe(false);
+    expect(isIosDevice("Mozilla/5.0 (Windows NT 10.0; Win64; x64)", 0)).toBe(false);
   });
 });
 

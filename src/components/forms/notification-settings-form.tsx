@@ -11,6 +11,7 @@ import { Switch, SwitchThumb } from "@/components/ui/switch";
 import { DEFAULT_TIME_ZONE } from "@/lib/notification-schedule";
 import type { NotificationStatusReason } from "@/lib/services/notifications";
 import { PushSetupError, disablePush, enablePush } from "@/lib/push-client";
+import { PushInstallHint } from "@/components/forms/push-install-hint";
 import {
   notificationSettingSchema,
   notificationSettingDefaults,
@@ -285,6 +286,8 @@ export function NotificationSettingsForm({
           </Switch>
         </div>
 
+        {vapidPublicKey && !pushEnabled && <PushInstallHint />}
+
         {errors.emailEnabled && (
           <p className="text-sm text-destructive">{errors.emailEnabled.message}</p>
         )}
@@ -306,7 +309,7 @@ export function NotificationSettingsForm({
 
         <p className="text-xs text-muted-foreground">
           {vapidPublicKey
-            ? "Pranešimai telefone veikia įsidiegus programėlę į pradžios ekraną."
+            ? "„iPhone“ ir „iPad“ pranešimai telefone veikia tik įsidiegus programėlę į pradžios ekraną."
             : "Pranešimai telefone šiuo metu neprieinami."}
         </p>
       </div>
