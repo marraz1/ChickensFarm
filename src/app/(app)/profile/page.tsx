@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { formatDateLT } from "@/lib/format";
-import { Tag, Settings, ChevronRight, User, Bell } from "lucide-react";
+import { Tag, Settings, ChevronRight, User, Bell, MessageSquare } from "lucide-react";
 
 export default async function ProfilePage() {
   const sessionUser = await requireUser();
@@ -23,6 +23,7 @@ export default async function ProfilePage() {
     ...(activeFarm
       ? [{ href: `/farms/${activeFarm.id}/settings`, label: "Ūkio nustatymai", icon: Settings }]
       : []),
+    { href: "/profile/feedback", label: "Siųsti atsiliepimą", icon: MessageSquare },
   ];
 
   return (

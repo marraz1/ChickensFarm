@@ -19,7 +19,7 @@ export default function PrivacyPage() {
         <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
           <h1 className="text-2xl font-semibold">Privatumo pranešimas</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Paskutinį kartą atnaujinta 2026-09-09
+            Paskutinį kartą atnaujinta 2026-09-29
           </p>
 
           <div className="mt-6 flex flex-col gap-6 text-sm leading-relaxed">
@@ -52,6 +52,12 @@ export default function PrivacyPage() {
                   <span className="font-medium">Techniniai duomenys:</span> slaptažodžio atkūrimo
                   užklausos ir su jomis susiję laikini žetonai, naudojami tik slaptažodžio atkūrimo
                   procesui.
+                </li>
+                <li>
+                  <span className="font-medium">Atsiliepimai:</span> jei išsiunčiate atsiliepimą
+                  programėlėje, saugomas jo tekstas, jūsų paskyra, tuo metu aktyvus ūkis ir
+                  programos versija — tik tam, kad galėtume atsiliepimą perskaityti ir, jei reikia,
+                  su jumis susisiekti.
                 </li>
               </ul>
             </section>
