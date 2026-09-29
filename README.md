@@ -431,6 +431,7 @@ Serve over HTTPS so the app stays installable as a PWA — Vercel does this by d
 
 ## Documentation
 
+- [`docs/strategy.md`](docs/strategy.md) — one-pager: who the app is for, the problem it solves, near-term direction, and what is out of scope for now
 - [`docs/architecture.md`](docs/architecture.md) — architecture overview: tenancy, auth, push notifications, finance math, and known gaps
 - [`docs/RELEASE.md`](docs/RELEASE.md) — branch model, how to cut a release, and how to read a failed one
 - [`docs/monitoring.md`](docs/monitoring.md) — error tracking (Sentry) and uptime monitoring setup
