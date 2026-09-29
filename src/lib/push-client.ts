@@ -44,6 +44,11 @@ export async function enablePush(vapidPublicKey: string): Promise<void> {
       "„iPhone“ ir „iPad“ pranešimai veikia tik įsidiegus programėlę. Safari naršyklėje spauskite dalinimosi mygtuką → „Į pradžios ekraną“, tada atidarykite ChickensFarm iš pradžios ekrano.",
     );
   }
+  if (support === "ios-needs-update") {
+    throw new PushSetupError(
+      "„iPhone“ ir „iPad“ pranešimams reikia iOS 16.4 ar naujesnės versijos. Atnaujinkite įrenginį ir bandykite dar kartą.",
+    );
+  }
   if (support === "unsupported") {
     throw new PushSetupError("Ši naršyklė nepalaiko pranešimų.");
   }
