@@ -94,6 +94,19 @@ export async function updateMotherHen(
 export async function deleteMotherHen(farmId: string, motherHenId: string) {
   const hen = await prisma.motherHen.findFirst({ where: { id: motherHenId, farmId } });
   if (!hen) throw new ValidationError("Perekšlė nerasta");
+
+  // Expenses and losses would merely have their link nulled, silently
+  // detaching the hen's cost and loss history — blocked, as for bird groups.
+  const [expenses, losses] = await Promise.all([
+    prisma.expense.count({ where: { motherHenId } }),
+    prisma.loss.count({ where: { motherHenId } }),
+  ]);
+  if (expenses + losses > 0) {
+    throw new ValidationError(
+      "Perekšlė susieta su išlaidomis ar nuostoliais, todėl jos ištrinti negalima",
+    );
+  }
+
   // Diary entries (MotherHenLog) cascade away with the hen.
   await prisma.motherHen.delete({ where: { id: motherHenId } });
 }

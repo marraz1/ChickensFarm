@@ -10,6 +10,11 @@ export const createMotherHenSchema = z.object({
   diedAt: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Neteisinga data")
+    // Rejects dates that do not exist ("2026-02-30" would roll over to March).
+    .refine((s) => {
+      const d = new Date(`${s}T00:00:00Z`);
+      return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s);
+    }, "Neteisinga data")
     .nullable()
     .optional()
     .or(z.literal("")),

@@ -26,11 +26,17 @@ import {
   GroupHasReferencesError,
   updateBirdGroup,
 } from "@/lib/services/bird-groups";
-import { createMotherHen, getMotherHenWithLogs, updateMotherHen } from "@/lib/services/mother-hens";
+import {
+  createMotherHen,
+  deleteMotherHen,
+  getMotherHenWithLogs,
+  updateMotherHen,
+} from "@/lib/services/mother-hens";
 import { finalizeHatch, getIncubationCycle } from "@/lib/services/incubation";
 import { createExpenseSchema } from "@/lib/validation/expenses";
 import { createLossSchema } from "@/lib/validation/losses";
 import { createBirdGroupSchema } from "@/lib/validation/bird-groups";
+import { createMotherHenSchema } from "@/lib/validation/mother-hens";
 import { farmAreaLabels } from "@/lib/labels";
 
 const FARM_ID = "farm-1";
@@ -296,6 +302,71 @@ describe("mother hen death", () => {
   it("rejects a date of death in the future", async () => {
     await expect(createMotherHen(FARM_ID, { name: "Rytoj", diedAt: "2999-01-01" })).rejects.toThrow(
       "Kritimo data negali būti ateityje",
+    );
+  });
+});
+
+describe("updates from forms that only know some targets", () => {
+  it("keeps a hen's loss on the hen when the V1 form sends an empty birdGroupId", async () => {
+    const created = await createLoss(FARM_ID, USER_ID, { ...loss, motherHenId: "hen-1" });
+    await expect(
+      updateLoss(FARM_ID, created.id as string, USER_ID, {
+        ...loss,
+        birdGroupId: "",
+        comment: "pataisyta",
+      }),
+    ).resolves.toMatchObject({ motherHenId: "hen-1", area: "HENS", comment: "pataisyta" });
+  });
+
+  it("still clears a group target when the V1 form empties it", async () => {
+    const created = await createLoss(FARM_ID, USER_ID, { ...loss, birdGroupId: "eggs-group" });
+    await expect(
+      updateLoss(FARM_ID, created.id as string, USER_ID, { ...loss, birdGroupId: "" }),
+    ).resolves.toMatchObject({ birdGroupId: null, area: null });
+  });
+
+  it("gives a pre-areas loss its group's area on its next edit", async () => {
+    await fakePrisma.loss.create({
+      data: {
+        id: "old-loss",
+        farmId: FARM_ID,
+        birdGroupId: "meat-group",
+        motherHenId: null,
+        incubationCycleId: null,
+        area: null,
+        lossDate: new Date("2024-12-01"),
+        quantity: 1,
+        reasonType: "OTHER",
+      },
+    });
+    await expect(
+      updateLoss(FARM_ID, "old-loss", USER_ID, { ...loss, birdGroupId: "meat-group" }),
+    ).resolves.toMatchObject({ area: "MEAT" });
+  });
+
+  it("returns an expense to Bendra when its target is removed without an area", async () => {
+    const created = await createExpense(FARM_ID, { ...expense, motherHenId: "hen-1" });
+    await expect(
+      updateExpense(FARM_ID, created.id as string, { ...expense, motherHenId: "" }),
+    ).resolves.toMatchObject({ area: "SHARED", motherHenId: null });
+  });
+});
+
+describe("mother hen references", () => {
+  it("cannot be deleted while an expense or a loss points at her", async () => {
+    await createLoss(FARM_ID, USER_ID, { ...loss, motherHenId: "hen-1" });
+    await expect(deleteMotherHen(FARM_ID, "hen-1")).rejects.toThrow(
+      "Perekšlė susieta su išlaidomis ar nuostoliais",
+    );
+    await expect(getMotherHenWithLogs(FARM_ID, "hen-1")).resolves.not.toBeNull();
+  });
+
+  it("rejects a date of death that does not exist", () => {
+    for (const diedAt of ["2026-13-40", "2026-02-30"]) {
+      expect(createMotherHenSchema.safeParse({ name: "Margė", diedAt }).success).toBe(false);
+    }
+    expect(createMotherHenSchema.safeParse({ name: "Margė", diedAt: "2024-02-29" }).success).toBe(
+      true,
     );
   });
 });

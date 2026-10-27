@@ -100,10 +100,12 @@ export async function updateLoss(
     const target = targetFromInput(input, loss);
     assertHenLossQuantity(target, input.quantity);
     // Same target → keep the stored area: the group may since have moved to
-    // another area, but the loss happened where it was at the time.
-    const area = sameTarget(target, loss)
-      ? loss.area
-      : await resolveTargetArea(tx, farmId, target);
+    // another area, but the loss happened where it was at the time. A row
+    // with a target but no area yet (written before areas existed) gets one.
+    const area =
+      sameTarget(target, loss) && loss.area
+        ? loss.area
+        : await resolveTargetArea(tx, farmId, target);
     const newGroupId = target.birdGroupId;
 
     // Reconcile the group-quantity effect. Same group → apply just the net

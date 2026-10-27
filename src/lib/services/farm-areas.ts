@@ -19,27 +19,36 @@ export type Target = {
   incubationCycleId: string | null;
 };
 
-const NO_TARGET: Target = { birdGroupId: null, motherHenId: null, incubationCycleId: null };
+const TARGET_KEYS = ["birdGroupId", "motherHenId", "incubationCycleId"] as const;
 
 /**
  * Normalises the target fields of a request. Without `existing` (create) a
- * missing or empty id means "none". With `existing` (update), a request that
- * leaves out all three keys keeps the stored target; one that sends any of
- * them replaces the target as a whole, so moving an expense from a group to a
- * hen never leaves both set.
+ * missing or empty id means "none". With `existing` (update):
+ * - any non-empty id replaces the target as a whole, so moving an expense
+ *   from a group to a hen never leaves both set;
+ * - otherwise a slot is cleared only when its own key is sent empty. The V1
+ *   loss form always sends `birdGroupId: ""` and knows nothing of hens or
+ *   cycles, so editing a hen's loss there must not silently drop the hen.
  */
 export function targetFromInput(input: TargetFields, existing?: Target): Target {
-  const sent =
-    input.birdGroupId !== undefined ||
-    input.motherHenId !== undefined ||
-    input.incubationCycleId !== undefined;
-  if (existing && !sent) return existing;
-  if (!sent) return NO_TARGET;
-  return {
-    birdGroupId: input.birdGroupId || null,
-    motherHenId: input.motherHenId || null,
-    incubationCycleId: input.incubationCycleId || null,
+  const chosen = TARGET_KEYS.some((key) => input[key]);
+  if (!existing || chosen) {
+    return {
+      birdGroupId: input.birdGroupId || null,
+      motherHenId: input.motherHenId || null,
+      incubationCycleId: input.incubationCycleId || null,
+    };
+  }
+  // Copy only the target slots: `existing` is usually the whole stored row.
+  const kept: Target = {
+    birdGroupId: existing.birdGroupId,
+    motherHenId: existing.motherHenId,
+    incubationCycleId: existing.incubationCycleId,
   };
+  for (const key of TARGET_KEYS) {
+    if (input[key] !== undefined) kept[key] = null;
+  }
+  return kept;
 }
 
 export function sameTarget(a: Target, b: Target): boolean {

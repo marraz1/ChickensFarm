@@ -22,53 +22,60 @@ export function getExpense(farmId: string, id: string) {
 
 // Every expense stores exactly one area (finance rule 1). Left out, the area is
 // taken from the target, else "Bendra". A target must sit in the expense's own
-// area and belong to this farm.
+// area and belong to this farm; the check and the write share a transaction.
 export async function createExpense(farmId: string, input: CreateExpenseInput) {
   const target = targetFromInput(input);
-  const targetArea = await resolveTargetArea(prisma, farmId, target);
-  const area = input.area ?? targetArea ?? "SHARED";
-  assertTargetInArea(area, targetArea);
+  return prisma.$transaction(async (tx) => {
+    const targetArea = await resolveTargetArea(tx, farmId, target);
+    const area = input.area ?? targetArea ?? "SHARED";
+    assertTargetInArea(area, targetArea);
 
-  return prisma.expense.create({
-    data: {
-      farmId,
-      area,
-      ...target,
-      expenseDate: new Date(input.expenseDate),
-      category: input.category,
-      amount: input.amount,
-      description: input.description || null,
-    },
+    return tx.expense.create({
+      data: {
+        farmId,
+        area,
+        ...target,
+        expenseDate: new Date(input.expenseDate),
+        category: input.category,
+        amount: input.amount,
+        description: input.description || null,
+      },
+    });
   });
 }
 
 export async function updateExpense(farmId: string, id: string, input: CreateExpenseInput) {
-  const existing = await prisma.expense.findFirst({ where: { id, farmId } });
-  if (!existing) throw new ValidationError("Išlaidos įrašas nerastas");
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.expense.findFirst({ where: { id, farmId } });
+    if (!existing) throw new ValidationError("Išlaidos įrašas nerastas");
 
-  const target = targetFromInput(input, existing);
-  const targetChanged = !sameTarget(target, existing);
-  let area = input.area ?? existing.area;
+    const target = targetFromInput(input, existing);
+    const targetChanged = !sameTarget(target, existing);
+    let area = input.area ?? existing.area;
 
-  // Re-check only when the area or the target changes. A group may since have
-  // moved to another area (chicks grown into layers), and that must not lock
-  // its older expenses against editing an amount or a date.
-  if (targetChanged || area !== existing.area) {
-    const targetArea = await resolveTargetArea(prisma, farmId, target);
-    if (!input.area && targetChanged && targetArea) area = targetArea;
-    assertTargetInArea(area, targetArea);
-  }
+    // Re-check only when the area or the target changes. A group may since have
+    // moved to another area (chicks grown into layers), and that must not lock
+    // its older expenses against editing an amount or a date.
+    if (targetChanged || area !== existing.area) {
+      const targetArea = await resolveTargetArea(tx, farmId, target);
+      // No area sent with a new target: follow it, as create does — and a
+      // cleared target falls back to "Bendra" rather than keeping the area of
+      // a target the expense no longer has.
+      if (!input.area && targetChanged) area = targetArea ?? "SHARED";
+      assertTargetInArea(area, targetArea);
+    }
 
-  return prisma.expense.update({
-    where: { id },
-    data: {
-      area,
-      ...target,
-      expenseDate: new Date(input.expenseDate),
-      category: input.category,
-      amount: input.amount,
-      description: input.description || null,
-    },
+    return tx.expense.update({
+      where: { id },
+      data: {
+        area,
+        ...target,
+        expenseDate: new Date(input.expenseDate),
+        category: input.category,
+        amount: input.amount,
+        description: input.description || null,
+      },
+    });
   });
 }
 

@@ -61,6 +61,22 @@ ALTER TABLE "expenses" ADD CONSTRAINT "expenses_motherHenId_fkey" FOREIGN KEY ("
 ALTER TABLE "expenses" ADD CONSTRAINT "expenses_incubationCycleId_fkey" FOREIGN KEY ("incubationCycleId") REFERENCES "incubation_cycles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 
+-- Backfill existing rows with the agreed rule (#180): a cycle's hatched group
+-- still in CHICK → Perinimas; a group with meat use → Mėsa; otherwise the
+-- EGGS default above. Expenses keep the "Bendra" default. Losses take the
+-- area of their group, as new losses do.
+UPDATE "bird_groups" g SET "area" = 'INC'
+WHERE g."category" = 'CHICK'
+  AND EXISTS (SELECT 1 FROM "incubation_cycles" c WHERE c."resultingGroupId" = g."id");
+
+UPDATE "bird_groups" g SET "area" = 'MEAT'
+WHERE g."area" = 'EGGS'
+  AND EXISTS (SELECT 1 FROM "bird_consumptions" b WHERE b."birdGroupId" = g."id");
+
+UPDATE "losses" l SET "area" = g."area"
+FROM "bird_groups" g
+WHERE l."birdGroupId" = g."id" AND l."area" IS NULL;
+
 -- Integrity rules Prisma cannot express in the schema (it neither creates nor
 -- diffs CHECK constraints, so these stay put across future migrations).
 -- The services enforce the same rules with readable Lithuanian messages; these
