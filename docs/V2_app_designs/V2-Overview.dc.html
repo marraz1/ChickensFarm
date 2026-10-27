@@ -2,7 +2,7 @@
 <html lang="lt">
 <head>
 <meta charset="utf-8">
-<title>Ūkio finansai</title>
+<title>Ūkio apžvalga</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -13,83 +13,229 @@
 <style>
 body{margin:0}
 a{text-decoration:none;color:inherit}
-svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+svg{flex-shrink:0}
 p{margin:0}
 .ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px}
 .ph h1{margin:0;font-size:18px;line-height:28px;font-weight:600}
 .add{display:flex;align-items:center;gap:4px;height:44px;padding:0 12px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font-size:14px;font-weight:500}
-.card{background:var(--card);border-radius:14px;box-shadow:0 0 0 1px color-mix(in oklch,var(--foreground) 10%,transparent);padding:16px}
-.mut{color:var(--muted-foreground)}
+.card{background:var(--card);border-radius:14px;box-shadow:0 0 0 1px color-mix(in oklch,var(--foreground) 10%,transparent)}
 .lab{font-size:14px;line-height:20px;color:var(--muted-foreground)}
-.sm{font-size:11px;line-height:1.25;color:var(--muted-foreground)}
-.pos{color:#059669}
-.neg{color:var(--destructive)}
-.row{display:flex;align-items:center;gap:12px;min-height:44px;padding:10px 0;border-top:1px solid var(--border)}
-.first{border-top:0}
-.ico{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:32px;height:32px;border-radius:999px;background:var(--accent);color:var(--accent-foreground)}
+.sm{font-size:11px;line-height:1.3;color:var(--muted-foreground)}
+.kv{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:14px;line-height:20px}
+.dot{display:inline-block;flex-shrink:0;width:10px;height:10px;border-radius:999px}
+.seg{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:2px;height:44px;box-sizing:border-box;padding:3px;border-radius:10px;background:var(--muted)}
+.seg button,.seg2 button{border:0;border-radius:8px;background:transparent;font:inherit;font-size:13px;font-weight:500;color:var(--muted-foreground)}
+.seg .on,.seg2 .on{background:var(--card);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.seg2{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:2px;height:44px;box-sizing:border-box;padding:3px;border-radius:10px;background:var(--muted);width:176px}
+.kpi{display:block;padding:12px}
+.kpi p:first-child{font-size:12px;line-height:16px;color:var(--muted-foreground)}
+.kpi p:last-child{font-size:18px;line-height:26px;font-weight:600}
 .bar{height:6px;overflow:hidden;border-radius:999px;background:var(--muted)}
 .bar i{display:block;height:100%;border-radius:999px;background:color-mix(in oklch,var(--foreground) 70%,transparent)}
-.cat{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px;font-size:14px}
-.seg{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:2px;height:44px;box-sizing:border-box;padding:3px;border-radius:10px;background:var(--muted)}
-.seg button{border:0;border-radius:8px;background:transparent;font:inherit;font-size:13px;font-weight:500;color:var(--muted-foreground)}
-.seg .on{background:var(--card);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.ghost{display:flex;align-items:center;justify-content:center;height:44px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-size:14px;font-weight:500}
 </style>
 </helmet>
-<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted:oklch(0.97 0 0);--muted-foreground:oklch(0.556 0 0);--accent:oklch(0.97 0 0);--accent-foreground:oklch(0.205 0 0);--destructive:oklch(0.577 0.245 27.325);--border:oklch(0.922 0 0);position:relative;width:390px;height:1400px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted:oklch(0.97 0 0);--muted-foreground:oklch(0.556 0 0);--accent:oklch(0.97 0 0);--accent-foreground:oklch(0.205 0 0);--destructive:oklch(0.577 0.245 27.325);--border:oklch(0.922 0 0);position:relative;width:390px;height:1450px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
 <dc-import name="V2Header" hint-size="100%,69px"></dc-import>
 <main style="flex:1;overflow:hidden;padding-bottom:64px">
-<div class="ph"><h1>Ūkio finansai</h1><a href="V2-Expense-Form.dc.html" class="add"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Išlaida</a></div>
+<div class="ph"><h1>Ūkio apžvalga</h1><a href="V2-Expense-Form.dc.html" class="add"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Išlaida</a></div>
 <div style="padding:0 16px 12px"><div class="seg" role="group" aria-label="Laikotarpis"><button type="button">Šis mėn.</button><button type="button" class="on" aria-pressed="true">2026 m.</button><button type="button">Laikotarpis</button></div></div>
 <div style="display:flex;flex-direction:column;gap:12px;padding:0 16px">
-<div class="card">
+
+<div class="card" style="padding:16px">
 <p class="lab">Nuostolis · 2026 m.</p>
-<p class="neg" style="font-size:30px;line-height:36px;font-weight:600">-348,50&nbsp;€</p>
-<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-<div><p class="lab">Pajamos</p><p class="pos" style="font-size:18px;line-height:28px;font-weight:600">1&nbsp;962,00&nbsp;€</p></div>
-<div><p class="lab">Išlaidos</p><p style="font-size:18px;line-height:28px;font-weight:600">2&nbsp;310,50&nbsp;€</p></div>
+<p style="font-size:30px;line-height:36px;font-weight:600;color:var(--destructive)">-348,50&nbsp;€</p>
+<div style="display:flex;gap:16px;margin-top:8px">
+<p style="font-size:13px;line-height:18px"><span style="color:var(--muted-foreground)">Pajamos</span> <span style="font-weight:500;color:#059669">1&nbsp;962,00&nbsp;€</span></p>
+<p style="font-size:13px;line-height:18px"><span style="color:var(--muted-foreground)">Išlaidos</span> <span style="font-weight:500">2&nbsp;310,50&nbsp;€</span></p>
 </div>
 </div>
-<div class="card" style="padding-top:12px;padding-bottom:4px">
-<p class="lab" style="margin-bottom:4px">Pagal sritį</p>
-<a href="V2-Eggs-Finance.dc.html" class="row first"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg></span><div style="flex:1;min-width:0"><p style="font-size:14px;line-height:20px;font-weight:500">Kiaušiniai ir prekyba</p><p class="sm">Pajamos 1&nbsp;742,00&nbsp;€ · Išlaidos 1&nbsp;246,00&nbsp;€</p></div><span class="pos" style="font-size:14px;font-weight:600">496,00&nbsp;€</span></a>
-<a href="V2-Hens-Finance.dc.html" class="row"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span><div style="flex:1;min-width:0"><p style="font-size:14px;line-height:20px;font-weight:500">Perekšlės</p><p class="sm">Pajamos 0,00&nbsp;€ · Išlaidos 96,50&nbsp;€</p></div><span class="neg" style="font-size:14px;font-weight:600">-96,50&nbsp;€</span></a>
-<a href="V2-Inc-Finance.dc.html" class="row"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg></span><div style="flex:1;min-width:0"><p style="font-size:14px;line-height:20px;font-weight:500">Perinimas</p><p class="sm">Pajamos 120,00&nbsp;€ · Išlaidos 214,00&nbsp;€</p></div><span class="neg" style="font-size:14px;font-weight:600">-94,00&nbsp;€</span></a>
-<a href="V2-Meat-Finance.dc.html" class="row"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.4 15.63a7.875 6 135 1 1 6.23-6.23 4.5 3.43 135 0 0-6.23 6.23"/><path d="m8.29 12.71-2.6 2.6a2.5 2.5 0 1 0-1.65 4.65A2.5 2.5 0 1 0 8.7 18.3l2.59-2.59"/></svg></span><div style="flex:1;min-width:0"><p style="font-size:14px;line-height:20px;font-weight:500">Mėsiniai paukščiai</p><p class="sm">Pajamos 100,00&nbsp;€ · Išlaidos 614,00&nbsp;€</p></div><span class="neg" style="font-size:14px;font-weight:600">-514,00&nbsp;€</span></a>
-<div class="row"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><div style="flex:1;min-width:0"><p style="font-size:14px;line-height:20px;font-weight:500">Bendros išlaidos</p><p class="sm">Nepriskirtos sričiai · elektra, tvoros</p></div><span class="neg" style="font-size:14px;font-weight:600">-140,00&nbsp;€</span></div>
+
+<div class="card" style="padding:16px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">
+<p class="lab">Pagal sritį</p>
+<div class="seg2" role="group" aria-label="Rodyti">
+<button type="button" class="{{expCls}}" aria-pressed="{{isExp}}" onClick="{{showExp}}">Išlaidos</button>
+<button type="button" class="{{incCls}}" aria-pressed="{{isInc}}" onClick="{{showInc}}">Pajamos</button>
 </div>
-<div class="card">
-<p class="lab" style="margin-bottom:12px">Išlaidos pagal kategoriją</p>
+</div>
+<div style="display:flex;align-items:center;gap:12px">
+<div style="position:relative;width:136px;height:136px;flex-shrink:0">
+<svg width="136" height="136" viewBox="0 0 136 136" role="img" aria-label="{{chartLabel}}">
+<circle cx="68" cy="68" r="52" fill="none" stroke="var(--muted)" stroke-width="20"></circle>
+<sc-for list="{{segs}}" as="s" hint-placeholder-count="5">
+<circle cx="68" cy="68" r="52" fill="none" stroke="{{s.color}}" stroke-width="{{s.w}}" stroke-dasharray="{{s.dash}}" stroke-dashoffset="{{s.offset}}" opacity="{{s.op}}" transform="rotate(-90 68 68)"></circle>
+</sc-for>
+</svg>
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 30px;text-align:center;pointer-events:none">
+<span style="font-size:11px;line-height:14px;color:var(--muted-foreground)">{{centerLabel}}</span>
+<span style="font-size:14px;line-height:20px;font-weight:600">{{centerValue}}</span>
+<span style="font-size:11px;line-height:14px;color:var(--muted-foreground)">{{centerSub}}</span>
+</div>
+</div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<sc-for list="{{legend}}" as="l" hint-placeholder-count="5">
+<button type="button" onClick="{{l.pick}}" aria-pressed="{{l.focused}}" style="display:flex;align-items:center;gap:8px;min-height:40px;padding:0 6px;border:0;border-radius:8px;background:{{l.bg}};font:inherit;color:inherit;text-align:left">
+<span class="dot" style="background:{{l.color}}"></span>
+<span style="flex:1;min-width:0;font-size:13px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{l.short}}</span>
+<span style="font-size:13px;line-height:18px;font-weight:500;color:{{l.pctColor}}">{{l.pct}}</span>
+</button>
+</sc-for>
+</div>
+</div>
+<p class="sm" style="margin-top:8px">Paspauskite sritį, kad pamatytumėte sumą.</p>
+</div>
+
+<div>
+<p class="lab" style="margin-bottom:8px">Sritys</p>
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px">
+<sc-for list="{{areas}}" as="a" hint-placeholder-count="5">
+<div class="card" style="grid-column:{{a.col}};overflow:hidden">
+<button type="button" onClick="{{a.toggle}}" aria-expanded="{{a.open}}" style="display:flex;flex-direction:column;gap:2px;width:100%;min-height:44px;padding:12px;border:0;background:transparent;font:inherit;color:inherit;text-align:left">
+<span style="display:flex;align-items:center;gap:6px;width:100%"><span class="dot" style="background:{{a.color}}"></span><span style="flex:1;min-width:0;font-size:12px;line-height:16px;color:var(--muted-foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{a.name}}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:{{a.rot}}"><path d="m6 9 6 6 6-6"/></svg></span>
+<span style="font-size:18px;line-height:26px;font-weight:600;color:{{a.resColor}}">{{a.result}}</span>
+<span class="sm">{{a.sub1}}</span>
+<span class="sm">{{a.sub2}}</span>
+</button>
+<sc-if value="{{a.open}}" hint-placeholder-val="{{false}}">
+<div style="display:flex;flex-direction:column;gap:12px;padding:12px;border-top:1px solid var(--border)">
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px">
+<div><p class="sm">Pajamos</p><p style="font-size:16px;line-height:24px;font-weight:600;color:#059669">{{a.inc}}</p></div>
+<div><p class="sm">Išlaidos</p><p style="font-size:16px;line-height:24px;font-weight:600">{{a.exp}}</p></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<p class="sm">Didžiausios išlaidos</p>
+<sc-for list="{{a.cats}}" as="c" hint-placeholder-count="2"><div class="kv"><span>{{c.name}}</span><span style="font-weight:500">{{c.amount}}</span></div></sc-for>
+</div>
+<sc-if value="{{a.hasLoss}}" hint-placeholder-val="{{true}}"><div class="kv"><span style="color:var(--muted-foreground)">Nuostoliai</span><span style="font-weight:500">{{a.losses}}</span></div></sc-if>
+<div style="display:flex;flex-direction:column;gap:4px">
+<p class="sm">Pagal mėnesius</p>
+<sc-for list="{{a.months}}" as="m" hint-placeholder-count="3"><div class="kv"><span>{{m.name}}</span><span style="font-weight:500;color:{{m.color}}">{{m.result}}</span></div></sc-for>
+</div>
+<sc-if value="{{a.hasLinks}}" hint-placeholder-val="{{true}}">
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:8px">
+<a href="{{a.ov}}" class="ghost">Atidaryti sritį</a>
+<a href="{{a.fin}}" class="ghost">Finansai</a>
+</div>
+</sc-if>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div>
+<p class="lab" style="margin-bottom:8px">Ūkis dabar</p>
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px">
+<a href="V2-Eggs-Overview.dc.html" class="card kpi"><p>Kiaušinių likutis</p><p>86</p></a>
+<a href="V2-Eggs-Overview.dc.html" class="card kpi"><p>Paukščių iš viso</p><p>67</p></a>
+<a href="V2-Inc-Overview.dc.html" class="card kpi"><p>Aktyvūs ciklai</p><p>2</p></a>
+<a href="V2-Eggs-Losses.dc.html" class="card kpi"><p>Nuostoliai · 2026 m.</p><p>6</p></a>
+</div>
+</div>
+
+<div class="card" style="overflow:hidden">
+<button type="button" onClick="{{toggleStats}}" aria-expanded="{{statsOpen}}" style="display:flex;align-items:center;justify-content:space-between;width:100%;min-height:52px;padding:0 16px;border:0;background:transparent;font:inherit;font-size:14px;font-weight:500;color:inherit">Daugiau statistikos<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:{{statsRot}}"><path d="m6 9 6 6 6-6"/></svg></button>
+<sc-if value="{{statsOpen}}" hint-placeholder-val="{{false}}">
+<div style="display:flex;flex-direction:column;gap:16px;padding:0 16px 16px">
 <div style="display:flex;flex-direction:column;gap:12px">
-<div><div class="cat"><span>Pašarai</span><span style="font-weight:500">1&nbsp;624,50&nbsp;€<span class="mut" style="margin-left:4px;font-size:12px">70,3&nbsp;%</span></span></div><div class="bar"><i style="width:100%"></i></div></div>
-<div><div class="cat"><span>Kita</span><span style="font-weight:500">280,00&nbsp;€<span class="mut" style="margin-left:4px;font-size:12px">12,1&nbsp;%</span></span></div><div class="bar"><i style="width:17%"></i></div></div>
-<div><div class="cat"><span>Vitaminai</span><span style="font-weight:500">164,00&nbsp;€<span class="mut" style="margin-left:4px;font-size:12px">7,1&nbsp;%</span></span></div><div class="bar"><i style="width:10%"></i></div></div>
-<div><div class="cat"><span>Paukščių pirkimai</span><span style="font-weight:500">136,00&nbsp;€<span class="mut" style="margin-left:4px;font-size:12px">5,9&nbsp;%</span></span></div><div class="bar"><i style="width:8%"></i></div></div>
-<div><div class="cat"><span>Vaistai</span><span style="font-weight:500">106,00&nbsp;€<span class="mut" style="margin-left:4px;font-size:12px">4,6&nbsp;%</span></span></div><div class="bar"><i style="width:7%"></i></div></div>
+<p class="sm">Išlaidos pagal kategoriją</p>
+<sc-for list="{{cats}}" as="c" hint-placeholder-count="5"><div><div class="kv" style="margin-bottom:4px"><span>{{c.name}}</span><span style="font-weight:500">{{c.amount}}<span style="margin-left:4px;font-size:12px;font-weight:400;color:var(--muted-foreground)">{{c.pct}}</span></span></div><div class="bar"><i style="width:{{c.w}}"></i></div></div></sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<p class="sm">Pagal mėnesius · visas ūkis</p>
+<sc-for list="{{months}}" as="m" hint-placeholder-count="3"><div class="kv" style="padding:6px 0;border-top:1px solid var(--border)"><span>{{m.name}}<span class="sm" style="display:block">{{m.sub}}</span></span><span style="font-weight:500;color:{{m.color}}">{{m.result}}</span></div></sc-for>
 </div>
 </div>
-<div class="card">
-<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px"><p class="lab">Nuostoliai pagal sritį</p><p style="font-size:14px;font-weight:600">6 paukščiai</p></div>
-<div style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:8px;text-align:center">
-<div><p style="font-size:18px;line-height:28px;font-weight:600">2</p><p class="sm">Kiaušiniai</p></div>
-<div><p style="font-size:18px;line-height:28px;font-weight:600">0</p><p class="sm">Perekšlės</p></div>
-<div><p style="font-size:18px;line-height:28px;font-weight:600">1</p><p class="sm">Perinimas</p></div>
-<div><p style="font-size:18px;line-height:28px;font-weight:600">3</p><p class="sm">Mėsa</p></div>
+</sc-if>
 </div>
-</div>
-<div class="card" style="padding-top:12px;padding-bottom:4px">
-<p class="lab" style="margin-bottom:4px">Pagal mėnesius</p>
-<div class="row first" style="justify-content:space-between"><div><p style="font-size:14px;line-height:20px">Spalis</p><p class="sm">Pajamos 186,40&nbsp;€ · Išlaidos 142,00&nbsp;€</p></div><span class="pos" style="font-size:14px;font-weight:500">44,40&nbsp;€</span></div>
-<div class="row" style="justify-content:space-between"><div><p style="font-size:14px;line-height:20px">Rugsėjis</p><p class="sm">Pajamos 210,00&nbsp;€ · Išlaidos 389,00&nbsp;€</p></div><span class="neg" style="font-size:14px;font-weight:500">-179,00&nbsp;€</span></div>
-<div class="row" style="justify-content:space-between"><div><p style="font-size:14px;line-height:20px">Rugpjūtis</p><p class="sm">Pajamos 255,00&nbsp;€ · Išlaidos 301,50&nbsp;€</p></div><span class="neg" style="font-size:14px;font-weight:500">-46,50&nbsp;€</span></div>
-</div>
+
 </div>
 </main>
 <div style="position:absolute;left:0;right:0;bottom:0"><dc-import name="V2Nav" active="overview" hint-size="100%,64px"></dc-import></div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1400}}'>
+<script type="text/x-dc" data-dc-script data-props='{"open":{"editor":"enum","options":["","eggs","hens","inc","meat","shared"],"default":""},"focus":{"editor":"enum","options":["","eggs","hens","inc","meat","shared"],"default":""},"stats":{"editor":"boolean","default":false},"$preview":{"width":390,"height":1450}}'>
 class Component extends DCLogic {
-renderVals() { return {}; }
+renderVals() {
+const s = this.state || {};
+const cur = (k, fallback) => (s[k] !== undefined ? s[k] : fallback);
+const open = cur('open', this.props.open || null);
+const focus = cur('focus', this.props.focus || null);
+const mode = cur('mode', 'exp');
+const statsOpen = cur('statsOpen', !!this.props.stats);
+const num = (n, d) => n.toLocaleString('lt-LT', { minimumFractionDigits: d, maximumFractionDigits: d });
+const eur = (n) => (n < 0 ? '-' : '') + num(Math.abs(n), 2) + ' €';
+const pos = '#059669';
+const neg = 'var(--destructive)';
+const A = [
+{ key: 'eggs', name: 'Kiaušiniai ir prekyba', short: 'Kiaušiniai', color: '#2a78d6', inc: 1742, exp: 1246, losses: 2, cats: [['Pašarai', 1040], ['Paukščių pirkimai', 136], ['Vitaminai', 70]], months: [['Spalis', 160.4, 112], ['Rugsėjis', 180, 140], ['Rugpjūtis', 220, 130]], ov: 'V2-Eggs-Overview.dc.html', fin: 'V2-Eggs-Finance.dc.html' },
+{ key: 'hens', name: 'Perekšlės', short: 'Perekšlės', color: '#eb6834', inc: 0, exp: 96.5, losses: 0, cats: [['Pašarai', 64.5], ['Vaistai', 32]], months: [['Spalis', 0, 12.5], ['Rugsėjis', 0, 84], ['Rugpjūtis', 0, 0]], ov: 'V2-Hens-Overview.dc.html', fin: 'V2-Hens-Finance.dc.html' },
+{ key: 'inc', name: 'Perinimas', short: 'Perinimas', color: '#1baf7a', inc: 120, exp: 214, losses: 1, cats: [['Kita', 140], ['Vaistai', 74]], months: [['Spalis', 0, 120], ['Rugsėjis', 120, 0], ['Rugpjūtis', 0, 94]], ov: 'V2-Inc-Overview.dc.html', fin: 'V2-Inc-Finance.dc.html' },
+{ key: 'meat', name: 'Mėsiniai paukščiai', short: 'Mėsa', color: '#eda100', inc: 100, exp: 614, losses: 3, cats: [['Pašarai', 520], ['Vitaminai', 94]], months: [['Spalis', 0, 52], ['Rugsėjis', 100, 186], ['Rugpjūtis', 0, 376]], ov: 'V2-Meat-Overview.dc.html', fin: 'V2-Meat-Finance.dc.html' },
+{ key: 'shared', name: 'Bendros išlaidos', short: 'Bendros', color: '#e87ba4', inc: 0, exp: 140, losses: null, cats: [['Elektra', 85], ['Tvoros ir remontas', 55]], months: [['Spalis', 0, 30], ['Rugsėjis', 0, 65], ['Rugpjūtis', 0, 45]], ov: null, fin: null }
+];
+const val = (a) => (mode === 'exp' ? a.exp : a.inc);
+const total = A.reduce((t, a) => t + val(a), 0);
+const C = 2 * Math.PI * 52;
+let cum = 0;
+const segs = [];
+A.forEach((a) => {
+const v = val(a);
+if (v <= 0) return;
+const len = (v / total) * C;
+segs.push({ color: a.color, dash: Math.max(len - 2, 0.5) + ' ' + C, offset: String(-cum), w: focus === a.key ? 24 : 20, op: focus && focus !== a.key ? 0.3 : 1 });
+cum += len;
+});
+const pct = (a) => num(total ? (val(a) / total) * 100 : 0, 1) + ' %';
+const legend = A.map((a) => ({
+short: a.short, color: a.color, pct: pct(a), focused: focus === a.key,
+bg: focus === a.key ? 'var(--muted)' : 'transparent',
+pctColor: val(a) > 0 ? 'var(--foreground)' : 'var(--muted-foreground)',
+pick: () => this.setState({ focus: focus === a.key ? null : a.key })
+}));
+const fa = A.find((a) => a.key === focus);
+const word = mode === 'exp' ? 'Išlaidos' : 'Pajamos';
+const areas = A.map((a) => {
+const r = a.inc - a.exp;
+const isOpen = open === a.key;
+return {
+name: a.name, color: a.color, open: isOpen,
+col: isOpen || a.key === 'shared' ? 'span 2' : 'auto',
+rot: isOpen ? 'rotate(180deg)' : 'none',
+result: eur(r), resColor: r >= 0 ? pos : neg,
+sub1: a.key === 'shared' ? 'Nepriskirtos sričiai' : 'Pajamos ' + eur(a.inc),
+sub2: a.key === 'shared' ? 'Elektra, tvoros' : 'Išlaidos ' + eur(a.exp),
+inc: eur(a.inc), exp: eur(a.exp),
+cats: a.cats.map(([n, v]) => ({ name: n, amount: eur(v) })),
+hasLoss: a.losses !== null, losses: a.losses + (a.losses === 1 ? ' paukštis' : a.losses === 0 ? ' paukščių' : ' paukščiai'),
+months: a.months.map(([n, i, e]) => ({ name: n, result: eur(i - e), color: i - e >= 0 ? pos : neg })),
+hasLinks: !!a.ov, ov: a.ov || '#', fin: a.fin || '#',
+toggle: () => this.setState({ open: isOpen ? null : a.key })
+};
+});
+const farmCats = [['Pašarai', 1624.5], ['Kita', 280], ['Vitaminai', 164], ['Paukščių pirkimai', 136], ['Vaistai', 106]];
+const exTotal = 2310.5;
+const cats = farmCats.map(([n, v]) => ({ name: n, amount: eur(v), pct: num((v / exTotal) * 100, 1) + ' %', w: Math.round((v / farmCats[0][1]) * 100) + '%' }));
+const months = [0, 1, 2].map((i) => {
+const inc = A.reduce((t, a) => t + a.months[i][1], 0);
+const exp = A.reduce((t, a) => t + a.months[i][2], 0);
+return { name: A[0].months[i][0], sub: 'Pajamos ' + eur(inc) + ' · Išlaidos ' + eur(exp), result: eur(inc - exp), color: inc - exp >= 0 ? pos : neg };
+});
+return {
+segs, legend, areas, cats, months,
+isExp: mode === 'exp', isInc: mode === 'inc',
+expCls: mode === 'exp' ? 'on' : '', incCls: mode === 'inc' ? 'on' : '',
+showExp: () => this.setState({ mode: 'exp' }), showInc: () => this.setState({ mode: 'inc' }),
+centerLabel: fa ? fa.short : word + ' iš viso',
+centerValue: eur(fa ? val(fa) : total),
+centerSub: fa ? pct(fa) : '5 sritys',
+chartLabel: word + ' pagal sritį: ' + A.map((a) => a.short + ' ' + pct(a)).join(', '),
+statsOpen, statsRot: statsOpen ? 'rotate(180deg)' : 'none',
+toggleStats: () => this.setState({ statsOpen: !statsOpen })
+};
+}
 }
 </script>
 </body>

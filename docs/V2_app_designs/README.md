@@ -41,10 +41,19 @@ The farm is split into four **areas** (sritys). Each area has its own records, e
 
 ### Farm level
 
-| File              | Screen                                                                                                                       |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `V2-Overview`     | Apžvalga — Ūkio finansai: period switch, farm result, per-area rows, shared costs, spend by category, losses by area, months |
-| `V2-Expense-Form` | General expense form with the area chooser (incl. "Bendra")                                                                  |
+| File               | Screen                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `V2-Overview`      | Apžvalga (interactive): period switch, farm result, donut by area, expandable area tiles, "Ūkis dabar" boxes, more |
+| `V2-Overview-Open` | The same page with the Kiaušiniai tile opened, its slice focused and "Daugiau statistikos" expanded                |
+| `V2-Expense-Form`  | General expense form with the area chooser (incl. "Bendra")                                                        |
+
+#### Apžvalga behaviour
+
+- **Donut "Pagal sritį"**: switch between Išlaidos and Pajamos. Each area keeps its colour in both views. Tapping a legend row highlights that slice and shows its amount and share in the centre; tapping it again clears it.
+- **Area colours** (fixed per area, never by rank): Kiaušiniai `#2a78d6`, Perekšlės `#eb6834`, Perinimas `#1baf7a`, Mėsa `#eda100`, Bendros `#e87ba4`. Checked with the dataviz palette validator on white (all checks pass). Three sit below 3:1 contrast, so every slice also has a text label with its percentage.
+- **Area tiles**: two per row with result, income and expenses. Tapping a tile widens it to full width and opens details: income and expenses, top expense categories, losses, last three months, and links to the area and its finance tab. One tile is open at a time.
+- **Ūkis dabar**: four small boxes (egg stock, birds, active cycles, losses) that link to the matching area.
+- **Daugiau statistikos**: collapsed by default; holds spend by category and the farm's months.
 
 ### Per area
 
