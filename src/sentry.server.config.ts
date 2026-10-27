@@ -15,9 +15,11 @@ Sentry.init({
   dsn,
   enabled: Boolean(dsn),
 
-  // Vercel sets VERCEL_ENV to "production" | "preview" | "development" on
-  // deployments; NODE_ENV covers everything else (local dev, tests).
-  environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
+  // SENTRY_ENVIRONMENT names a separate deployment of the same code (the V2
+  // beta sets "v2-beta", see docs/v2-environment.md) so its events never mix
+  // with V1's. Otherwise Vercel sets VERCEL_ENV to "production" | "preview" |
+  // "development" on deployments; NODE_ENV covers everything else.
+  environment: process.env.SENTRY_ENVIRONMENT ?? process.env.VERCEL_ENV ?? process.env.NODE_ENV,
 
   // Kept low on purpose: the free tier's event quota is the limiting
   // resource for a small solo-maintained project, not trace coverage gaps.
