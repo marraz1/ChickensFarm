@@ -16,8 +16,12 @@ Sentry.init({
   // Vercel exposes VERCEL_ENV to the client bundle under this NEXT_PUBLIC_
   // alias (system env vars aren't otherwise available in browser code);
   // NODE_ENV covers everything else (local dev, tests). Mirrors
-  // sentry.server.config.ts / sentry.edge.config.ts.
-  environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.NODE_ENV,
+  // sentry.server.config.ts / sentry.edge.config.ts, including the
+  // SENTRY_ENVIRONMENT override (browser code needs the NEXT_PUBLIC_ copy).
+  environment:
+    process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ??
+    process.env.NEXT_PUBLIC_VERCEL_ENV ??
+    process.env.NODE_ENV,
 
   // Kept low on purpose: the free tier's event quota is the limiting
   // resource for a small solo-maintained project, not trace coverage gaps.

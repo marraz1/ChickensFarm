@@ -14,7 +14,8 @@ const dsn = process.env.SENTRY_DSN;
 Sentry.init({
   dsn,
   enabled: Boolean(dsn),
-  environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
+  // See src/sentry.server.config.ts for SENTRY_ENVIRONMENT.
+  environment: process.env.SENTRY_ENVIRONMENT ?? process.env.VERCEL_ENV ?? process.env.NODE_ENV,
 
   // Kept low on purpose: the free tier's event quota is the limiting
   // resource for a small solo-maintained project, not trace coverage gaps.

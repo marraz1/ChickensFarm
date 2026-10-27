@@ -11,11 +11,13 @@ name: CI
 # is unchanged or better.
 
 on:
-  # Every branch in the promotion chain: feature -> develop -> main -> release.
+  # Every branch in the promotion chain: feature -> develop -> main -> release,
+  # plus the long-lived V2 line (v2/<type>/<N>-slug -> v2/develop), see
+  # docs/V2_app_designs/V2-implementation-plan.md.
   pull_request:
-    branches: [develop, main, release]
+    branches: [develop, main, release, v2/develop]
   push:
-    branches: [develop, main, release]
+    branches: [develop, main, release, v2/develop]
 
 permissions:
   contents: read
@@ -132,6 +134,11 @@ jobs:
           SHA: ${{ github.event.pull_request.head.sha }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           TIMEOUT_SECONDS: 900
+          # PRs into the V2 line are built by the separate `chickensfarm-v2`
+          # Vercel project (docs/v2-environment.md); the V1 project skips them.
+          # Both projects can leave a deployment record on the same commit, so
+          # V2 PRs only look at V2's. Empty for V1 PRs: no filter, as before.
+          VERCEL_PROJECT: ${{ startsWith(github.base_ref, 'v2/') && 'chickensfarm-v2' || '' }}
         run: |
           echo "## Preview build" >> "$GITHUB_STEP_SUMMARY"
           {
@@ -153,9 +160,17 @@ jobs:
           VERCEL_UID=""
           STATE=""
 
+          # Vercel names the GitHub environment "Preview – <project>".
+          DEPLOY_FILTER='.[].id'
+          VERCEL_APP=""
+          if [ -n "$VERCEL_PROJECT" ]; then
+            DEPLOY_FILTER=".[] | select(.environment | endswith(\" $VERCEL_PROJECT\")) | .id"
+            VERCEL_APP="&app=$VERCEL_PROJECT"
+          fi
+
           check_github() {
             local id st
-            for id in $(gh api "repos/$REPO/deployments?sha=$SHA&per_page=20" --jq '.[].id' 2>/dev/null); do
+            for id in $(gh api "repos/$REPO/deployments?sha=$SHA&per_page=20" --jq "$DEPLOY_FILTER" 2>/dev/null); do
               SEEN=1
               st=$(gh api "repos/$REPO/deployments/$id/statuses?per_page=1" \
                 --jq '.[0].state // ""' 2>/dev/null || echo "")
@@ -173,7 +188,7 @@ jobs:
           check_vercel() {
             [ -n "$VERCEL_TOKEN" ] || return 0
             curl -sS --max-time 30 -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v6/deployments?limit=1&sha=$SHA" -o v.json 2>/dev/null || return 0
+              "https://api.vercel.com/v6/deployments?limit=1&sha=$SHA$VERCEL_APP" -o v.json 2>/dev/null || return 0
             local uid
             uid=$(jq -r '.deployments[0].uid // empty' v.json 2>/dev/null || echo "")
             [ -n "$uid" ] || return 0
@@ -246,7 +261,7 @@ jobs:
           if [ "$STATE" = "failure" ] || [ "$STATE" = "error" ]; then
             if [ -z "$VERCEL_UID" ] && [ -n "$VERCEL_TOKEN" ]; then
               curl -sS --max-time 30 -H "Authorization: Bearer $VERCEL_TOKEN" \
-                "https://api.vercel.com/v6/deployments?limit=1&sha=$SHA" -o v.json 2>/dev/null || true
+                "https://api.vercel.com/v6/deployments?limit=1&sha=$SHA$VERCEL_APP" -o v.json 2>/dev/null || true
               VERCEL_UID=$(jq -r '.deployments[0].uid // empty' v.json 2>/dev/null)
             fi
             if [ -n "$VERCEL_UID" ]; then
@@ -281,6 +296,11 @@ jobs:
       # Optional. Vercel "Protection Bypass for Automation" secret; without it a
       # preview behind Deployment Protection cannot be reached by the runner.
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      # Seeded test user for e2e/signed-in.spec.ts. Only V2 previews get it:
+      # they run on the V2 preview database, where the user is seeded. V1
+      # previews share the production database, so the spec skips there.
+      E2E_USER_EMAIL: ${{ startsWith(github.base_ref, 'v2/') && secrets.E2E_USER_EMAIL || '' }}
+      E2E_USER_PASSWORD: ${{ startsWith(github.base_ref, 'v2/') && secrets.E2E_USER_PASSWORD || '' }}
     steps:
       - uses: actions/checkout@v5
 
