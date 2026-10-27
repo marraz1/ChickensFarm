@@ -1,10 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 import { getLocalNow } from "@/lib/notification-schedule";
-import type {
-  CreateMotherHenInput,
-  CreateMotherHenLogInput,
-} from "@/lib/validation/mother-hens";
+import type { CreateMotherHenInput, CreateMotherHenLogInput } from "@/lib/validation/mother-hens";
 
 export function listMotherHens(farmId: string) {
   return prisma.motherHen.findMany({
@@ -67,7 +64,7 @@ function parseDiedAt(diedAt: string | null | undefined): Date | null | undefined
 export async function updateMotherHen(
   farmId: string,
   motherHenId: string,
-  input: CreateMotherHenInput
+  input: CreateMotherHenInput,
 ) {
   const hen = await prisma.motherHen.findFirst({ where: { id: motherHenId, farmId } });
   if (!hen) throw new ValidationError("Perekšlė nerasta");
@@ -114,7 +111,7 @@ export async function deleteMotherHen(farmId: string, motherHenId: string) {
 export async function addMotherHenLog(
   farmId: string,
   motherHenId: string,
-  input: CreateMotherHenLogInput
+  input: CreateMotherHenLogInput,
 ) {
   // Ensure the hen belongs to this farm before appending to its diary.
   const hen = await prisma.motherHen.findFirst({ where: { id: motherHenId, farmId } });

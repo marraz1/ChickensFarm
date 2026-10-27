@@ -70,12 +70,13 @@ export async function finalizeHatch(
   farmId: string,
   cycleId: string,
   userId: string,
-  input: HatchInput
+  input: HatchInput,
 ) {
   return prisma.$transaction(async (tx) => {
     const cycle = await tx.incubationCycle.findFirst({ where: { id: cycleId, farmId } });
     if (!cycle) throw new ValidationError("Perinimo ciklas nerastas");
-    if (cycle.hatchDate) throw new ValidationError("Šis ciklas jau užbaigtas (išsiritimas registruotas)");
+    if (cycle.hatchDate)
+      throw new ValidationError("Šis ciklas jau užbaigtas (išsiritimas registruotas)");
 
     let resultingGroupId: string | null = null;
 
@@ -170,7 +171,7 @@ export async function finishGrowthTracking(
   farmId: string,
   cycleId: string,
   userId: string,
-  input: FinishGrowthTrackingInput
+  input: FinishGrowthTrackingInput,
 ) {
   return prisma.$transaction(async (tx) => {
     const cycle = await tx.incubationCycle.findFirst({
@@ -182,7 +183,7 @@ export async function finishGrowthTracking(
     if (!cycle.hatchDate) throw new ValidationError("Ciklas dar neužbaigtas išsiritimu");
 
     const cohort = cycle.resultingGroup; // may be null (hatch recorded without a group)
-    const available = cohort ? cohort.quantity : cycle.hatchedCount ?? 0;
+    const available = cohort ? cohort.quantity : (cycle.hatchedCount ?? 0);
     const totalDistributed = input.entries.reduce((sum, e) => sum + e.count, 0);
     if (totalDistributed > available) {
       throw new ValidationError(`Negalima perkelti daugiau nei turima (${available})`);

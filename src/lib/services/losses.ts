@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { adjustBirdGroupQuantityTx } from "@/lib/services/bird-groups";
 import { ValidationError } from "@/lib/errors";
-import { resolveTargetArea, sameTarget, targetFromInput, type Target } from "@/lib/services/farm-areas";
+import {
+  resolveTargetArea,
+  sameTarget,
+  targetFromInput,
+  type Target,
+} from "@/lib/services/farm-areas";
 import type { Prisma } from "@/generated/prisma/client";
 import type { CreateLossInput } from "@/lib/validation/losses";
 import type { LossReasonType } from "@/generated/prisma/client";
@@ -72,7 +77,7 @@ async function restoreLossQuantityTx(
   tx: TxClient,
   farmId: string,
   userId: string,
-  loss: { id: string; birdGroupId: string | null; quantity: number }
+  loss: { id: string; birdGroupId: string | null; quantity: number },
 ) {
   if (!loss.birdGroupId) return;
   await adjustBirdGroupQuantityTx(tx, {
@@ -91,7 +96,7 @@ export async function updateLoss(
   farmId: string,
   lossId: string,
   userId: string,
-  input: CreateLossInput
+  input: CreateLossInput,
 ) {
   return prisma.$transaction(async (tx) => {
     const loss = await tx.loss.findFirst({ where: { id: lossId, farmId } });
