@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Privatumo pranešimas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none}
+h2{margin:0;font-size:14px;line-height:1.6;font-weight:500}
+li{margin-top:4px}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--muted-foreground:oklch(0.556 0 0);--border:oklch(0.922 0 0);width:390px;height:1000px;box-sizing:border-box;overflow:hidden;padding:40px 16px;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+<div style="margin-bottom:24px"><a href="Login.dc.html" style="font-size:14px;line-height:20px;color:var(--muted-foreground)">← Grįžti į prisijungimą</a></div>
+<div style="border:1px solid var(--border);border-radius:16px;background:var(--card);padding:24px;box-shadow:0 1px 2px rgba(0,0,0,.05)">
+<h1 style="margin:0;font-size:24px;line-height:32px;font-weight:600">Privatumo pranešimas</h1>
+<p style="margin:4px 0 0;font-size:14px;line-height:20px;color:var(--muted-foreground)">Paskutinį kartą atnaujinta 2026-09-29</p>
+<div style="display:flex;flex-direction:column;gap:24px;margin-top:24px;font-size:14px;line-height:1.625">
+<p style="margin:0">Šis pranešimas trumpai paaiškina, kokius asmens duomenis ChickensFarm renka, kodėl juos renka ir kam jie gali būti perduodami.</p>
+<section>
+<h2>Kokius duomenis renkame</h2>
+<ul style="margin:8px 0 0;padding-left:20px">
+<li><span style="font-weight:500">Paskyros duomenys:</span> vardas, el. pašto adresas ir slaptažodžio šifruotė, naudojami registracijai ir prisijungimui.</li>
+<li><span style="font-weight:500">Ūkio duomenys:</span> jūsų įvesti paukštininkystės ūkio duomenys.</li>
+<li><span style="font-weight:500">Pranešimų prenumeratos:</span> įrenginio push prenumeratos identifikatorius priminimams siųsti.</li>
+</ul>
+</section>
+<section>
+<h2>Kodėl renkame šiuos duomenis</h2>
+<p style="margin:8px 0 0">Duomenys renkami tik tam, kad galėtume suteikti ChickensFarm paslaugą. Jie nėra naudojami reklamai ir neparduodami tretiesiems asmenims.</p>
+</section>
+<section>
+<h2>Kam perduodami duomenys</h2>
+<p style="margin:8px 0 0">Duomenys tvarkomi naudojant infrastruktūros paslaugų teikėjus, kurie veikia kaip duomenų tvarkytojai.</p>
+</section>
+<section>
+<h2>Duomenų saugojimas ir jūsų teisės</h2>
+<p style="margin:8px 0 0">Saugojimo laikotarpis ir jūsų teisės aprašomos viso pranešimo tekste.</p>
+</section>
+<section>
+<h2 id="pareiskimas">Privatumo ir duomenų saugumo pareiškimas</h2>
+<p style="margin:8px 0 0">Pareiškimas, su kuriuo sutinkama registruojantis.</p>
+</section>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

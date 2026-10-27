@@ -12,7 +12,20 @@
     "Birds.dc.html": { "x": 0, "y": 964, "w": 390, "h": 844, "title": "Paukščiai" },
     "Egg-collections.dc.html": { "x": 470, "y": 964, "w": 390, "h": 844, "title": "Kiaušinių surinkimas" },
     "Egg-new.dc.html": { "x": 940, "y": 964, "w": 390, "h": 844, "title": "Naujas surinkimas" },
-    "Incubation.dc.html": { "x": 1410, "y": 964, "w": 390, "h": 844, "title": "Perinimas" }
+    "Incubation.dc.html": { "x": 1410, "y": 964, "w": 390, "h": 844, "title": "Perinimas" },
+    "Auth-Register.dc.html": { "x": 0, "y": 2208, "w": 390, "h": 844, "title": "Registracija" },
+    "Auth-Forgot.dc.html": { "x": 470, "y": 2208, "w": 390, "h": 844, "title": "Slaptažodžio atkūrimas" },
+    "Auth-Forgot-sent.dc.html": { "x": 940, "y": 2208, "w": 390, "h": 844, "title": "Nuoroda išsiųsta" },
+    "Auth-Privacy.dc.html": { "x": 1410, "y": 2208, "w": 390, "h": 1000, "title": "Privatumo pranešimas" },
+    "Farms-List.dc.html": { "x": 0, "y": 3608, "w": 390, "h": 844, "title": "Mano ūkiai" },
+    "Farms-New.dc.html": { "x": 470, "y": 3608, "w": 390, "h": 844, "title": "Naujas ūkis" },
+    "Farms-Settings.dc.html": { "x": 940, "y": 3608, "w": 390, "h": 844, "title": "Ūkio nustatymai" },
+    "Farms-Delete.dc.html": { "x": 1410, "y": 3608, "w": 390, "h": 844, "title": "Ištrinti ūkį?" },
+    "Groups-List.dc.html": { "x": 0, "y": 4852, "w": 390, "h": 844, "title": "Paukščių grupės" },
+    "Groups-Detail.dc.html": { "x": 470, "y": 4852, "w": 390, "h": 844, "title": "Grupės informacija" },
+    "Groups-Form.dc.html": { "x": 940, "y": 4852, "w": 390, "h": 844, "title": "Nauja grupė" },
+    "Breeds-List.dc.html": { "x": 1410, "y": 4852, "w": 390, "h": 844, "title": "Veislės" },
+    "Breeds-Form.dc.html": { "x": 1880, "y": 4852, "w": 390, "h": 844, "title": "Nauja veislė" }
   },
   "order": [
     "Main.dc.html",
@@ -22,10 +35,26 @@
     "Birds.dc.html",
     "Egg-collections.dc.html",
     "Egg-new.dc.html",
-    "Incubation.dc.html"
+    "Incubation.dc.html",
+    "Auth-Register.dc.html",
+    "Auth-Forgot.dc.html",
+    "Auth-Forgot-sent.dc.html",
+    "Auth-Privacy.dc.html",
+    "Farms-List.dc.html",
+    "Farms-New.dc.html",
+    "Farms-Settings.dc.html",
+    "Farms-Delete.dc.html",
+    "Groups-List.dc.html",
+    "Groups-Detail.dc.html",
+    "Groups-Form.dc.html",
+    "Breeds-List.dc.html",
+    "Breeds-Form.dc.html"
   ],
   "notes": {
-    "title": { "x": 0, "y": -300, "text": "ChickensFarm — how it looks now", "kind": "title1", "maxW": 1800 }
+    "title": { "x": 0, "y": -300, "text": "ChickensFarm — how it looks now", "kind": "title1", "maxW": 1800 },
+    "f-auth": { "x": 0, "y": 1908, "text": "Account access", "kind": "title1", "maxW": 1800 },
+    "f-farms": { "x": 0, "y": 3308, "text": "Farms", "kind": "title1", "maxW": 1800 },
+    "f-groups": { "x": 0, "y": 4552, "text": "Bird groups and breeds", "kind": "title1", "maxW": 2270 }
   },
   "designSystems": [
     {

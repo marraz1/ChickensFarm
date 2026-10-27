@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Naujas ūkis</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+p{margin:0}
+.ph{display:flex;align-items:center;gap:8px;padding:16px}
+.ph h1{margin:0;font-size:18px;line-height:28px;font-weight:600}
+.fld{display:flex;flex-direction:column;gap:6px}
+.lbl{font-size:14px;line-height:14px;font-weight:500}
+.inp{box-sizing:border-box;width:100%;height:44px;border:1px solid var(--input);border-radius:10px;background:transparent;padding:4px 10px;font:inherit;font-size:16px;color:var(--foreground)}
+.btn{height:44px;margin-top:8px;border:0;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font:inherit;font-size:14px;font-weight:500}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted-foreground:oklch(0.556 0 0);--border:oklch(0.922 0 0);--input:oklch(0.922 0 0);position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+<header style="padding:12px 16px;background:var(--card);border-bottom:1px solid var(--border)"><span style="font-size:18px;line-height:28px;font-weight:500">ChickensFarm</span></header>
+<main style="flex:1">
+<div class="ph"><h1>Naujas ūkis</h1></div>
+<form style="display:flex;flex-direction:column;gap:16px;padding:0 16px">
+<div class="fld"><label class="lbl" for="name">Ūkio pavadinimas</label><input class="inp" id="name" value="Mano ūkis"></div>
+<div class="fld"><label class="lbl" for="location">Adresas / vietovė</label><input class="inp" id="location" value="Kaunas"></div>
+<button type="submit" class="btn">Sukurti ūkį</button>
+</form>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
