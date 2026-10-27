@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Paukščių grupės</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+p{margin:0}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--border)}
+.av{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border:0;padding:0;border-radius:999px;background:var(--accent);color:var(--accent-foreground)}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px}
+.ph h1{margin:0;font-size:18px;line-height:28px;font-weight:600}
+.bk{display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-left:-8px;color:var(--muted-foreground)}
+.add{display:flex;align-items:center;gap:4px;height:44px;padding:0 12px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font-size:14px;font-weight:500}
+.card{background:var(--card);border-radius:14px;box-shadow:0 0 0 1px color-mix(in oklch,var(--foreground) 10%,transparent);padding:16px}
+.mut{color:var(--muted-foreground)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tabs{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-around;background:color-mix(in oklch,var(--card) 95%,transparent);border-top:1px solid var(--border);backdrop-filter:blur(8px)}
+.tab{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;padding:8px 0;border:0;background:transparent;font:inherit;color:var(--muted-foreground);font-size:11px;line-height:16px}
+.tab span{display:flex;align-items:center;justify-content:center;height:28px}
+.tab.on{color:var(--primary)}
+.plus{width:28px;height:28px;border-radius:999px;background:var(--primary);color:var(--primary-foreground)}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted-foreground:oklch(0.556 0 0);--accent:oklch(0.97 0 0);--accent-foreground:oklch(0.205 0 0);--border:oklch(0.922 0 0);position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+<header class="hdr">
+<div style="display:flex;flex-direction:column;align-items:flex-start"><span class="mut" style="font-size:12px;line-height:16px">Ūkis</span><span style="display:flex;align-items:center;gap:4px;font-size:18px;line-height:28px;font-weight:500">Mano ūkis<svg class="mut" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div>
+<button type="button" class="av" aria-label="Profilis"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+</header>
+<main style="flex:1;overflow:hidden">
+<div class="ph">
+<div style="display:flex;align-items:center;gap:4px"><a href="Birds.dc.html" class="bk" aria-label="Grįžti"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a><h1>Paukščių grupės</h1></div>
+<a href="Groups-Form.dc.html" class="add"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Nauja</a>
+</div>
+<div style="padding:0 16px 8px">
+<p class="mut" style="margin-bottom:8px;font-size:14px;line-height:20px;font-weight:500">Bandos sudėtis</p>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div class="card">
+<div class="row"><p style="font-weight:500">Višta</p><span style="font-size:18px;line-height:28px;font-weight:600">30</span></div>
+<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+<div class="row" style="align-items:baseline"><div><p style="font-size:14px;line-height:20px">Brama</p><p class="mut" style="font-size:11px;line-height:1.25">Dedeklės 18 · Gaidukai 2 · Jauniklės vištos 4</p></div><span style="font-size:14px;line-height:20px;font-weight:500">24</span></div>
+<div class="row" style="align-items:baseline"><div><p style="font-size:14px;line-height:20px">Sussex</p><p class="mut" style="font-size:11px;line-height:1.25">Dedeklės 6</p></div><span style="font-size:14px;line-height:20px;font-weight:500">6</span></div>
+</div>
+</div>
+<div class="card">
+<div class="row"><p style="font-weight:500">Antis</p><span style="font-size:18px;line-height:28px;font-weight:600">12</span></div>
+<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+<div class="row" style="align-items:baseline"><div><p style="font-size:14px;line-height:20px">Pekino antis</p><p class="mut" style="font-size:11px;line-height:1.25">Dedeklės 8 · Viščiukai 4</p></div><span style="font-size:14px;line-height:20px;font-weight:500">12</span></div>
+</div>
+</div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px;padding:0 16px">
+<p class="mut" style="padding-top:8px;font-size:14px;line-height:20px;font-weight:500">Visos grupės</p>
+<a href="Groups-Detail.dc.html" class="card">
+<div class="row"><p style="font-weight:500">Vištidė A</p><span style="font-size:18px;line-height:28px;font-weight:600">24</span></div>
+<p class="mut" style="margin-top:2px;font-size:14px;line-height:20px">Brama · Višta</p>
+<p class="mut" style="margin-top:4px;font-size:14px;line-height:20px">Dedeklės · Patelė · 14 mėn. · nuo 2025 m. rugpjūčio 3 d.</p>
+</a>
+<a href="Groups-Detail.dc.html" class="card">
+<div class="row"><p style="font-weight:500">Sussex</p><span style="font-size:18px;line-height:28px;font-weight:600">6</span></div>
+<p class="mut" style="margin-top:2px;font-size:14px;line-height:20px">Sussex · Višta</p>
+<p class="mut" style="margin-top:4px;font-size:14px;line-height:20px">Dedeklės · Patelė · 8 mėn. · nuo 2026 m. vasario 11 d.</p>
+</a>
+</div>
+</main>
+<nav class="tabs">
+<a href="Main.dc.html" class="tab"><span><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Pradžia</a>
+<a href="Birds.dc.html" class="tab on"><span><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></svg></span>Paukščiai</a>
+<button type="button" class="tab" aria-label="Pridėti įrašą"><span class="plus"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>Pridėti</button>
+<a href="Finance-Hub.dc.html" class="tab"><span><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>Finansai</a>
+<a href="Incubation.dc.html" class="tab"><span><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg></span>Perinimas</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
