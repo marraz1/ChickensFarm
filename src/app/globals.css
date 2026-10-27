@@ -7,7 +7,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -115,6 +115,39 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Type scale (mirrors the design system's `type.groups`). Use these instead of
+   ad-hoc text-[11px] / text-lg combinations on new screens. */
+@utility text-page-title {
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 600;
+}
+@utility text-card-title {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 500;
+}
+@utility text-stat {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 500;
+}
+@utility text-body {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+@utility text-label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+}
+@utility text-caption {
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 400;
 }
 
 @layer base {
