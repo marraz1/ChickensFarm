@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Prisijungimas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted-foreground:oklch(0.556 0 0);--border:oklch(0.922 0 0);--input:oklch(0.922 0 0);width:390px;height:844px;box-sizing:border-box;overflow:hidden;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:40px 16px;-webkit-font-smoothing:antialiased">
+<div style="width:100%;max-width:384px">
+<div style="display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:32px">
+<div style="width:72px;height:72px;margin-bottom:12px;border-radius:999px;background:var(--primary);color:var(--primary-foreground);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.05),0 0 0 1px rgba(0,0,0,.05)">
+<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></svg>
+</div>
+<h1 style="margin:0;font-size:20px;line-height:28px;font-weight:600">ChickensFarm</h1>
+<p style="margin:0;font-size:14px;line-height:20px;color:var(--muted-foreground)">Paukštininkystės ūkio valdymas</p>
+</div>
+<div style="border:1px solid var(--border);border-radius:16px;background:var(--card);padding:24px;box-shadow:0 1px 2px rgba(0,0,0,.05)">
+<form style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;flex-direction:column;gap:6px">
+<label for="email" style="font-size:14px;line-height:14px;font-weight:500">El. paštas</label>
+<input id="email" type="email" autocomplete="email" value="jonas@pavyzdys.lt" style="box-sizing:border-box;width:100%;height:44px;border:1px solid var(--input);border-radius:10px;background:transparent;padding:4px 10px;font:inherit;font-size:16px;color:var(--foreground)">
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<label for="password" style="font-size:14px;line-height:14px;font-weight:500">Slaptažodis</label>
+<input id="password" type="password" autocomplete="current-password" value="slaptazodis" style="box-sizing:border-box;width:100%;height:44px;border:1px solid var(--input);border-radius:10px;background:transparent;padding:4px 10px;font:inherit;font-size:16px;color:var(--foreground)">
+</div>
+<button type="submit" style="height:44px;margin-top:8px;border:0;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font:inherit;font-size:14px;font-weight:500">Prisijungti</button>
+<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;text-align:center;font-size:14px;line-height:20px;color:var(--muted-foreground)">
+<a href="#" style="color:inherit">Pamiršote slaptažodį?</a>
+<p style="margin:0">Neturite paskyros? <a href="#" style="color:var(--foreground);font-weight:500">Registruotis</a></p>
+<a href="#" style="color:inherit">Privatumo pranešimas</a>
+</div>
+</form>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

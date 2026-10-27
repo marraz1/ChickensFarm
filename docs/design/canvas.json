@@ -1,0 +1,39 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-27T12:00:00Z" },
+  "title": "ChickensFarm Design",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Pradžia" },
+    "Dashboard-dark.dc.html": { "x": 470, "y": 0, "w": 390, "h": 844, "title": "Pradžia · dark" },
+    "Quick-add.dc.html": { "x": 940, "y": 0, "w": 390, "h": 844, "title": "Pridėti įrašą" },
+    "Login.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 844, "title": "Prisijungimas" },
+    "Birds.dc.html": { "x": 0, "y": 964, "w": 390, "h": 844, "title": "Paukščiai" },
+    "Egg-collections.dc.html": { "x": 470, "y": 964, "w": 390, "h": 844, "title": "Kiaušinių surinkimas" },
+    "Egg-new.dc.html": { "x": 940, "y": 964, "w": 390, "h": 844, "title": "Naujas surinkimas" },
+    "Incubation.dc.html": { "x": 1410, "y": 964, "w": 390, "h": 844, "title": "Perinimas" }
+  },
+  "order": [
+    "Main.dc.html",
+    "Dashboard-dark.dc.html",
+    "Quick-add.dc.html",
+    "Login.dc.html",
+    "Birds.dc.html",
+    "Egg-collections.dc.html",
+    "Egg-new.dc.html",
+    "Incubation.dc.html"
+  ],
+  "notes": {
+    "title": { "x": 0, "y": -300, "text": "ChickensFarm — how it looks now", "kind": "title1", "maxW": 1800 }
+  },
+  "designSystems": [
+    {
+      "title": "ChickensFarm",
+      "namespace": "chickensfarm",
+      "artifact": "https://claude.ai/artifact/8hDvDvknuXcezXyYPQcTUQ",
+      "version": "1793093887-489f",
+      "copiedAt": "2026-10-27T12:00:00Z"
+    }
+  ]
+}
