@@ -92,6 +92,7 @@ export async function finalizeHatch(
             breedId: input.target.breedId,
             sex: "UNKNOWN",
             category: "CHICK", // išperinti jaunikliai → Viščiukai (atskiriami paaugus)
+            area: "INC", // stays in Perinimas until moved to Kiaušiniai or Mėsa
             quantity: 0,
             birthOrAcquiredDate: new Date(input.hatchDate),
             notes: "Išsiritę jaunikliai (perinimas)",

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import { getLocalNow } from "@/lib/notification-schedule";
 import type {
   CreateMotherHenInput,
   CreateMotherHenLogInput,
@@ -35,15 +36,32 @@ export async function createMotherHen(farmId: string, input: CreateMotherHenInpu
     if (!group) throw new ValidationError("Pasirinkta paukščių grupė nerasta");
   }
 
+  const diedAt = parseDiedAt(input.diedAt);
+
   return prisma.motherHen.create({
     data: {
       farmId,
+      diedAt,
       name: input.name,
       birdGroupId,
       photoUrl: input.photoUrl || null,
       description: input.description || null,
     },
   });
+}
+
+// The farm's calendar day, not UTC's: just after midnight in Vilnius, UTC is
+// still on yesterday and would reject a death recorded "today".
+const FARM_TIME_ZONE = "Europe/Vilnius";
+
+// undefined → leave unchanged; "" or null → alive; "YYYY-MM-DD" → died that day.
+function parseDiedAt(diedAt: string | null | undefined): Date | null | undefined {
+  if (diedAt === undefined) return undefined;
+  if (!diedAt) return null;
+  if (diedAt > getLocalNow(new Date(), FARM_TIME_ZONE).date) {
+    throw new ValidationError("Kritimo data negali būti ateityje");
+  }
+  return new Date(diedAt);
 }
 
 export async function updateMotherHen(
@@ -54,6 +72,7 @@ export async function updateMotherHen(
   const hen = await prisma.motherHen.findFirst({ where: { id: motherHenId, farmId } });
   if (!hen) throw new ValidationError("Perekšlė nerasta");
 
+  const diedAt = parseDiedAt(input.diedAt);
   const birdGroupId = input.birdGroupId || null;
   if (birdGroupId) {
     const group = await prisma.birdGroup.findFirst({ where: { id: birdGroupId, farmId } });
@@ -67,6 +86,7 @@ export async function updateMotherHen(
       birdGroupId,
       photoUrl: input.photoUrl || null,
       description: input.description || null,
+      diedAt,
     },
   });
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { birdGroupAreaEnum } from "@/lib/validation/farm-areas";
 
 export const sexEnum = z.enum(["MALE", "FEMALE", "UNKNOWN"]);
 export const birdCategoryEnum = z.enum([
@@ -18,6 +19,8 @@ export const createBirdGroupSchema = z.object({
   quantity: z.number().int().min(0, "Kiekis negali būti neigiamas"),
   birthOrAcquiredDate: z.string().min(1, "Įveskite datą"),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
+  // Optional for the V1 form: "Kiaušiniai" on create, unchanged on update.
+  area: birdGroupAreaEnum.optional(),
 });
 export type CreateBirdGroupInput = z.infer<typeof createBirdGroupSchema>;
 

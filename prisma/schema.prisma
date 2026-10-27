@@ -42,6 +42,19 @@ enum ExpenseCategory {
   OTHER
 }
 
+// V2 farm areas (#179). Every expense belongs to exactly one area, SHARED being
+// "Bendra" (electricity, fencing, ...). Bird groups only ever sit in EGGS, MEAT
+// or INC — enforced by a CHECK constraint, since one enum is shared by all
+// three tables. HENS is the mother-hen area: a hen is an individual bird, not
+// a group, so it has no area column; anything targeting one is HENS.
+enum FarmArea {
+  EGGS // Kiaušiniai ir prekyba
+  HENS // Perekšlės
+  INC // Perinimas
+  MEAT // Mėsiniai paukščiai
+  SHARED // Bendra
+}
+
 enum EggQuality {
   HEALTHY
   BROKEN
@@ -239,19 +252,20 @@ model Breed {
 }
 
 model BirdGroup {
-  id                  String   @id @default(cuid())
+  id                  String       @id @default(cuid())
   farmId              String
-  farm                Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  farm                Farm         @relation(fields: [farmId], references: [id], onDelete: Cascade)
   breedId             String
   breed               Breed        @relation(fields: [breedId], references: [id], onDelete: Restrict)
   name                String? // optional free-text label (e.g. "Vištidė A"), shown alongside the breed
   sex                 Sex          @default(UNKNOWN)
   category            BirdCategory @default(OTHER)
+  area                FarmArea     @default(EGGS)
   quantity            Int
-  birthOrAcquiredDate DateTime @db.Date
+  birthOrAcquiredDate DateTime     @db.Date
   notes               String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   motherHens        MotherHen[]
   losses            Loss[]
@@ -261,9 +275,11 @@ model BirdGroup {
   birdConsumptions  BirdConsumption[]
   hatchedFromCycles IncubationCycle[] @relation("EggSourceGroup")
   hatchedIntoCycles IncubationCycle[] @relation("ResultingGroup")
+  expenses          Expense[]
 
   @@index([farmId])
   @@index([farmId, breedId])
+  @@index([farmId, area])
   @@map("bird_groups")
 }
 
@@ -299,9 +315,13 @@ model MotherHen {
   name        String
   photoUrl    String?
   description String?
+  // Set when the hen has died; null while she is alive.
+  diedAt      DateTime?  @db.Date
   createdAt   DateTime   @default(now())
 
-  logs MotherHenLog[]
+  logs     MotherHenLog[]
+  losses   Loss[]
+  expenses Expense[]
 
   @@index([farmId])
   @@map("mother_hens")
@@ -364,35 +384,64 @@ model EggConsumption {
   @@map("egg_consumptions")
 }
 
+// A loss targets at most one of a bird group, a mother hen or an incubation
+// cycle (CHECK constraint in the add_farm_areas migration). Its area is derived
+// from that target on write and stored, rather than joined at read time,
+// because SetNull would otherwise lose the area of a deleted hen or cycle and
+// because a group may later move to another area while its past losses stay
+// where they happened. Null only for a loss recorded without any target.
 model Loss {
-  id          String         @id @default(cuid())
-  farmId      String
-  farm        Farm           @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  birdGroupId String?
-  birdGroup   BirdGroup?     @relation(fields: [birdGroupId], references: [id], onDelete: SetNull)
-  lossDate    DateTime       @db.Date
-  quantity    Int
-  reasonType  LossReasonType
-  comment     String?
-  createdAt   DateTime       @default(now())
+  id                String           @id @default(cuid())
+  farmId            String
+  farm              Farm             @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  birdGroupId       String?
+  birdGroup         BirdGroup?       @relation(fields: [birdGroupId], references: [id], onDelete: SetNull)
+  motherHenId       String?
+  motherHen         MotherHen?       @relation(fields: [motherHenId], references: [id], onDelete: SetNull)
+  incubationCycleId String?
+  incubationCycle   IncubationCycle? @relation(fields: [incubationCycleId], references: [id], onDelete: SetNull)
+  area              FarmArea?
+  lossDate          DateTime         @db.Date
+  quantity          Int
+  reasonType        LossReasonType
+  comment           String?
+  createdAt         DateTime         @default(now())
 
   @@index([farmId, lossDate])
   @@index([farmId, reasonType])
+  @@index([farmId, area])
+  @@index([motherHenId])
+  @@index([incubationCycleId])
   @@map("losses")
 }
 
+// The expense's own `area` is the reporting source of truth (finance rule 1).
+// The optional target (at most one — CHECK constraint in the add_farm_areas
+// migration) must sit in that area when the expense is written; moving a group
+// to another area later deliberately does not rewrite its past expenses.
 model Expense {
-  id          String          @id @default(cuid())
-  farmId      String
-  farm        Farm            @relation(fields: [farmId], references: [id], onDelete: Cascade)
-  expenseDate DateTime        @db.Date
-  category    ExpenseCategory
-  amount      Decimal         @db.Decimal(10, 2)
-  description String?
-  createdAt   DateTime        @default(now())
+  id                String           @id @default(cuid())
+  farmId            String
+  farm              Farm             @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  area              FarmArea         @default(SHARED)
+  birdGroupId       String?
+  birdGroup         BirdGroup?       @relation(fields: [birdGroupId], references: [id], onDelete: SetNull)
+  motherHenId       String?
+  motherHen         MotherHen?       @relation(fields: [motherHenId], references: [id], onDelete: SetNull)
+  incubationCycleId String?
+  incubationCycle   IncubationCycle? @relation(fields: [incubationCycleId], references: [id], onDelete: SetNull)
+  expenseDate       DateTime         @db.Date
+  category          ExpenseCategory
+  amount            Decimal          @db.Decimal(10, 2)
+  description       String?
+  createdAt         DateTime         @default(now())
 
   @@index([farmId, expenseDate])
   @@index([farmId, category])
+  @@index([farmId, area])
+  @@index([birdGroupId])
+  @@index([motherHenId])
+  @@index([incubationCycleId])
   @@map("expenses")
 }
 
@@ -469,6 +518,8 @@ model IncubationCycle {
   updatedAt         DateTime   @updatedAt
 
   growthLogs IncubationGrowthLog[]
+  losses     Loss[]
+  expenses   Expense[]
 
   @@index([farmId, startDate])
   @@map("incubation_cycles")

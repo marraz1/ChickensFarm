@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { adjustBirdGroupQuantityTx } from "@/lib/services/bird-groups";
 import { ValidationError } from "@/lib/errors";
+import { resolveTargetArea, sameTarget, targetFromInput, type Target } from "@/lib/services/farm-areas";
 import type { Prisma } from "@/generated/prisma/client";
 import type { CreateLossInput } from "@/lib/validation/losses";
 import type { LossReasonType } from "@/generated/prisma/client";
@@ -19,15 +20,30 @@ export function getLoss(farmId: string, id: string) {
   return prisma.loss.findFirst({ where: { id, farmId } });
 }
 
+// A mother hen is one bird, so a loss against her is always exactly one.
+function assertHenLossQuantity(target: Target, quantity: number) {
+  if (target.motherHenId && quantity !== 1) {
+    throw new ValidationError("Perekšlės nuostolio kiekis turi būti 1");
+  }
+}
+
+// A loss targets at most one of a bird group, a mother hen or an incubation
+// cycle, and takes its area from that target (stored, see the Loss model).
+// Only a bird-group loss moves a head count; hens and cycles have none.
 export async function createLoss(farmId: string, userId: string, input: CreateLossInput) {
+  const target = targetFromInput(input);
+  assertHenLossQuantity(target, input.quantity);
+
   return prisma.$transaction(async (tx) => {
+    const area = await resolveTargetArea(tx, farmId, target);
     const loss = await tx.loss.create({
       data: {
         farmId,
+        ...target,
+        area,
         lossDate: new Date(input.lossDate),
         quantity: input.quantity,
         reasonType: input.reasonType,
-        birdGroupId: input.birdGroupId || null,
         comment: input.comment || null,
       },
     });
@@ -81,11 +97,14 @@ export async function updateLoss(
     const loss = await tx.loss.findFirst({ where: { id: lossId, farmId } });
     if (!loss) throw new ValidationError("Nuostolio įrašas nerastas");
 
-    const newGroupId = input.birdGroupId || null;
-    if (newGroupId) {
-      const group = await tx.birdGroup.findFirst({ where: { id: newGroupId, farmId } });
-      if (!group) throw new ValidationError("Pasirinkta paukščių grupė nerasta");
-    }
+    const target = targetFromInput(input, loss);
+    assertHenLossQuantity(target, input.quantity);
+    // Same target → keep the stored area: the group may since have moved to
+    // another area, but the loss happened where it was at the time.
+    const area = sameTarget(target, loss)
+      ? loss.area
+      : await resolveTargetArea(tx, farmId, target);
+    const newGroupId = target.birdGroupId;
 
     // Reconcile the group-quantity effect. Same group → apply just the net
     // change; group changed → give the old group its birds back and take the new
@@ -126,7 +145,8 @@ export async function updateLoss(
         lossDate: new Date(input.lossDate),
         quantity: input.quantity,
         reasonType: input.reasonType,
-        birdGroupId: newGroupId,
+        ...target,
+        area,
         comment: input.comment || null,
       },
     });

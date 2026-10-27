@@ -15,11 +15,11 @@ export class NegativeQuantityError extends Error {
 
 // Raised when a delete is blocked because the group is still referenced by
 // historical records (losses, egg collections, meat/food use, mother hens,
-// incubation cycles).
+// incubation cycles, expenses).
 export class GroupHasReferencesError extends ValidationError {
   constructor() {
     super(
-      "Grupė susieta su įrašais (nuostoliais, kiaušiniais, mėsai suvartotais paukščiais, inkubacija ar perekšlėmis), todėl jos ištrinti negalima",
+      "Grupė susieta su įrašais (nuostoliais, kiaušiniais, mėsai suvartotais paukščiais, inkubacija, perekšlėmis ar išlaidomis), todėl jos ištrinti negalima",
     );
     this.name = "GroupHasReferencesError";
   }
@@ -182,6 +182,7 @@ export async function createBirdGroup(farmId: string, userId: string, input: Cre
         name: input.name?.trim() || null,
         sex: input.sex,
         category: input.category,
+        area: input.area ?? "EGGS",
         quantity: input.quantity,
         birthOrAcquiredDate: new Date(input.birthOrAcquiredDate),
         notes: input.notes || null,
@@ -232,6 +233,9 @@ export async function updateBirdGroup(
         name: input.name?.trim() || null,
         sex: input.sex,
         category: input.category,
+        // Moving a group to another area leaves its past expenses and losses
+        // where they were recorded; only new records follow the group.
+        area: input.area ?? group.area,
         birthOrAcquiredDate: new Date(input.birthOrAcquiredDate),
         notes: input.notes || null,
       },
@@ -254,7 +258,7 @@ export async function updateBirdGroup(
 }
 
 // Deletes a group only when nothing else references it. History (BirdGroupEvent)
-// cascades away with the group; losses/eggs/incubation/mother-hens would merely
+// cascades away with the group; losses/eggs/incubation/mother-hens/expenses would merely
 // have their link nulled, silently detaching real records — so we block instead.
 // Meat/food-use records point at the group with a NOT NULL, Restrict link, so
 // they are counted here too and get the same readable error.
@@ -263,20 +267,37 @@ export async function deleteBirdGroup(farmId: string, birdGroupId: string) {
     const group = await tx.birdGroup.findFirst({ where: { id: birdGroupId, farmId } });
     if (!group) throw new ValidationError("Paukščių grupė nerasta");
 
-    const [motherHens, losses, eggCollections, birdConsumptions, sourceCycles, resultCycles] =
-      await Promise.all([
-        tx.motherHen.count({ where: { birdGroupId } }),
-        tx.loss.count({ where: { birdGroupId } }),
-        tx.eggCollection.count({ where: { birdGroupId } }),
-        // Unlike the others this link is NOT NULL with onDelete: Restrict, so
-        // without this count the delete would surface as an opaque FK 500
-        // instead of the readable message below.
-        tx.birdConsumption.count({ where: { birdGroupId } }),
-        tx.incubationCycle.count({ where: { eggSourceGroupId: birdGroupId } }),
-        tx.incubationCycle.count({ where: { resultingGroupId: birdGroupId } }),
-      ]);
+    const [
+      motherHens,
+      losses,
+      eggCollections,
+      birdConsumptions,
+      sourceCycles,
+      resultCycles,
+      expenses,
+    ] = await Promise.all([
+      tx.motherHen.count({ where: { birdGroupId } }),
+      tx.loss.count({ where: { birdGroupId } }),
+      tx.eggCollection.count({ where: { birdGroupId } }),
+      // Unlike the others this link is NOT NULL with onDelete: Restrict, so
+      // without this count the delete would surface as an opaque FK 500
+      // instead of the readable message below.
+      tx.birdConsumption.count({ where: { birdGroupId } }),
+      tx.incubationCycle.count({ where: { eggSourceGroupId: birdGroupId } }),
+      tx.incubationCycle.count({ where: { resultingGroupId: birdGroupId } }),
+      tx.expense.count({ where: { birdGroupId } }),
+    ]);
 
-    if (motherHens + losses + eggCollections + birdConsumptions + sourceCycles + resultCycles > 0) {
+    if (
+      motherHens +
+        losses +
+        eggCollections +
+        birdConsumptions +
+        sourceCycles +
+        resultCycles +
+        expenses >
+      0
+    ) {
       throw new GroupHasReferencesError();
     }
 
