@@ -18,7 +18,9 @@ test("a seeded user signs in and sees their profile", async ({ page }) => {
   await page.getByLabel("Slaptažodis").fill(password!);
   await page.getByRole("button", { name: "Prisijungti" }).click();
 
-  await expect(page).toHaveURL(/\/profile$/);
+  // The first sign-in on a cold deployment waits for bcrypt, a Neon compute
+  // waking up and (locally) the auth route compiling — well past the 5s default.
+  await expect(page).toHaveURL(/\/profile$/, { timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "Profilis" })).toBeVisible();
   await expect(page.getByText(email!)).toBeVisible();
 });
