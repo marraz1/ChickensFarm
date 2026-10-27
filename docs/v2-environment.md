@@ -29,7 +29,7 @@ Steps 1–5 are done by hand in the Neon, Vercel and GitHub dashboards.
 
 1. Neon console → **New project** `chickensfarm-v2`, same region as V1.
    A separate _project_, not a branch of V1: no shared roles, no shared storage.
-2. In it, create a branch **`preview`** from `main`. V2 PR previews use it, so they never
+2. In it, create a branch **`preview`** from the default branch (`production`). V2 PR previews use it, so they never
    share a database with V2 production either (the hazard in `docs/RELEASE.md` § "A hazard
    worth knowing" does not carry over to V2).
 3. Copy for each branch: the pooled URL (`DATABASE_URL`) and the direct URL (`DIRECT_URL`).
@@ -44,12 +44,17 @@ Steps 1–5 are done by hand in the Neon, Vercel and GitHub dashboards.
    [[ "$VERCEL_GIT_COMMIT_REF" == v2/* ]] && exit 1 || exit 0
    ```
 
+   Also make sure the project **creates GitHub deployments** (project setting
+   `gitProviderOptions.createDeployments = enabled`). A newly imported project had it
+   disabled, so CI's preview job found no deployment record and waited until it was
+   cancelled.
+
 4. **Settings → Environment Variables:**
 
    | Variable                                                | Production                                       | Preview                 |
    | ------------------------------------------------------- | ------------------------------------------------ | ----------------------- |
-   | `DATABASE_URL`                                          | V2 `main` pooled URL                             | V2 `preview` pooled URL |
-   | `DIRECT_URL`                                            | V2 `main` direct URL                             | V2 `preview` direct URL |
+   | `DATABASE_URL`                                          | V2 `production` pooled URL                       | V2 `preview` pooled URL |
+   | `DIRECT_URL`                                            | V2 `production` direct URL                       | V2 `preview` direct URL |
    | `AUTH_SECRET`                                           | new value (`openssl rand -base64 32`), not V1's  | same as Production      |
    | `AUTH_URL`                                              | the beta URL                                     | unset                   |
    | `APP_URL`                                               | the beta URL                                     | unset                   |
@@ -63,9 +68,9 @@ Steps 1–5 are done by hand in the Neon, Vercel and GitHub dashboards.
    Never paste a V1 database URL into this project.
 
 5. **Settings → Deployment Protection → Protection Bypass for Automation:** generate a secret
-   (CI's e2e job needs it to reach previews; the repo already has a
-   `VERCEL_AUTOMATION_BYPASS_SECRET` secret — either reuse that value here or add the V2 one
-   under the same name if the V1 project has none).
+   and store it as the repository secret `VERCEL_AUTOMATION_BYPASS_SECRET`. Without it CI's
+   e2e job gets Vercel's SSO redirect, prints a warning and skips every test. V1 PRs send the
+   same header, which simply does not match V1's protection, so they behave as before.
 
 ### 3. Vercel: make V1 skip V2 branches
 
@@ -87,9 +92,11 @@ E2E_USER_EMAIL="e2e@<your domain>" E2E_USER_PASSWORD="<12+ chars>" \
 npm run db:seed:e2e
 ```
 
-The preview branch must have the schema first: run
-`DATABASE_URL="<V2 preview direct URL>" npx prisma migrate deploy` once (preview builds do
-not migrate).
+The preview branch must have the schema first, because preview builds do not migrate.
+Let the first `v2/develop` deploy migrate `production`, then in Neon **reset `preview` from
+its parent** (`production`). That copies the tables and the `_prisma_migrations` history. Do
+the same after any merge that adds a migration, and re-run the seed afterwards, because
+a reset discards preview's data, including the e2e user.
 
 ### 5. GitHub
 
