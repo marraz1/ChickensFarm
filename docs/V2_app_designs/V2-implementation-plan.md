@@ -23,7 +23,7 @@ Decisions (owner, 2026-10-27):
   for the last time at cutover, during a short V1 write freeze.
 - **End state:** V2 replaces V1 after a beta on a V2 URL. V1 is kept as a rollback for a window.
 
-The backlog is **4 Epics + 22 Stories** on board #3. They are created with the
+The backlog is **4 Epics + 24 Stories** on board #3. They are created with the
 `create-user-story-by-curent-code-base-and-feature-designs` skill after the AC are reviewed.
 
 ---
@@ -122,49 +122,49 @@ Markers follow `<!-- feature-stories:v1 id=... -->`. No existing V2 epics/storie
 only related item is #157 "Mark bird groups as used for meat/food consumption", which is closed
 and implemented as `BirdConsumption`.
 
-### Epic A — V2 platform, separate database & data migration
+### Epic A — V2 platform, separate database & data migration (#177)
 
-| #   | Story                                                                                                                                                                                                                                                                                                                        | P   | Size | Depends |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---- | ------- |
-| A1  | V2 beta environment runs separately from V1 (branch `v2/develop` + protection, Vercel project `chickensfarm-v2`, Neon V2 DB + preview branch, env isolation, V1 Ignored Build Step for `v2/*`, `ci.yml` push trigger for `v2/develop`, seeded e2e user + signed-in smoke on V2 preview, `DIRECT_URL` in `.env.example`)      | P0  | M    | —       |
-| A2  | Farm data is organised into areas (schema: `FarmArea` enum EGGS/HENS/INC/MEAT/SHARED; `Expense.area` + optional target (birdGroupId/motherHenId/incubationCycleId); `BirdGroup.area`; `Loss.motherHenId`/`incubationCycleId`; `MotherHen.diedAt`; new categories per open Q) — services, Zod, tenant checks, isolation tests | P0  | L    | A1      |
-| A3  | Farm owner's V1 data appears in V2 (re-runnable ETL + verification report + manual workflow)                                                                                                                                                                                                                                 | P0  | L    | A2      |
-| A4  | Farmer can sign in to V2 beta with V1 account (beta banner "Beta: duomenys gali būti perrašyti", Sentry env, reminders off, version on profile)                                                                                                                                                                              | P1  | S    | A1, A3  |
-| A5  | Farm owners move to V2 without data loss (V1 read-only switch — V1 ticket via the normal flow; cutover runbook; rehearsal on a Neon branch)                                                                                                                                                                                  | P0  | M    | A3      |
-| A6  | V2 becomes the main app (merge v2→main, release pipeline, retire V1 project/DB after the window)                                                                                                                                                                                                                             | P1  | S    | A5      |
+| #       | Story                                                                                                                                                                                                                                                                                                                        | P   | Size | Depends |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---- | ------- |
+| A1 #178 | V2 beta environment runs separately from V1 (branch `v2/develop` + protection, Vercel project `chickensfarm-v2`, Neon V2 DB + preview branch, env isolation, V1 Ignored Build Step for `v2/*`, `ci.yml` push trigger for `v2/develop`, seeded e2e user + signed-in smoke on V2 preview, `DIRECT_URL` in `.env.example`)      | P0  | M    | —       |
+| A2 #179 | Farm data is organised into areas (schema: `FarmArea` enum EGGS/HENS/INC/MEAT/SHARED; `Expense.area` + optional target (birdGroupId/motherHenId/incubationCycleId); `BirdGroup.area`; `Loss.motherHenId`/`incubationCycleId`; `MotherHen.diedAt`; new categories per open Q) — services, Zod, tenant checks, isolation tests | P0  | L    | A1      |
+| A3 #180 | Farm owner's V1 data appears in V2 (re-runnable ETL + verification report + manual workflow)                                                                                                                                                                                                                                 | P0  | L    | A2      |
+| A4 #181 | Farmer can sign in to V2 beta with V1 account (beta banner "Beta: duomenys gali būti perrašyti", Sentry env, reminders off, version on profile)                                                                                                                                                                              | P1  | S    | A1, A3  |
+| A5 #182 | Farm owners move to V2 without data loss (V1 read-only switch — V1 ticket via the normal flow; cutover runbook; rehearsal on a Neon branch)                                                                                                                                                                                  | P0  | M    | A3      |
+| A6 #183 | V2 becomes the main app (merge v2→main, release pipeline, retire V1 project/DB after the window)                                                                                                                                                                                                                             | P1  | S    | A5      |
 
-### Epic B — V2 navigation & farm areas
+### Epic B — V2 navigation & farm areas (#184)
 
-| #   | Story                                                                                                                                                                                | P   | Size | Depends |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- | ---- | ------- |
-| B1  | Farmer navigates by farm area (V2Nav Apžvalga/Kiaušiniai/Perekšlės/Perinimas/Mėsa, V2Tabs, V2Header; no "+" FAB; reused V1 screens rendered in the V2 shell; route map)              | P0  | M    | A1      |
-| B2  | Bird groups belong to Kiaušiniai or Mėsa (group form area field; "Dedeklių grupės"/"Mėsinių grupės" filtered lists; Trade-Form preset type + area; hatch-created groups → Perinimas) | P0  | M    | A2, B1  |
-| B3  | Eggs area overview & "Naujas" sheet (Kiaušinių likutis, Dedeklių pulkas, Balansas; Įrašai links; 6 actions + Nauja išlaida / Registruoti nuostolį)                                   | P1  | M    | B1, B2  |
-| B4  | Mother hens area overview & "Nauja" sheet (Perekšlės, Peri dabar, photo cards, "Pradėti perėjimą su perekšle" → Inc-New)                                                             | P1  | S    | B1      |
-| B5  | Incubation area overview & "Naujas ciklas" (Aktyvūs ciklai, Efektyvumas = hatched/fertile, cycle cards with status badge)                                                            | P1  | M    | B1      |
-| B6  | Meat area overview & "Naujas" sheet (Auginama mėsai, Suvartota mėsai, Paskutiniai įrašai)                                                                                            | P1  | S    | B1, B2  |
+| #       | Story                                                                                                                                                                                | P   | Size | Depends |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- | ---- | ------- |
+| B1 #185 | Farmer navigates by farm area (V2Nav Apžvalga/Kiaušiniai/Perekšlės/Perinimas/Mėsa, V2Tabs, V2Header; no "+" FAB; reused V1 screens rendered in the V2 shell; route map)              | P0  | M    | A1      |
+| B2 #186 | Bird groups belong to Kiaušiniai or Mėsa (group form area field; "Dedeklių grupės"/"Mėsinių grupės" filtered lists; Trade-Form preset type + area; hatch-created groups → Perinimas) | P0  | M    | A2, B1  |
+| B3 #187 | Eggs area overview & "Naujas" sheet (Kiaušinių likutis, Dedeklių pulkas, Balansas; Įrašai links; 6 actions + Nauja išlaida / Registruoti nuostolį)                                   | P1  | M    | B1, B2  |
+| B4 #188 | Mother hens area overview & "Nauja" sheet (Perekšlės, Peri dabar, photo cards, "Pradėti perėjimą su perekšle" → Inc-New)                                                             | P1  | S    | B1      |
+| B5 #189 | Incubation area overview & "Naujas ciklas" (Aktyvūs ciklai, Efektyvumas = hatched/fertile, cycle cards with status badge)                                                            | P1  | M    | B1      |
+| B6 #190 | Meat area overview & "Naujas" sheet (Auginama mėsai, Suvartota mėsai, Paskutiniai įrašai)                                                                                            | P1  | S    | B1, B2  |
 
-### Epic C — V2 area expenses, losses & finances
+### Epic C — V2 area expenses, losses & finances (#191)
 
-| #   | Story                                                                                                                                                                                                                            | P   | Size | Depends |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---- | ------- |
-| C1  | Farmer records an expense for an area (V2ExpenseForm, area pre-filled, optional target, "Išsaugoti")                                                                                                                             | P0  | M    | A2, B1  |
-| C2  | Farmer records a shared or other-area expense from the overview (V2-Expense-Form radio incl. "Bendra (visam ūkiui)")                                                                                                             | P1  | S    | C1      |
-| C3  | Farmer sees an area's expenses (Išlaidos tab: total + category breakdown, rows, bird purchases as derived rows → Trade-Purchases)                                                                                                | P0  | M    | C1      |
-| C4  | Farmer records a loss against a group, hen or cycle (V2LossForm: target required, Liga/Plėšrūnas/Kita; group → `adjustBirdGroupQuantityTx`; hen → marked dead; cycle → alive chicks reduced)                                     | P0  | L    | A2, B1  |
-| C5  | Farmer sees an area's losses (Nuostoliai tab: count by cause, rows, empty state "Šiais metais perekšlių nuostolių nebuvo.")                                                                                                      | P0  | M    | C4      |
-| C6  | Area-specific loss insights (Eggs "Sudaužyti kiaušiniai" from collections; Inc "Neapvaisinti"/"Apvaisinti, bet neišsirito"; Meat "Prarasta pašarų vertė ≈"; Hens broken eggs — open Q)                                           | P2  | M    | C5      |
-| C7  | Farmer sees an area's finances (Finansai tab: Pelnas/Nuostolis, period switch, income by source rule 4, categories, Pagal mėnesius, "Visi ūkio finansai") — shared `getAreaFinance` service in integer cents (`finance-math.ts`) | P0  | L    | C3      |
-| C8  | Area unit economics (Pelno marža, cost per hatched chick, cost per meat bird, per hen, meat home use count)                                                                                                                      | P2  | S    | C7      |
+| #       | Story                                                                                                                                                                                                                            | P   | Size | Depends |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---- | ------- |
+| C1 #192 | Farmer records an expense for an area (V2ExpenseForm, area pre-filled, optional target, "Išsaugoti")                                                                                                                             | P0  | M    | A2, B1  |
+| C2 #193 | Farmer records a shared or other-area expense from the overview (V2-Expense-Form radio incl. "Bendra (visam ūkiui)")                                                                                                             | P1  | S    | C1      |
+| C3 #194 | Farmer sees an area's expenses (Išlaidos tab: total + category breakdown, rows, bird purchases as derived rows → Trade-Purchases)                                                                                                | P0  | M    | C1      |
+| C4 #195 | Farmer records a loss against a group, hen or cycle (V2LossForm: target required, Liga/Plėšrūnas/Kita; group → `adjustBirdGroupQuantityTx`; hen → marked dead; cycle → alive chicks reduced)                                     | P0  | L    | A2, B1  |
+| C5 #196 | Farmer sees an area's losses (Nuostoliai tab: count by cause, rows, empty state "Šiais metais perekšlių nuostolių nebuvo.")                                                                                                      | P0  | M    | C4      |
+| C6 #197 | Area-specific loss insights (Eggs "Sudaužyti kiaušiniai" from collections; Inc "Neapvaisinti"/"Apvaisinti, bet neišsirito"; Meat "Prarasta pašarų vertė ≈"; Hens broken eggs — open Q)                                           | P2  | M    | C5      |
+| C7 #198 | Farmer sees an area's finances (Finansai tab: Pelnas/Nuostolis, period switch, income by source rule 4, categories, Pagal mėnesius, "Visi ūkio finansai") — shared `getAreaFinance` service in integer cents (`finance-math.ts`) | P0  | L    | C3      |
+| C8 #199 | Area unit economics (Pelno marža, cost per hatched chick, cost per meat bird, per hen, meat home use count)                                                                                                                      | P2  | S    | C7      |
 
-### Epic D — V2 farm overview (Apžvalga)
+### Epic D — V2 farm overview (Apžvalga) (#200)
 
-| #   | Story                                                                                                                              | P   | Size | Depends |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------- | --- | ---- | ------- |
-| D1  | Farm result for a period (Pelnas/Nuostolis, Pajamos/Išlaidos, Šis mėn./2026 m./Laikotarpis; areas + Bendros sum to total — rule 7) | P0  | M    | C7      |
-| D2  | Spending/income by area donut (Išlaidos/Pajamos toggle, fixed area colours, tap-to-focus, % labels for contrast)                   | P1  | M    | D1      |
-| D3  | Expandable area tiles (one open at a time; top categories, losses, last 3 months, "Atidaryti sritį"/"Finansai")                    | P1  | M    | D1, C5  |
-| D4  | "Ūkis dabar" KPIs & "Daugiau statistikos" (collapsed by default)                                                                   | P2  | S    | D1      |
+| #       | Story                                                                                                                              | P   | Size | Depends |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------- | --- | ---- | ------- |
+| D1 #201 | Farm result for a period (Pelnas/Nuostolis, Pajamos/Išlaidos, Šis mėn./2026 m./Laikotarpis; areas + Bendros sum to total — rule 7) | P0  | M    | C7      |
+| D2 #202 | Spending/income by area donut (Išlaidos/Pajamos toggle, fixed area colours, tap-to-focus, % labels for contrast)                   | P1  | M    | D1      |
+| D3 #203 | Expandable area tiles (one open at a time; top categories, losses, last 3 months, "Atidaryti sritį"/"Finansai")                    | P1  | M    | D1, C5  |
+| D4 #204 | "Ūkis dabar" KPIs & "Daugiau statistikos" (collapsed by default)                                                                   | P2  | S    | D1      |
 
 Every story gets full AC when the skill runs: happy path, validation, empty state, tenant
 isolation (another farm's targets are rejected with 400 and never shown), effect on totals,
@@ -199,15 +199,15 @@ money is summed in cents via `src/lib/finance-math.ts`; dates are `@db.Date` in 
 
 ## Backlog status
 
-Not yet on the board. When the Epics and Stories are created, their issue numbers replace
-A1…D4 above. Order of creation: Epic → board (Backlog) → each Story linked as a sub-issue
-with Priority/Size/Estimate → each Epic's `## Stories` checklist. Branches and Vercel/Neon
-resources are the work of Story A1, not of backlog creation. This plan file is docs only and
-safe on main: the "nothing V2 on main" rule covers code, schema and migrations.
+Created on board #3 on 2026-10-27, all in Backlog: Epics #177 (A), #184 (B), #191 (C), #200 (D) with
+24 Stories (#178–#204) linked as sub-issues, each with Priority, Size and Estimate. The `A1`…`D4`
+codes above match the "Plan ref" in each story. Branches and Vercel/Neon resources are Story A1's
+work. This plan file is docs only and safe on main: the "nothing V2 on main" rule covers code,
+schema and migrations.
 
 ## Verification
 
-- `gh project item-list 3 --owner marraz1` shows 26 new items in Backlog with Priority/Size.
+- `gh project item-list 3 --owner marraz1` shows 28 new items in Backlog with Priority/Size.
 - `gh api repos/marraz1/ChickensFarm/issues/<epic>/sub_issues` lists each Epic's stories.
 - Every body starts with the `feature-stories:v1` marker. A re-run creates nothing new.
 - Architecture check against the codebase: `package.json` `vercel-build` gating,
