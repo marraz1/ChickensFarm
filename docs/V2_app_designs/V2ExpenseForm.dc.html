@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>V2 išlaidos forma</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<form style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted:oklch(0.97 0 0);--muted-foreground:oklch(0.556 0 0);--accent:oklch(0.97 0 0);--accent-foreground:oklch(0.205 0 0);--border:oklch(0.922 0 0);--input:oklch(0.922 0 0);box-sizing:border-box;width:100%;display:flex;flex-direction:column;gap:16px;padding:0 16px 16px;font-family:'Geist',system-ui,sans-serif;color:var(--foreground)">
+<div style="display:flex;flex-direction:column;gap:6px">
+<span style="font-size:14px;line-height:14px;font-weight:500">Sritis</span>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;box-sizing:border-box;padding:0 12px;border-radius:10px;background:var(--muted)">
+<span style="font-size:14px;font-weight:500">{{name}}</span>
+<a href="V2-Expense-Form.dc.html" style="display:flex;align-items:center;min-height:44px;font-size:13px;color:var(--muted-foreground);text-decoration:underline">Keisti</a>
+</div>
+<span style="font-size:12px;line-height:16px;color:var(--muted-foreground)">Išlaida bus įskaičiuota į šios srities ir viso ūkio finansus.</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px">
+<div style="display:flex;flex-direction:column;gap:6px"><label for="exp-date" style="font-size:14px;line-height:14px;font-weight:500">Data</label><input id="exp-date" type="date" value="2026-10-27" style="box-sizing:border-box;width:100%;height:44px;border:1px solid var(--input);border-radius:10px;background:transparent;padding:4px 10px;font:inherit;font-size:16px;color:var(--foreground)"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="exp-amount" style="font-size:14px;line-height:14px;font-weight:500">Suma (€)</label><input id="exp-amount" inputmode="decimal" placeholder="pvz. 12,50" value="{{amount}}" style="box-sizing:border-box;width:100%;height:44px;border:1px solid var(--input);border-radius:10px;background:transparent;padding:4px 10px;font:inherit;font-size:16px;color:var(--foreground)"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="exp-cat" style="font-size:14px;line-height:14px;font-weight:500">Kategorija</label><button id="exp-cat" type="button" style="box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;width:100%;height:44px;border:1px solid var(--input);border-radius:10px;background:transparent;padding:0 10px;font:inherit;font-size:14px;color:var(--foreground);text-align:left">{{cat}}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="exp-target" style="font-size:14px;line-height:14px;font-weight:500">{{target}}</label><button id="exp-target" type="button" style="box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;width:100%;height:44px;border:1px solid var(--input);border-radius:10px;background:transparent;padding:0 10px;font:inherit;font-size:14px;color:var(--foreground);text-align:left">{{targetVal}}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+<div style="display:flex;flex-direction:column;gap:6px"><label for="exp-desc" style="font-size:14px;line-height:14px;font-weight:500">Aprašymas</label><input id="exp-desc" value="{{desc}}" style="box-sizing:border-box;width:100%;height:44px;border:1px solid var(--input);border-radius:10px;background:transparent;padding:4px 10px;font:inherit;font-size:16px;color:var(--foreground)"></div>
+<button type="submit" style="height:44px;margin-top:8px;border:0;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font:inherit;font-size:14px;font-weight:500">Išsaugoti</button>
+</form>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"sec":{"editor":"enum","options":["Eggs","Hens","Inc","Meat"],"default":"Eggs"},"$preview":{"width":390,"height":520}}'>
+class Component extends DCLogic {
+renderVals() {
+const M = {
+Eggs: { name: 'Kiaušiniai ir prekyba', cat: 'Pašarai', target: 'Dedeklių grupė (neprivaloma)', targetVal: 'Vištidė A · Brama', desc: 'Lesalas dedeklėms, 25 kg', amount: '18,90' },
+Hens: { name: 'Perekšlės', cat: 'Pašarai', target: 'Perekšlė (neprivaloma)', targetVal: 'Rita', desc: 'Lesalas perinčiai Ritai', amount: '12,50' },
+Inc: { name: 'Perinimas', cat: 'Kita', target: 'Perinimo ciklas (neprivaloma)', targetVal: 'Rudens partija', desc: 'Elektra inkubatoriui', amount: '46,00' },
+Meat: { name: 'Mėsiniai paukščiai', cat: 'Pašarai', target: 'Mėsinių grupė (neprivaloma)', targetVal: 'Pekino antis', desc: 'Lesalas mėsiniams, 40 kg', amount: '38,00' }
+};
+return M[this.props.sec] ?? M.Eggs;
+}
+}
+</script>
+</body>
+</html>

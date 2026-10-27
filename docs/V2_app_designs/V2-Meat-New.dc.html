@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Naujas įrašas · Mėsa</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+p{margin:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px}
+.ph h1{margin:0;font-size:18px;line-height:28px;font-weight:600}
+.act{display:flex;align-items:center;gap:12px;min-height:44px;padding:10px 8px;border-radius:10px;font-size:14px;line-height:20px}
+.act svg{color:var(--muted-foreground)}
+.mut{color:var(--muted-foreground)}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--popover:oklch(1 0 0);--muted-foreground:oklch(0.556 0 0);--border:oklch(0.922 0 0);position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+<dc-import name="V2Header" hint-size="100%,69px"></dc-import>
+<div class="ph"><h1>Mėsiniai paukščiai</h1></div>
+<div style="position:absolute;left:0;right:0;bottom:0"><dc-import name="V2Nav" active="meat" hint-size="100%,64px"></dc-import></div>
+<div style="position:absolute;inset:0;background:rgba(0,0,0,.5)"></div>
+<section role="dialog" aria-label="Naujas įrašas" style="position:absolute;left:0;right:0;bottom:0;box-sizing:border-box;padding:16px 16px 32px;border-top:1px solid var(--border);background:var(--popover);display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+<div><h2 style="margin:0;font-size:16px;line-height:24px;font-weight:500">Naujas įrašas</h2><p class="mut" style="font-size:14px;line-height:20px">Mėsiniai paukščiai</p></div>
+<a href="V2-Meat-Overview.dc.html" aria-label="Uždaryti" style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin:-10px -10px 0 0;color:var(--muted-foreground)"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></a>
+</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<a href="Meat-Form.dc.html" class="act"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.4 15.63a7.875 6 135 1 1 6.23-6.23 4.5 3.43 135 0 0-6.23 6.23"/><path d="m8.29 12.71-2.6 2.6a2.5 2.5 0 1 0-1.65 4.65A2.5 2.5 0 1 0 8.7 18.3l2.59-2.59"/></svg>Suvartoti mėsai</a>
+<a href="Trade-Form.dc.html" class="act"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>Parduoti paukščių</a>
+<a href="Trade-Form.dc.html" class="act"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Pirkti jauniklių auginti</a>
+<a href="Groups-Form.dc.html" class="act"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Nauja mėsinių grupė</a>
+</div>
+<div style="height:1px;background:var(--border)"></div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<a href="V2-Meat-Expense-New.dc.html" class="act"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>Nauja išlaida</a>
+<a href="V2-Meat-Loss-New.dc.html" class="act"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Registruoti nuostolį</a>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

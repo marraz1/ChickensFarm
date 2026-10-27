@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Perekšlių finansai</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+p{margin:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px}
+.ph h1{margin:0;font-size:18px;line-height:28px;font-weight:600}
+.card{background:var(--card);border-radius:14px;box-shadow:0 0 0 1px color-mix(in oklch,var(--foreground) 10%,transparent);padding:16px}
+.mut{color:var(--muted-foreground)}
+.lab{font-size:14px;line-height:20px;color:var(--muted-foreground)}
+.sm{font-size:11px;line-height:1.25;color:var(--muted-foreground)}
+.pos{color:#059669}
+.neg{color:var(--destructive)}
+.bar{height:6px;overflow:hidden;border-radius:999px;background:var(--muted)}
+.bar i{display:block;height:100%;border-radius:999px;background:color-mix(in oklch,var(--foreground) 70%,transparent)}
+.cat{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px;font-size:14px}
+.mrow{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:10px 0;border-top:1px solid var(--border)}
+.first{border-top:0}
+.seg{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:2px;height:44px;box-sizing:border-box;padding:3px;border-radius:10px;background:var(--muted)}
+.seg button{border:0;border-radius:8px;background:transparent;font:inherit;font-size:13px;font-weight:500;color:var(--muted-foreground)}
+.seg .on{background:var(--card);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted:oklch(0.97 0 0);--muted-foreground:oklch(0.556 0 0);--accent:oklch(0.97 0 0);--accent-foreground:oklch(0.205 0 0);--destructive:oklch(0.577 0.245 27.325);--border:oklch(0.922 0 0);position:relative;width:390px;height:1000px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+<dc-import name="V2Header" hint-size="100%,69px"></dc-import>
+<main style="flex:1;overflow:hidden;padding-bottom:64px">
+<div class="ph"><h1>Perekšlės</h1></div>
+<dc-import name="V2Tabs" sec="Hens" tab="finance" hint-size="100%,56px"></dc-import>
+<div style="padding:0 16px 12px"><div class="seg" role="group" aria-label="Laikotarpis"><button type="button">Šis mėn.</button><button type="button" class="on" aria-pressed="true">2026 m.</button><button type="button">Laikotarpis</button></div></div>
+<div style="display:flex;flex-direction:column;gap:12px;padding:0 16px">
+<div class="card"><p class="lab">Nuostolis · 2026 m.</p><p class="neg" style="font-size:30px;line-height:36px;font-weight:600">-96,50&nbsp;€</p><p class="sm" style="margin-top:4px">Išperinti jaunikliai įskaitomi Perinimo srityje</p></div>
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px">
+<div class="card"><p class="lab">Pajamos</p><p style="font-size:20px;line-height:28px;font-weight:600">0,00&nbsp;€</p><p class="sm" style="margin-top:4px">Pardavimų nebuvo</p></div>
+<div class="card"><p class="lab">Išlaidos</p><p style="font-size:20px;line-height:28px;font-weight:600">96,50&nbsp;€</p><p class="sm" style="margin-top:4px">48,25&nbsp;€ vienai perekšlei</p></div>
+</div>
+<div class="card">
+<p class="lab" style="margin-bottom:12px">Išlaidos pagal kategoriją</p>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div><div class="cat"><span>Pašarai</span><span style="font-weight:500">64,50&nbsp;€<span class="mut" style="margin-left:4px;font-size:12px">66,8&nbsp;%</span></span></div><div class="bar"><i style="width:100%"></i></div></div>
+<div><div class="cat"><span>Vaistai</span><span style="font-weight:500">32,00&nbsp;€<span class="mut" style="margin-left:4px;font-size:12px">33,2&nbsp;%</span></span></div><div class="bar"><i style="width:50%"></i></div></div>
+</div>
+</div>
+<div class="card" style="padding-top:12px;padding-bottom:4px">
+<p class="lab" style="margin-bottom:4px">Pagal mėnesius</p>
+<div class="mrow first"><div><p style="font-size:14px;line-height:20px">Spalis</p><p class="sm">Pajamos 0,00&nbsp;€ · Išlaidos 12,50&nbsp;€</p></div><span class="neg" style="font-size:14px;font-weight:500">-12,50&nbsp;€</span></div>
+<div class="mrow"><div><p style="font-size:14px;line-height:20px">Rugsėjis</p><p class="sm">Pajamos 0,00&nbsp;€ · Išlaidos 84,00&nbsp;€</p></div><span class="neg" style="font-size:14px;font-weight:500">-84,00&nbsp;€</span></div>
+<div class="mrow"><div><p style="font-size:14px;line-height:20px">Rugpjūtis</p><p class="sm">Pajamos 0,00&nbsp;€ · Išlaidos 0,00&nbsp;€</p></div><span style="font-size:14px;font-weight:500">0,00&nbsp;€</span></div>
+</div>
+<a href="V2-Overview.dc.html" style="display:flex;align-items:center;justify-content:center;gap:4px;height:44px;border:1px solid var(--border);border-radius:10px;background:var(--card);font-size:14px;font-weight:500">Visi ūkio finansai<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+</div>
+</main>
+<div style="position:absolute;left:0;right:0;bottom:0"><dc-import name="V2Nav" active="hens" hint-size="100%,64px"></dc-import></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

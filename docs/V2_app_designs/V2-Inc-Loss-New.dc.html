@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Naujas nuostolis · Perinimas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.ph{display:flex;align-items:center;gap:4px;padding:16px}
+.ph h1{margin:0;font-size:18px;line-height:28px;font-weight:600}
+.bk{display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-left:-8px;color:var(--muted-foreground)}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--muted-foreground:oklch(0.556 0 0);--border:oklch(0.922 0 0);position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+<dc-import name="V2Header" hint-size="100%,69px"></dc-import>
+<main style="flex:1;overflow:hidden;padding-bottom:64px">
+<div class="ph"><a href="V2-Inc-Losses.dc.html" class="bk" aria-label="Grįžti"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a><h1>Naujas nuostolis</h1></div>
+<dc-import name="V2LossForm" sec="Inc" hint-size="100%,460px"></dc-import>
+</main>
+<div style="position:absolute;left:0;right:0;bottom:0"><dc-import name="V2Nav" active="inc" hint-size="100%,64px"></dc-import></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

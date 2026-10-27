@@ -14,3 +14,4 @@ docs/evaluations/*.html
 
 # Canvas design files: generated markup, not hand-formatted source
 docs/design
+docs/V2_app_designs/*.dc.html

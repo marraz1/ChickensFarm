@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>V2 srities skirtukai</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--muted:oklch(0.97 0 0);--muted-foreground:oklch(0.556 0 0);box-sizing:border-box;width:100%;height:56px;padding:0 16px 12px;font-family:'Geist',system-ui,sans-serif;color:var(--foreground)">
+<nav aria-label="Srities skirtukai" style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:2px;height:44px;box-sizing:border-box;padding:3px;border-radius:10px;background:var(--muted)">
+<a href="V2-{{sec}}-Overview.dc.html" style="display:flex;align-items:center;justify-content:center;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500;background:{{bgOverview}};color:{{fgOverview}};box-shadow:{{shOverview}}">Apžvalga</a>
+<a href="V2-{{sec}}-Expenses.dc.html" style="display:flex;align-items:center;justify-content:center;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500;background:{{bgExpenses}};color:{{fgExpenses}};box-shadow:{{shExpenses}}">Išlaidos</a>
+<a href="V2-{{sec}}-Losses.dc.html" style="display:flex;align-items:center;justify-content:center;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500;background:{{bgLosses}};color:{{fgLosses}};box-shadow:{{shLosses}}">Nuostoliai</a>
+<a href="V2-{{sec}}-Finance.dc.html" style="display:flex;align-items:center;justify-content:center;border-radius:8px;text-decoration:none;font-size:13px;font-weight:500;background:{{bgFinance}};color:{{fgFinance}};box-shadow:{{shFinance}}">Finansai</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"sec":{"editor":"enum","options":["Eggs","Hens","Inc","Meat"],"default":"Eggs"},"tab":{"editor":"enum","options":["overview","expenses","losses","finance"],"default":"overview"},"$preview":{"width":390,"height":56}}'>
+class Component extends DCLogic {
+renderVals() {
+const t = this.props.tab ?? 'overview';
+const out = { sec: this.props.sec ?? 'Eggs' };
+const keys = { overview: 'Overview', expenses: 'Expenses', losses: 'Losses', finance: 'Finance' };
+Object.keys(keys).forEach((k) => {
+const on = t === k;
+out['bg' + keys[k]] = on ? 'var(--card)' : 'transparent';
+out['fg' + keys[k]] = on ? 'var(--foreground)' : 'var(--muted-foreground)';
+out['sh' + keys[k]] = on ? '0 1px 2px rgba(0,0,0,.08)' : 'none';
+});
+return out;
+}
+}
+</script>
+</body>
+</html>

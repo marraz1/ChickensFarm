@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Perinimas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+p{margin:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px}
+.ph h1{margin:0;font-size:18px;line-height:28px;font-weight:600}
+.add{display:flex;align-items:center;gap:4px;height:44px;padding:0 12px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font-size:14px;font-weight:500}
+.card{display:block;background:var(--card);border-radius:14px;box-shadow:0 0 0 1px color-mix(in oklch,var(--foreground) 10%,transparent)}
+.stat{padding:12px}
+.stat p:nth-child(1){margin-bottom:4px;font-size:12px;line-height:16px;color:var(--muted-foreground)}
+.stat p:nth-child(2){font-size:20px;line-height:28px;font-weight:500}
+.sm{font-size:11px;line-height:1.25;color:var(--muted-foreground)}
+.mut{color:var(--muted-foreground)}
+.neg{color:var(--destructive)}
+.badge{flex-shrink:0;padding:2px 8px;border-radius:999px;font-size:12px;line-height:16px;font-weight:500}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted:oklch(0.97 0 0);--muted-foreground:oklch(0.556 0 0);--accent:oklch(0.97 0 0);--accent-foreground:oklch(0.205 0 0);--destructive:oklch(0.577 0.245 27.325);--border:oklch(0.922 0 0);position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+<dc-import name="V2Header" hint-size="100%,69px"></dc-import>
+<main style="flex:1;overflow:hidden;padding-bottom:64px">
+<div class="ph"><h1>Perinimas</h1><a href="V2-Inc-New.dc.html" class="add"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Naujas ciklas</a></div>
+<dc-import name="V2Tabs" sec="Inc" tab="overview" hint-size="100%,56px"></dc-import>
+<div style="display:flex;flex-direction:column;gap:12px;padding:0 16px">
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px">
+<div class="card stat"><p>Aktyvūs ciklai</p><p>2</p><p class="sm" style="margin-top:4px">42 kiaušiniai inkubatoriuje</p></div>
+<div class="card stat"><p>Efektyvumas</p><p>81,6&nbsp;%</p><p class="sm" style="margin-top:4px">Išsirito 31 iš 38 apvaisintų</p></div>
+<a href="V2-Inc-Finance.dc.html" class="card stat" style="grid-column:span 2"><p>Balansas · 2026 m.</p><p class="neg">-94,00&nbsp;€</p><p class="sm" style="margin-top:4px">Pajamos 120,00&nbsp;€ · Išlaidos 214,00&nbsp;€</p></a>
+</div>
+<p class="mut" style="margin-top:4px;font-size:14px;line-height:20px">Ciklai</p>
+<a href="Inc-Detail-Early.dc.html" class="card" style="padding:16px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><p style="font-size:14px;line-height:20px;font-weight:500">Rudens partija</p><span class="badge" style="background:#fef3c7;color:#b45309">Apšviesta</span></div>
+<p class="mut" style="margin-top:2px;font-size:12px;line-height:16px">Pradėta 2026 m. spalio 12 d. · 15-a diena</p>
+<p class="mut" style="margin-top:4px;font-size:14px;line-height:20px">Šaltinis: Brama · 24 kiaušinių</p>
+</a>
+<a href="Inc-Detail-Early.dc.html" class="card" style="padding:16px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><p style="font-size:14px;line-height:20px;font-weight:500">Iš perekšlės Ritos</p><span class="badge" style="background:var(--muted);color:var(--muted-foreground)">Pradėta</span></div>
+<p class="mut" style="margin-top:2px;font-size:12px;line-height:16px">Pradėta 2026 m. spalio 21 d. · 6-a diena</p>
+<p class="mut" style="margin-top:4px;font-size:14px;line-height:20px">Perekšlė Rita · 18 kiaušinių</p>
+</a>
+<a href="Inc-Detail-Hatched.dc.html" class="card" style="padding:16px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><p style="font-size:14px;line-height:20px;font-weight:500">Vasaros partija</p><span class="badge" style="background:#d1fae5;color:#047857">Išsiritę</span></div>
+<p class="mut" style="margin-top:2px;font-size:12px;line-height:16px">Pradėta 2026 m. rugsėjo 2 d.</p>
+<p style="margin-top:4px;font-size:14px;line-height:20px;color:#059669">Išsirito 16 · dabar gyvų 15</p>
+</a>
+</div>
+</main>
+<div style="position:absolute;left:0;right:0;bottom:0"><dc-import name="V2Nav" active="inc" hint-size="100%,64px"></dc-import></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

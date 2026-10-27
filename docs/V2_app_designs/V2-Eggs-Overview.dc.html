@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Kiaušiniai ir prekyba</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+p{margin:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px}
+.ph h1{margin:0;font-size:18px;line-height:28px;font-weight:600}
+.add{display:flex;align-items:center;gap:4px;height:44px;padding:0 12px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font-size:14px;font-weight:500}
+.card{background:var(--card);border-radius:14px;box-shadow:0 0 0 1px color-mix(in oklch,var(--foreground) 10%,transparent)}
+.stat{padding:12px}
+.stat p:nth-child(1){margin-bottom:4px;font-size:12px;line-height:16px;color:var(--muted-foreground)}
+.stat p:nth-child(2){font-size:20px;line-height:28px;font-weight:500}
+.sm{font-size:11px;line-height:1.25;color:var(--muted-foreground)}
+.mut{color:var(--muted-foreground)}
+.pos{color:#059669}
+.link{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 16px;border-top:1px solid var(--border)}
+.link:first-child{border-top:0}
+.link span{flex:1;font-size:14px;line-height:20px;font-weight:500}
+.link b{font-size:14px;font-weight:400;color:var(--muted-foreground)}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted:oklch(0.97 0 0);--muted-foreground:oklch(0.556 0 0);--accent:oklch(0.97 0 0);--accent-foreground:oklch(0.205 0 0);--destructive:oklch(0.577 0.245 27.325);--border:oklch(0.922 0 0);position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+<dc-import name="V2Header" hint-size="100%,69px"></dc-import>
+<main style="flex:1;overflow:hidden;padding-bottom:64px">
+<div class="ph"><h1>Kiaušiniai ir prekyba</h1><a href="V2-Eggs-New.dc.html" class="add"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Naujas</a></div>
+<dc-import name="V2Tabs" sec="Eggs" tab="overview" hint-size="100%,56px"></dc-import>
+<div style="display:flex;flex-direction:column;gap:12px;padding:0 16px">
+<div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px">
+<div class="card stat"><p>Kiaušinių likutis</p><p>86</p><p class="sm" style="margin-top:4px">Šį mėn. 214 · Metais 1&nbsp;532</p></div>
+<div class="card stat"><p>Dedeklių pulkas</p><p>30</p><p class="sm" style="margin-top:4px">Brama 24 · Sussex 6</p></div>
+<a href="V2-Eggs-Finance.dc.html" class="card stat" style="grid-column:span 2"><p>Balansas · 2026 m.</p><p class="pos">496,00&nbsp;€</p><p class="sm" style="margin-top:4px">Pajamos 1&nbsp;742,00&nbsp;€ · Išlaidos 1&nbsp;246,00&nbsp;€</p></a>
+</div>
+<p class="mut" style="margin-top:4px;font-size:14px;line-height:20px">Įrašai</p>
+<div class="card" style="overflow:hidden">
+<a href="Egg-collections.dc.html" class="link"><svg class="mut" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg><span>Kiaušinių surinkimas</span><b>214 šį mėn.</b><svg class="mut" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+<a href="Eggs-Sales-List.dc.html" class="link"><svg class="mut" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg><span>Kiaušinių pardavimai</span><b>22,50&nbsp;€</b><svg class="mut" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+<a href="Eggs-Consumption-List.dc.html" class="link"><svg class="mut" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg><span>Suvartoti kiaušiniai</span><b>22</b><svg class="mut" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+<a href="Trade-Purchases.dc.html" class="link"><svg class="mut" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg><span>Paukščių pirkimai</span><b>136,00&nbsp;€</b><svg class="mut" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+<a href="Trade-Sales.dc.html" class="link"><svg class="mut" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg><span>Paukščių pardavimai</span><b>80,00&nbsp;€</b><svg class="mut" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+<a href="Groups-List.dc.html" class="link"><svg class="mut" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Dedeklių grupės</span><b>2</b><svg class="mut" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a>
+</div>
+</div>
+</main>
+<div style="position:absolute;left:0;right:0;bottom:0"><dc-import name="V2Nav" active="eggs" hint-size="100%,64px"></dc-import></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
