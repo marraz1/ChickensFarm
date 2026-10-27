@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>V2 apatinė juosta</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<nav aria-label="Ūkio sritys" style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--muted-foreground:oklch(0.556 0 0);--border:oklch(0.922 0 0);box-sizing:border-box;width:100%;height:64px;display:flex;align-items:center;justify-content:space-around;background:color-mix(in oklch,var(--card) 95%,transparent);border-top:1px solid var(--border);backdrop-filter:blur(8px);font-family:'Geist',system-ui,sans-serif;color:var(--foreground)">
+<a href="V2-Overview.dc.html" style="display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;padding:8px 0;text-decoration:none;font-size:11px;line-height:16px;font-weight:{{wOverview}};color:{{cOverview}}"><span style="display:flex;align-items:center;justify-content:center;height:28px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>Apžvalga</a>
+<a href="V2-Eggs-Overview.dc.html" style="display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;padding:8px 0;text-decoration:none;font-size:11px;line-height:16px;font-weight:{{wEggs}};color:{{cEggs}}"><span style="display:flex;align-items:center;justify-content:center;height:28px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg></span>Kiaušiniai</a>
+<a href="V2-Hens-Overview.dc.html" style="display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;padding:8px 0;text-decoration:none;font-size:11px;line-height:16px;font-weight:{{wHens}};color:{{cHens}}"><span style="display:flex;align-items:center;justify-content:center;height:28px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg></span>Perekšlės</a>
+<a href="V2-Inc-Overview.dc.html" style="display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;padding:8px 0;text-decoration:none;font-size:11px;line-height:16px;font-weight:{{wInc}};color:{{cInc}}"><span style="display:flex;align-items:center;justify-content:center;height:28px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg></span>Perinimas</a>
+<a href="V2-Meat-Overview.dc.html" style="display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;padding:8px 0;text-decoration:none;font-size:11px;line-height:16px;font-weight:{{wMeat}};color:{{cMeat}}"><span style="display:flex;align-items:center;justify-content:center;height:28px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.4 15.63a7.875 6 135 1 1 6.23-6.23 4.5 3.43 135 0 0-6.23 6.23"/><path d="m8.29 12.71-2.6 2.6a2.5 2.5 0 1 0-1.65 4.65A2.5 2.5 0 1 0 8.7 18.3l2.59-2.59"/></svg></span>Mėsa</a>
+</nav>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["overview","eggs","hens","inc","meat"],"default":"overview"},"$preview":{"width":390,"height":64}}'>
+class Component extends DCLogic {
+renderVals() {
+const a = this.props.active ?? 'overview';
+const on = (k) => (a === k ? 'var(--primary)' : 'var(--muted-foreground)');
+const w = (k) => (a === k ? '500' : '400');
+return {
+cOverview: on('overview'), cEggs: on('eggs'), cHens: on('hens'), cInc: on('inc'), cMeat: on('meat'),
+wOverview: w('overview'), wEggs: w('eggs'), wHens: w('hens'), wInc: w('inc'), wMeat: w('meat')
+};
+}
+}
+</script>
+</body>
+</html>

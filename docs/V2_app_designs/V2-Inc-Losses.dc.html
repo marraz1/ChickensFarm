@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="lt">
+<head>
+<meta charset="utf-8">
+<title>Perinimo nuostoliai</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+p{margin:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px}
+.ph h1{margin:0;font-size:18px;line-height:28px;font-weight:600}
+.add{display:flex;align-items:center;gap:4px;height:44px;padding:0 12px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font-size:14px;font-weight:500}
+.card{background:var(--card);border-radius:14px;box-shadow:0 0 0 1px color-mix(in oklch,var(--foreground) 10%,transparent);padding:16px}
+.item{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mut{color:var(--muted-foreground)}
+.lab{font-size:14px;line-height:20px;color:var(--muted-foreground)}
+.neg{color:var(--destructive)}
+.trio{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);text-align:center}
+.trio p:first-child{font-size:18px;line-height:28px;font-weight:600}
+.trio p:last-child{font-size:12px;line-height:16px;color:var(--muted-foreground)}
+</style>
+</helmet>
+<div style="--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--primary:oklch(0.205 0 0);--primary-foreground:oklch(0.985 0 0);--muted:oklch(0.97 0 0);--muted-foreground:oklch(0.556 0 0);--accent:oklch(0.97 0 0);--accent-foreground:oklch(0.205 0 0);--destructive:oklch(0.577 0.245 27.325);--border:oklch(0.922 0 0);position:relative;width:390px;height:844px;overflow:hidden;box-sizing:border-box;background:oklch(0.991 0 0);color:var(--foreground);font-family:'Geist',system-ui,sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased">
+<dc-import name="V2Header" hint-size="100%,69px"></dc-import>
+<main style="flex:1;overflow:hidden;padding-bottom:64px">
+<div class="ph"><h1>Perinimas</h1><a href="V2-Inc-Loss-New.dc.html" class="add"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Nuostolis</a></div>
+<dc-import name="V2Tabs" sec="Inc" tab="losses" hint-size="100%,56px"></dc-import>
+<div style="display:flex;flex-direction:column;gap:12px;padding:0 16px">
+<div class="card">
+<p class="lab">Žuvę jaunikliai · 2026 m.</p>
+<p style="font-size:24px;line-height:32px;font-weight:600">1 jauniklis</p>
+<div class="trio"><div><p>1</p><p>Liga</p></div><div><p>0</p><p>Plėšrūnas</p></div><div><p>0</p><p>Kita</p></div></div>
+</div>
+<div class="card">
+<p class="lab">Kiaušiniai, iš kurių neišsirito</p>
+<div class="trio" style="margin-top:8px;padding-top:0;border-top:0;grid-template-columns:repeat(2, minmax(0, 1fr))"><div><p>6</p><p>Neapvaisinti</p></div><div><p>3</p><p>Apvaisinti, bet neišsirito</p></div></div>
+</div>
+<p class="lab" style="margin-top:4px">Įrašai</p>
+<a href="Inc-Detail-Hatched.dc.html" class="card item"><div><p style="font-weight:500">Liga · 2026 m. spalio 10 d.</p><p class="lab">Vasaros partija · iš sekimo įrašo</p></div><p class="neg" style="font-size:18px;line-height:28px;font-weight:600">-1</p></a>
+</div>
+</main>
+<div style="position:absolute;left:0;right:0;bottom:0"><dc-import name="V2Nav" active="inc" hint-size="100%,64px"></dc-import></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
