@@ -90,8 +90,14 @@ import {
   getEggConsumption,
   updateEggConsumption,
 } from "@/lib/services/egg-consumptions";
-import { deleteExpense, getExpense, updateExpense } from "@/lib/services/expenses";
-import { deleteLoss, getLoss, updateLoss } from "@/lib/services/losses";
+import {
+  createExpense,
+  deleteExpense,
+  getExpense,
+  listExpenses,
+  updateExpense,
+} from "@/lib/services/expenses";
+import { createLoss, deleteLoss, getLoss, listLosses, updateLoss } from "@/lib/services/losses";
 import {
   addMotherHenLog,
   createMotherHen,
@@ -667,5 +673,84 @@ describe("incubation cycles", () => {
         target: { mode: "none" },
       }),
     ).rejects.toThrow(ValidationError);
+  });
+});
+
+// #179: an expense or a loss can point at a bird group, a mother hen or an
+// incubation cycle. Each of those references must be checked against the
+// caller's farm, exactly like the birdGroupId links above.
+describe("expense and loss targets (farm areas)", () => {
+  beforeEach(async () => {
+    await seedTwoFarms();
+    await fakePrisma.breed.create({
+      data: { id: "breed-a", farmId: FARM_A_ID, name: "Rhode Island Red", birdType: "HEN" },
+    });
+    await fakePrisma.birdGroup.create({
+      data: {
+        id: "group-a",
+        farmId: FARM_A_ID,
+        breedId: "breed-a",
+        sex: "FEMALE",
+        category: "LAYER",
+        area: "EGGS",
+        quantity: 10,
+        birthOrAcquiredDate: new Date("2025-01-01"),
+      },
+    });
+    await fakePrisma.motherHen.create({
+      data: { id: "hen-a", farmId: FARM_A_ID, birdGroupId: null, name: "Cluck" },
+    });
+    await fakePrisma.incubationCycle.create({
+      data: { id: "cycle-a", farmId: FARM_A_ID, name: "Spring", startDate: new Date("2025-01-01") },
+    });
+    await fakePrisma.expense.create({
+      data: {
+        id: "exp-b",
+        farmId: FARM_B_ID,
+        area: "SHARED",
+        birdGroupId: null,
+        motherHenId: null,
+        incubationCycleId: null,
+        expenseDate: new Date("2025-01-01"),
+        category: "FEED",
+        amount: 10,
+      },
+    });
+  });
+
+  const expense = { expenseDate: "2025-02-01", category: "FEED" as const, amount: 5 };
+  const loss = { lossDate: "2025-02-01", quantity: 1, reasonType: "DISEASE" as const };
+  const foreignTargets = [
+    { birdGroupId: "group-a" },
+    { motherHenId: "hen-a" },
+    { incubationCycleId: "cycle-a" },
+  ];
+
+  it.each(foreignTargets)("refuses an expense targeting another farm's %o", async (target) => {
+    await expect(createExpense(FARM_B_ID, { ...expense, ...target })).rejects.toThrow(
+      ValidationError,
+    );
+    await expect(listExpenses(FARM_B_ID)).resolves.toHaveLength(1);
+  });
+
+  it.each(foreignTargets)("refuses to move an expense onto another farm's %o", async (target) => {
+    await expect(updateExpense(FARM_B_ID, "exp-b", { ...expense, ...target })).rejects.toThrow(
+      ValidationError,
+    );
+    await expect(getExpense(FARM_B_ID, "exp-b")).resolves.toMatchObject({
+      birdGroupId: null,
+      motherHenId: null,
+      incubationCycleId: null,
+    });
+  });
+
+  it.each(foreignTargets)("refuses a loss targeting another farm's %o", async (target) => {
+    await expect(createLoss(FARM_B_ID, USER_B_ID, { ...loss, ...target })).rejects.toThrow(
+      ValidationError,
+    );
+    await expect(listLosses(FARM_B_ID)).resolves.toHaveLength(0);
+    await expect(getBirdGroupWithEvents(FARM_A_ID, "group-a")).resolves.toMatchObject({
+      quantity: 10,
+    });
   });
 });

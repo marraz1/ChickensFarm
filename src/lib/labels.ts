@@ -6,6 +6,7 @@ import type {
   ExpenseCategory,
   EggQuality,
   BirdTransactionType,
+  FarmArea,
 } from "@/generated/prisma/client";
 
 export const birdCategoryLabels: Record<BirdCategory, string> = {
@@ -72,3 +73,15 @@ export const birdTransactionCounterpartyLabels: Record<BirdTransactionType, stri
   PURCHASE: "Pardavėjas",
   SALE: "Pirkėjas",
 };
+
+export const farmAreaLabels: Record<FarmArea, string> = {
+  EGGS: "Kiaušiniai ir prekyba",
+  HENS: "Perekšlės",
+  INC: "Perinimas",
+  MEAT: "Mėsiniai paukščiai",
+  SHARED: "Bendra",
+};
+
+// Display order for area breakdowns, matching the V2 navigation; "Bendra"
+// comes last, after the areas it is shared between.
+export const farmAreaOrder: FarmArea[] = ["EGGS", "HENS", "INC", "MEAT", "SHARED"];

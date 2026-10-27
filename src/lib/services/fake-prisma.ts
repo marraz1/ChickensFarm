@@ -190,6 +190,16 @@ function sumFields(rows: Row[], select: Record<string, boolean> | undefined) {
   return sums;
 }
 
+/**
+ * Prisma treats an `undefined` field in `data` as "leave the column alone",
+ * which the services rely on for optional fields (e.g. a mother hen's diedAt
+ * left out of an update). A plain object spread would overwrite the stored
+ * value with undefined instead, so drop those keys first.
+ */
+function definedFields(data: Row): Row {
+  return Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+}
+
 function notImplemented(model: ModelName, method: string) {
   return () => {
     throw new Error(
@@ -215,20 +225,20 @@ function createModelClient(model: ModelName) {
       return rowsOf(model).find((r) => matchesWhere(model, args.where, r)) ?? null;
     },
     async create(args: { data: Row }): Promise<Row> {
-      const row: Row = { id: randomUUID(), createdAt: new Date(), ...args.data };
+      const row: Row = { id: randomUUID(), createdAt: new Date(), ...definedFields(args.data) };
       db[model].set(row.id as string, row);
       return row;
     },
     async update(args: { where: Where; data: Row }): Promise<Row> {
       const target = rowsOf(model).find((r) => matchesWhere(model, args.where, r));
       if (!target) throw new Error(`fake-prisma: ${model} not found (update)`);
-      const updated = { ...target, ...args.data };
+      const updated = { ...target, ...definedFields(args.data) };
       db[model].set(target.id as string, updated);
       return updated;
     },
     async updateMany(args: { where?: Where; data: Row }): Promise<{ count: number }> {
       const matched = rowsOf(model).filter((r) => matchesWhere(model, args.where, r));
-      for (const r of matched) db[model].set(r.id as string, { ...r, ...args.data });
+      for (const r of matched) db[model].set(r.id as string, { ...r, ...definedFields(args.data) });
       return { count: matched.length };
     },
     async delete(args: { where: Where }): Promise<Row> {
