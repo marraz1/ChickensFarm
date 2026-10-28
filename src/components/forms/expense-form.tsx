@@ -14,19 +14,46 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Link from "next/link";
 import type { z } from "zod";
 import { createExpenseSchema, type CreateExpenseInput } from "@/lib/validation/expenses";
 import { expenseCategoryLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
+import type { ExpenseTargetField } from "@/lib/v2-navigation";
+import type { FarmArea } from "@/generated/prisma/client";
+
+/**
+ * Opening the form from an area (#192, V2ExpenseForm): the area is fixed and
+ * shown, and an optional target is offered from that area only.
+ */
+export type ExpenseAreaContext = {
+  area: FarmArea;
+  areaLabel: string;
+  /**
+   * "Keisti": the general expense form. Choosing another area there arrives
+   * with #193 (its "Sritis" chooser); until then it is the V1 form, which
+   * files an expense without a target under "Bendra".
+   */
+  changeHref: string;
+  target: {
+    field: ExpenseTargetField;
+    label: string;
+    options: { id: string; label: string }[];
+  };
+};
+
+const NO_TARGET = "";
 
 export function ExpenseForm({
   expenseId,
   defaultValues,
   onSuccessPath = "/expenses",
+  areaContext,
 }: {
   expenseId?: string;
   defaultValues?: Partial<CreateExpenseInput>;
   onSuccessPath?: string;
+  areaContext?: ExpenseAreaContext;
 } = {}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -39,10 +66,17 @@ export function ExpenseForm({
     formState: { errors, isSubmitting },
   } = useForm<z.input<typeof createExpenseSchema>, unknown, CreateExpenseInput>({
     resolver: zodResolver(createExpenseSchema),
-    defaultValues: { expenseDate: todayInputValue(), category: "FEED", ...defaultValues },
+    defaultValues: {
+      expenseDate: todayInputValue(),
+      category: "FEED",
+      ...(areaContext ? { area: areaContext.area } : {}),
+      ...defaultValues,
+    },
   });
 
   const category = watch("category");
+  const targetField = areaContext?.target.field;
+  const targetId = targetField ? (watch(targetField) ?? NO_TARGET) : NO_TARGET;
 
   async function onSubmit(data: CreateExpenseInput) {
     setServerError(null);
@@ -64,6 +98,24 @@ export function ExpenseForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      {areaContext && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Sritis</span>
+          <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border bg-muted/40 px-3">
+            <span className="text-sm font-medium">{areaContext.areaLabel}</span>
+            <Link
+              href={areaContext.changeHref}
+              className="flex min-h-11 items-center text-sm font-medium text-primary"
+            >
+              Keisti
+            </Link>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Išlaida bus įskaičiuota į šios srities ir viso ūkio finansus.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="expenseDate">Data</Label>
         <Input id="expenseDate" type="date" className="h-11" {...register("expenseDate")} />
@@ -91,6 +143,33 @@ export function ExpenseForm({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Hidden when the area has nothing to pick (as the loss form does). */}
+      {areaContext && targetField && areaContext.target.options.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="target">{areaContext.target.label}</Label>
+          <Select
+            items={{
+              [NO_TARGET]: "Nenurodyta",
+              ...Object.fromEntries(areaContext.target.options.map((o) => [o.id, o.label])),
+            }}
+            value={targetId}
+            onValueChange={(v) => setValue(targetField, v ? v : undefined)}
+          >
+            <SelectTrigger id="target" className="h-11 w-full">
+              <SelectValue placeholder="Nenurodyta" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_TARGET}>Nenurodyta</SelectItem>
+              {areaContext.target.options.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="amount">Suma (€)</Label>
