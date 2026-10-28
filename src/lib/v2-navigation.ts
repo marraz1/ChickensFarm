@@ -116,12 +116,14 @@ export function groupAreaShortLabel(area: GroupArea): string {
 // from, so the bar keeps that area highlighted. `group` screens accept the
 // areas a bird group can live in (#186); `any` screens accept every area,
 // Perekšlės included (#192). Only screens that actually work in that area are
-// listed — the farm-wide expense list is not filtered, so it is not here.
-const AREA_PARAM_SCREENS: readonly { prefix: string; accepts: "group" | "any" }[] = [
-  { prefix: "/bird-groups", accepts: "group" },
-  { prefix: "/birds/purchases", accepts: "group" },
-  { prefix: "/birds/sales", accepts: "group" },
-  { prefix: "/expenses/new", accepts: "any" },
+// listed — the farm-wide expense list is not filtered, so it is not here; the
+// new-expense form and an expense opened from an area's list (#194) are.
+const AREA_PARAM_SCREENS: readonly { match: RegExp; accepts: "group" | "any" }[] = [
+  { match: /^\/bird-groups(\/|$)/, accepts: "group" },
+  { match: /^\/birds\/purchases(\/|$)/, accepts: "group" },
+  { match: /^\/birds\/sales(\/|$)/, accepts: "group" },
+  { match: /^\/expenses\/new$/, accepts: "any" },
+  { match: /^\/expenses\/[^/]+\/edit$/, accepts: "any" },
 ];
 
 function areaFromParam(areaParam: string | null | undefined, accepts: "group" | "any") {
@@ -137,7 +139,7 @@ export function navKeyForPath(pathname: string, areaParam?: string | null): NavK
   const area = /^\/areas\/([^/]+)/.exec(pathname)?.[1];
   if (area !== undefined) return isAreaSlug(area) ? area : null;
 
-  const screen = AREA_PARAM_SCREENS.find((s) => underPrefix(pathname, s.prefix));
+  const screen = AREA_PARAM_SCREENS.find((s) => s.match.test(pathname));
   const fromParam = screen ? areaFromParam(areaParam, screen.accepts) : null;
   if (fromParam) return fromParam;
 
@@ -185,12 +187,12 @@ export const AREA_EXPENSE_TARGETS: Record<AreaSlug, { field: ExpenseTargetField;
     meat: { field: "birdGroupId", label: "Mėsinių grupė (neprivaloma)" },
   };
 
-// Farm-wide V1 screen each not-yet-built area tab points to meanwhile.
+// Farm-wide V1 screen each not-yet-built area tab points to meanwhile
+// (Išlaidos has its own list since #194).
 export const AREA_TAB_FALLBACK: Record<
-  Exclude<AreaTabSegment, null>,
+  Exclude<AreaTabSegment, null | "expenses">,
   { href: string; label: string }
 > = {
-  expenses: { href: "/expenses", label: "Visos ūkio išlaidos" },
   losses: { href: "/losses", label: "Visi ūkio nuostoliai" },
   finance: { href: "/finance/profit-loss", label: "Ūkio pelnas / nuostoliai" },
 };

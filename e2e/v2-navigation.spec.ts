@@ -82,6 +82,9 @@ test("bar items, area tabs and the profile button are at least 44px tall on a ph
   ];
   expect(targets).toHaveLength(10);
   for (const target of targets) {
+    // Measure only once laid out: under load the page can still be settling,
+    // and boundingBox() of an element not yet rendered is null (read as 0).
+    await expect(target).toBeVisible();
     const box = await target.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);

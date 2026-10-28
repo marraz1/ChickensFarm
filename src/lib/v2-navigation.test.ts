@@ -155,7 +155,9 @@ describe("navKeyForPath with an area", () => {
     ["/expenses/new", "toString", "overview"],
     // The farm-wide list is not filtered by area, so it never claims one.
     ["/expenses", "meat", "overview"],
-    ["/expenses/abc/edit", "hens", "overview"],
+    // An expense opened from an area's list keeps that area (#194).
+    ["/expenses/abc/edit", "hens", "hens"],
+    ["/expenses/abc/edit", null, "overview"],
   ] as const)("%s?area=%s → %s", (path, area, key) => {
     expect(navKeyForPath(path, area)).toBe(key);
   });
