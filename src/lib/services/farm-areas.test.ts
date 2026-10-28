@@ -34,6 +34,7 @@ import {
   updateMotherHen,
 } from "@/lib/services/mother-hens";
 import { finalizeHatch, getIncubationCycle } from "@/lib/services/incubation";
+import { getProfitLossReport } from "@/lib/services/reports";
 import { createExpenseSchema } from "@/lib/validation/expenses";
 import { createLossSchema } from "@/lib/validation/losses";
 import { createBirdGroupSchema } from "@/lib/validation/bird-groups";
@@ -110,6 +111,22 @@ describe("expense area", () => {
     await expect(
       createExpense(FARM_ID, { ...expense, area: "EGGS", birdGroupId: "eggs-group" }),
     ).resolves.toMatchObject({ area: "EGGS", birdGroupId: "eggs-group" });
+  });
+
+  // #192: an expense recorded from an area counts in the whole farm's totals.
+  it("counts an area expense in the farm's profit and loss", async () => {
+    const range = { from: new Date("2025-01-01"), to: new Date("2025-12-31") };
+    const before = (await getProfitLossReport(FARM_ID, range)).expenses;
+
+    await createExpense(FARM_ID, {
+      ...expense,
+      amount: 12.5,
+      area: "MEAT",
+      birdGroupId: "meat-group",
+    });
+    await createExpense(FARM_ID, { ...expense, amount: 3, area: "HENS", motherHenId: "hen-1" });
+
+    expect((await getProfitLossReport(FARM_ID, range)).expenses).toBeCloseTo(before + 15.5, 2);
   });
 
   it("rejects a target from another area with a Lithuanian message", async () => {

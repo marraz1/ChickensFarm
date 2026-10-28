@@ -7,6 +7,7 @@ import {
   navKeyForPath,
   AREA_RECORD_LINKS,
   groupAreaFromParam,
+  AREA_EXPENSE_TARGETS,
 } from "./v2-navigation";
 
 describe("NAV_ITEMS", () => {
@@ -144,7 +145,26 @@ describe("navKeyForPath with an area", () => {
     // The area only steers the shared group and trade screens.
     ["/eggs/collections", "meat", "eggs"],
     ["/mother-hens", "meat", "hens"],
+    // #192: the expense form opened from any area, Perekšlės included.
+    ["/expenses/new", "eggs", "eggs"],
+    ["/expenses/new", "hens", "hens"],
+    ["/expenses/new", "incubation", "incubation"],
+    ["/expenses/new", "meat", "meat"],
+    ["/expenses/new", null, "overview"],
+    ["/expenses/new", "shared", "overview"],
+    ["/expenses", "toString", "overview"],
   ] as const)("%s?area=%s → %s", (path, area, key) => {
     expect(navKeyForPath(path, area)).toBe(key);
+  });
+});
+
+describe("AREA_EXPENSE_TARGETS", () => {
+  it.each([
+    ["eggs", "birdGroupId", "Dedeklių grupė (neprivaloma)"],
+    ["hens", "motherHenId", "Perekšlė (neprivaloma)"],
+    ["incubation", "incubationCycleId", "Perinimo ciklas (neprivaloma)"],
+    ["meat", "birdGroupId", "Mėsinių grupė (neprivaloma)"],
+  ] as const)("%s → %s labelled %s", (area, field, label) => {
+    expect(AREA_EXPENSE_TARGETS[area]).toEqual({ field, label });
   });
 });

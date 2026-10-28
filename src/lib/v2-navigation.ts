@@ -127,6 +127,11 @@ export function navKeyForPath(pathname: string, areaParam?: string | null): NavK
   if (groupArea && AREA_AWARE_PREFIXES.some((p) => underPrefix(pathname, p))) {
     return groupAreaSlug(groupArea);
   }
+  // Farm-wide record screens opened from inside an area (#192): any area,
+  // Perekšlės included, since expenses can belong to every one of them.
+  if (areaParam && isAreaSlug(areaParam) && underPrefix(pathname, "/expenses")) {
+    return areaParam;
+  }
 
   let best: { length: number; key: NavKey | null } | null = null;
   for (const [prefix, key] of ROUTE_AREAS) {
@@ -158,6 +163,19 @@ export const AREA_RECORD_LINKS: Record<AreaSlug, readonly { href: string; label:
     { href: "/birds/sales", label: "Paukščių pardavimai" },
   ],
 };
+
+export type ExpenseTargetField = "birdGroupId" | "motherHenId" | "incubationCycleId";
+
+// What an area's expense can optionally point at (#192, V2ExpenseForm): the
+// field it is stored in and the field's label. The server checks that the
+// target belongs to the farm and to the expense's area (#179).
+export const AREA_EXPENSE_TARGETS: Record<AreaSlug, { field: ExpenseTargetField; label: string }> =
+  {
+    eggs: { field: "birdGroupId", label: "Dedeklių grupė (neprivaloma)" },
+    hens: { field: "motherHenId", label: "Perekšlė (neprivaloma)" },
+    incubation: { field: "incubationCycleId", label: "Perinimo ciklas (neprivaloma)" },
+    meat: { field: "birdGroupId", label: "Mėsinių grupė (neprivaloma)" },
+  };
 
 // Farm-wide V1 screen each not-yet-built area tab points to meanwhile.
 export const AREA_TAB_FALLBACK: Record<

@@ -83,7 +83,11 @@ test("a group's page keeps its own area lit, however it was opened", async ({ pa
   // From the unfiltered list…
   await page.goto("/bird-groups");
   await page.getByText(names.meat).click();
-  await expect(page).toHaveURL(new RegExp(`/bird-groups/${ids.meat}\\?area=meat$`));
+  // A client navigation to a page that may still be compiling (dev server) or
+  // waking a cold deployment: allow well past the 5s default.
+  await expect(page).toHaveURL(new RegExp(`/bird-groups/${ids.meat}\\?area=meat$`), {
+    timeout: 15_000,
+  });
   await expectActive(page, "Mėsa");
 
   // …and from a bare link (a save redirect, an old bookmark).
