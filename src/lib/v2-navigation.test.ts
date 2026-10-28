@@ -1,0 +1,116 @@
+import { describe, it, expect } from "vitest";
+import {
+  AREA_TABS,
+  NAV_ITEMS,
+  areaTabHref,
+  isAreaSlug,
+  navKeyForPath,
+  AREA_RECORD_LINKS,
+} from "./v2-navigation";
+
+describe("NAV_ITEMS", () => {
+  it("lists the five V2 bar items in design order", () => {
+    expect(NAV_ITEMS.map((i) => i.label)).toEqual([
+      "Apžvalga",
+      "Kiaušiniai",
+      "Perekšlės",
+      "Perinimas",
+      "Mėsa",
+    ]);
+  });
+
+  it("points each item at its own page", () => {
+    expect(NAV_ITEMS.map((i) => i.href)).toEqual([
+      "/",
+      "/areas/eggs",
+      "/areas/hens",
+      "/areas/incubation",
+      "/areas/meat",
+    ]);
+  });
+});
+
+describe("AREA_TABS / areaTabHref", () => {
+  it("has the four area tabs in design order", () => {
+    expect(AREA_TABS.map((t) => t.label)).toEqual([
+      "Apžvalga",
+      "Išlaidos",
+      "Nuostoliai",
+      "Finansai",
+    ]);
+  });
+
+  it("builds tab URLs under the area", () => {
+    expect(AREA_TABS.map((t) => areaTabHref("meat", t.segment))).toEqual([
+      "/areas/meat",
+      "/areas/meat/expenses",
+      "/areas/meat/losses",
+      "/areas/meat/finance",
+    ]);
+  });
+});
+
+describe("isAreaSlug", () => {
+  it("accepts the four area slugs", () => {
+    for (const slug of ["eggs", "hens", "incubation", "meat"]) expect(isAreaSlug(slug)).toBe(true);
+  });
+
+  it("rejects anything else, including inherited object keys", () => {
+    for (const slug of ["EGGS", "inc", "shared", "", "toString", "__proto__"]) {
+      expect(isAreaSlug(slug)).toBe(false);
+    }
+  });
+});
+
+describe("navKeyForPath", () => {
+  it.each([
+    ["/", "overview"],
+    ["/areas/eggs", "eggs"],
+    ["/areas/hens/expenses", "hens"],
+    ["/areas/incubation/finance", "incubation"],
+    ["/areas/meat/losses", "meat"],
+    ["/eggs/collections", "eggs"],
+    ["/eggs/collections/new", "eggs"],
+    ["/birds/purchases/abc/edit", "eggs"],
+    ["/birds/sales", "eggs"],
+    ["/bird-groups/g1", "eggs"],
+    ["/breeds/new", "eggs"],
+    ["/mother-hens/h1/logs/new", "hens"],
+    ["/incubation/c1/finish", "incubation"],
+    ["/birds/consumptions/new", "meat"],
+    ["/expenses", "overview"],
+    ["/losses/new", "overview"],
+    ["/finance/profit-loss", "overview"],
+    ["/birds", "overview"],
+  ] as const)("%s → %s", (path, key) => {
+    expect(navKeyForPath(path)).toBe(key);
+  });
+
+  it.each(["/profile", "/farms/new", "/areas/unknown", "/eggs-x", "/birdsong", "/mother-hensx"])(
+    "%s highlights nothing",
+    (path) => {
+      expect(navKeyForPath(path)).toBeNull();
+    },
+  );
+});
+
+describe("AREA_RECORD_LINKS", () => {
+  it("links every area to at least one existing screen", () => {
+    for (const links of Object.values(AREA_RECORD_LINKS)) {
+      expect(links.length).toBeGreaterThan(0);
+      for (const { href } of links) expect(href.startsWith("/")).toBe(true);
+    }
+  });
+
+  it("keeps each link inside the area it is listed under", () => {
+    for (const [area, links] of Object.entries(AREA_RECORD_LINKS)) {
+      for (const { href } of links) {
+        // Group lists are shared until groups are split by area (#186).
+        if (href === "/bird-groups") continue;
+        // Meat-bird sales use the same V1 sales list as laying birds for now.
+        if (area === "meat" && href === "/birds/sales") continue;
+        expect(navKeyForPath(href)).toBe(area);
+      }
+    }
+  });
+});
