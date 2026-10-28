@@ -6,17 +6,19 @@ import type { AreaSlug } from "@/lib/v2-navigation";
 export type TargetOption = { id: string; label: string };
 
 /**
- * What a new expense in an area can point at (#192): only the active farm's
- * current targets in that area, as select options.
+ * What a new expense (#192) or loss (#195) in an area can point at: only the
+ * active farm's current targets in that area, as select options.
  *
- * "Current" means it can still incur costs: a group with birds in it, a living
- * mother hen, an incubation cycle whose chick tracking is not finished. The
- * server accepts any target of the farm and area (#179) — this only keeps
- * defunct ones out of the list. Lean selects: just what the labels need.
+ * "Current" means it can still incur costs or losses: a group with birds in
+ * it, a living mother hen, an incubation cycle whose chick tracking is not
+ * finished — and, for a loss, one that has hatched chicks to lose. The server
+ * accepts any target of the farm and area (#179) — this only keeps defunct ones
+ * out of the list. Lean selects: just what the labels need.
  */
-export async function listExpenseTargetOptions(
+export async function listAreaTargetOptions(
   farmId: string,
   area: AreaSlug,
+  purpose: "expense" | "loss",
 ): Promise<TargetOption[]> {
   switch (area) {
     case "eggs":
@@ -39,7 +41,11 @@ export async function listExpenseTargetOptions(
     case "incubation":
       return (
         await prisma.incubationCycle.findMany({
-          where: { farmId, growthCompletedAt: null },
+          where: {
+            farmId,
+            growthCompletedAt: null,
+            ...(purpose === "loss" ? { hatchedCount: { not: null } } : {}),
+          },
           select: { id: true, name: true, startDate: true },
           orderBy: { startDate: "desc" },
         })

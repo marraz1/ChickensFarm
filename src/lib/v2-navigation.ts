@@ -124,6 +124,8 @@ const AREA_PARAM_SCREENS: readonly { match: RegExp; accepts: "group" | "any" }[]
   { match: /^\/birds\/sales(\/|$)/, accepts: "group" },
   { match: /^\/expenses\/new$/, accepts: "any" },
   { match: /^\/expenses\/[^/]+\/edit$/, accepts: "any" },
+  { match: /^\/losses\/new$/, accepts: "any" },
+  { match: /^\/losses\/[^/]+\/edit$/, accepts: "any" },
 ];
 
 function areaFromParam(areaParam: string | null | undefined, accepts: "group" | "any") {
@@ -186,6 +188,50 @@ export const AREA_EXPENSE_TARGETS: Record<AreaSlug, { field: ExpenseTargetField;
     incubation: { field: "incubationCycleId", label: "Perinimo ciklas (neprivaloma)" },
     meat: { field: "birdGroupId", label: "Mėsinių grupė (neprivaloma)" },
   };
+
+const GROUP_LOSS_HINT = "Grupės kiekis bus sumažintas ir įrašytas į istoriją.";
+
+// What an area's loss is recorded against (#195, V2LossForm): required, and
+// what happens to it is spelled out under the field.
+export const AREA_LOSS_TARGETS: Record<
+  AreaSlug,
+  {
+    field: ExpenseTargetField;
+    label: string;
+    hint: string;
+    quantityLabel: string;
+    requiredMessage: string;
+  }
+> = {
+  eggs: {
+    field: "birdGroupId",
+    label: "Dedeklių grupė",
+    hint: GROUP_LOSS_HINT,
+    quantityLabel: "Kiekis",
+    requiredMessage: "Pasirinkite dedeklių grupę",
+  },
+  hens: {
+    field: "motherHenId",
+    label: "Perekšlė",
+    hint: "Perekšlė bus pažymėta kaip nugaišusi.",
+    quantityLabel: "Kiekis",
+    requiredMessage: "Pasirinkite perekšlę",
+  },
+  incubation: {
+    field: "incubationCycleId",
+    label: "Perinimo ciklas",
+    hint: "Gyvų jauniklių skaičius cikle bus sumažintas.",
+    quantityLabel: "Jauniklių",
+    requiredMessage: "Pasirinkite perinimo ciklą",
+  },
+  meat: {
+    field: "birdGroupId",
+    label: "Mėsinių grupė",
+    hint: GROUP_LOSS_HINT,
+    quantityLabel: "Kiekis",
+    requiredMessage: "Pasirinkite mėsinių grupę",
+  },
+};
 
 // Farm-wide V1 screen each not-yet-built area tab points to meanwhile
 // (Išlaidos has its own list since #194).

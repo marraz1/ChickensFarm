@@ -1,7 +1,7 @@
 import { requireActiveFarm } from "@/lib/session";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExpenseForm, type ExpenseAreaContext } from "@/components/forms/expense-form";
-import { listExpenseTargetOptions } from "@/lib/services/expense-targets";
+import { listAreaTargetOptions } from "@/lib/services/area-targets";
 import { farmAreaLabels } from "@/lib/labels";
 import { AREA_EXPENSE_TARGETS, AREA_SLUGS, isAreaSlug } from "@/lib/v2-navigation";
 
@@ -32,7 +32,7 @@ export default async function NewExpensePage({
     area: AREA_SLUGS[area],
     areaLabel: farmAreaLabels[AREA_SLUGS[area]],
     changeHref: "/expenses/new",
-    target: { ...target, options: await listExpenseTargetOptions(farm.id, area) },
+    target: { ...target, options: await listAreaTargetOptions(farm.id, area, "expense") },
   };
 
   return (

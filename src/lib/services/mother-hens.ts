@@ -51,13 +51,18 @@ export async function createMotherHen(farmId: string, input: CreateMotherHenInpu
 // still on yesterday and would reject a death recorded "today".
 const FARM_TIME_ZONE = "Europe/Vilnius";
 
+/** Refuses a death date after the farm's today ("YYYY-MM-DD"). */
+export function assertDiedAtNotFuture(diedAt: string) {
+  if (diedAt > getLocalNow(new Date(), FARM_TIME_ZONE).date) {
+    throw new ValidationError("Kritimo data negali būti ateityje");
+  }
+}
+
 // undefined → leave unchanged; "" or null → alive; "YYYY-MM-DD" → died that day.
 function parseDiedAt(diedAt: string | null | undefined): Date | null | undefined {
   if (diedAt === undefined) return undefined;
   if (!diedAt) return null;
-  if (diedAt > getLocalNow(new Date(), FARM_TIME_ZONE).date) {
-    throw new ValidationError("Kritimo data negali būti ateityje");
-  }
+  assertDiedAtNotFuture(diedAt);
   return new Date(diedAt);
 }
 
