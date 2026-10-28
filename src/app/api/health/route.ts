@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isEmailConfigured } from "@/lib/email";
 import { pushPublicKey, vapidSubject } from "@/lib/push";
 import { evaluateDue } from "@/lib/notification-schedule";
+import { appStage } from "@/lib/app-stage";
 
 // Nothing here may be cached: a cached "ok" from a previous deployment is worse
 // than no health check at all.
@@ -143,6 +144,8 @@ export async function GET(req: Request) {
       // the difference between "a deploy succeeded" and "the intended version
       // is being served".
       version: process.env.APP_VERSION ?? null,
+      // "beta" on the V2 beta (#181); null on V1 and on V2 after cutover.
+      stage: appStage(),
       commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
       environment: process.env.VERCEL_ENV ?? null,
       region: process.env.VERCEL_REGION ?? null,

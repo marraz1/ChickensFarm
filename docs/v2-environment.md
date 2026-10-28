@@ -64,8 +64,14 @@ Steps 1–5 are done by hand in the Neon, Vercel and GitHub dashboards.
    | `SENTRY_ENVIRONMENT` / `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | `v2-beta`                                        | `v2-preview`            |
    | `RESEND_API_KEY` / `EMAIL_FROM`                         | same as V1 (password reset)                      | same                    |
    | `CRON_SECRET`                                           | **unset** — no reminders from V2 during the beta | unset                   |
+   | `APP_STAGE`                                             | `beta`                                           | `beta`                  |
 
    Never paste a V1 database URL into this project.
+
+   `APP_STAGE=beta` shows the banner "Beta: duomenys gali būti perrašyti" on every page,
+   labels the version on the profile screen "V2 beta", and makes `/api/cron/reminders`
+   answer 503 even if a `CRON_SECRET` is ever set (#181). **Remove it at cutover (#182)**,
+   when V2 becomes the production app.
 
 5. **Settings → Deployment Protection → Protection Bypass for Automation:** generate a secret
    and store it as the repository secret `VERCEL_AUTOMATION_BYPASS_SECRET`. Without it CI's

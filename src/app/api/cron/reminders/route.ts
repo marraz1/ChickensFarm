@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { runReminderBatch } from "@/lib/services/reminders";
+import { appStage } from "@/lib/app-stage";
 
 export const maxDuration = 60;
 
@@ -18,6 +19,12 @@ function isAuthorized(req: Request): boolean {
 // a prefetch or an intermediary caching it. Reached without a session because
 // middleware.ts excludes /api/cron — the bearer check above is the only gate.
 export async function POST(req: Request) {
+  // The V2 beta never sends reminders: V1 already does, from the same users'
+  // settings, so a beta run would mail everyone twice (#181). Checked first,
+  // so it holds even if a CRON_SECRET is configured on the beta by mistake.
+  if (appStage() === "beta") {
+    return NextResponse.json({ error: "Reminders are disabled in the V2 beta" }, { status: 503 });
+  }
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 503 });
   }

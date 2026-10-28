@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { formatDateLT } from "@/lib/format";
+import { appVersionLabel } from "@/lib/app-stage";
 import { Tag, Settings, ChevronRight, User, Bell, MessageSquare } from "lucide-react";
 
 export default async function ProfilePage() {
@@ -64,7 +65,7 @@ export default async function ProfilePage() {
             an old build long after a deploy, and this is the quickest way to
             tell from the device itself. */}
         <p className="pb-2 text-center text-xs text-muted-foreground">
-          Versija {process.env.APP_VERSION ?? "—"}
+          Versija {appVersionLabel()}
         </p>
       </div>
     </div>
