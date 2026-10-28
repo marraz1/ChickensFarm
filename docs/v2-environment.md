@@ -118,6 +118,69 @@ a reset discards preview's data, including the e2e user.
 - Bring V1 fixes across regularly: `git checkout v2/develop && git merge origin/main` (via a
   PR). V1 migrations then apply to V2 on the next beta deploy.
 
+## Copying V1 data into V2 (#180)
+
+`scripts/v2-migrate/` copies every V1 farm, user, membership and record into a V2 branch,
+keeping the ids, so V1 logins and photo links keep working. It then applies the farm-area
+backfill from #179:
+
+- a cycle's hatched CHICK group → Perinimas;
+- a group with meat use → Mėsa;
+- other groups → Kiaušiniai;
+- every expense → Bendra;
+- each loss → its group's area.
+
+Push subscriptions, password-reset tokens and Prisma's migration history are not copied.
+
+**A real run empties the target branch and reloads it.** Anything entered in V2 since the
+last run is lost. It runs in one transaction, which commits only when the copy matches V1:
+
+- row counts and an md5 of every copied column, per table;
+- per-farm row counts;
+- per-farm all-time income and expenses;
+- per-farm bird and egg stock.
+
+Any difference rolls V2 back unchanged and exits 1. Running it twice gives the same data as
+running it once.
+
+**Run it when nobody is using V2.** Emptying the tables locks every one of them until the
+transaction ends, so V2 requests wait for the whole copy and check, which takes seconds at
+today's size.
+
+The JSON report and the job summary list table names, row counts and farm ids. On a
+mismatch they also show the differing values, money amounts included, so treat a failed
+run's report as farm data.
+
+### From GitHub (normal)
+
+**Actions → V2 data copy → Run workflow:**
+
+- `target`: `production` by default, or `preview`.
+- `dry_run`: on by default. A dry run reads both sides and prints the plan; it writes
+  nothing.
+
+Needs the repository secret **`NEON_API_KEY`** (Neon console → Account settings → API
+keys). The workflow:
+
+1. Branches V1 production (copy-on-write).
+2. Creates a SELECT-only role on that throwaway branch with plain SQL. Roles created through
+   the Neon API join `neon_superuser` and can write, so they are not used.
+3. Runs the copy, and uploads `report.json`.
+4. Deletes the branch.
+
+V1 production is never connected to.
+
+### Locally
+
+```bash
+V1_DATABASE_URL="<read-only role on a V1 snapshot branch>" \
+V2_DATABASE_URL="<V2 target branch>" \
+npm run v2:migrate -- --dry-run --report report.json
+```
+
+Drop `--dry-run` to load. After loading `preview`, re-seed the e2e user (step 4 above),
+because the copy replaces all users.
+
 ## Checking the separation
 
 - V1 `GET /api/health` (with `CRON_SECRET`) reports the same version, commit and migrations
