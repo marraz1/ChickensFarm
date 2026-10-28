@@ -29,7 +29,11 @@ import type { FarmArea } from "@/generated/prisma/client";
 export type ExpenseAreaContext = {
   area: FarmArea;
   areaLabel: string;
-  /** The general form, where the area can be chosen ("Keisti"). */
+  /**
+   * "Keisti": the general expense form. Choosing another area there arrives
+   * with #193 (its "Sritis" chooser); until then it is the V1 form, which
+   * files an expense without a target under "Bendra".
+   */
   changeHref: string;
   target: {
     field: ExpenseTargetField;
@@ -140,7 +144,8 @@ export function ExpenseForm({
         </Select>
       </div>
 
-      {areaContext && targetField && (
+      {/* Hidden when the area has nothing to pick (as the loss form does). */}
+      {areaContext && targetField && areaContext.target.options.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="target">{areaContext.target.label}</Label>
           <Select

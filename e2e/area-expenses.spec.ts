@@ -10,15 +10,16 @@ test.skip(!email || !password, "E2E_USER_EMAIL / E2E_USER_PASSWORD not set");
 // Signed in once by e2e/auth.setup.ts; logins are rate-limited.
 test.use({ storageState: AUTH_FILE });
 
-type Created = { breedId?: string; groupIds: string[]; expenseIds: string[] };
-let created: Created = { groupIds: [], expenseIds: [] };
+type Created = { breedId?: string; groupIds: string[]; expenseIds: string[]; henIds: string[] };
+let created: Created = { groupIds: [], expenseIds: [], henIds: [] };
 
 test.beforeEach(() => {
-  created = { groupIds: [], expenseIds: [] };
+  created = { groupIds: [], expenseIds: [], henIds: [] };
 });
 
 test.afterEach(async ({ page }) => {
   for (const id of created.expenseIds) await page.request.delete(`/api/expenses/${id}`);
+  for (const id of created.henIds) await page.request.delete(`/api/mother-hens/${id}`);
   for (const id of created.groupIds) await page.request.delete(`/api/bird-groups/${id}`);
   if (created.breedId) await page.request.delete(`/api/breeds/${created.breedId}`);
 });
@@ -31,14 +32,14 @@ async function createGroups(page: Page) {
   expect(breed.ok()).toBe(true);
   created.breedId = (await breed.json()).id as string;
 
-  const make = async (name: string, area: "EGGS" | "MEAT") => {
+  const make = async (name: string, area: "EGGS" | "MEAT", quantity = 3) => {
     const res = await page.request.post("/api/bird-groups", {
       data: {
         breedId: created.breedId,
         name,
         sex: "UNKNOWN",
         category: area === "MEAT" ? "COCKEREL" : "LAYER",
-        quantity: 3,
+        quantity,
         birthOrAcquiredDate: "2026-01-01",
         area,
       },
@@ -48,11 +49,14 @@ async function createGroups(page: Page) {
     created.groupIds.push(id);
     return id;
   };
-  const names = { eggs: `Dedeklės ${tag}`, meat: `Mėsiniai ${tag}` };
-  return {
-    names,
-    ids: { eggs: await make(names.eggs, "EGGS"), meat: await make(names.meat, "MEAT") },
+  const names = {
+    eggs: `Dedeklės ${tag}`,
+    meat: `Mėsiniai ${tag}`,
+    emptyEggs: `Tuščia ${tag}`,
   };
+  const ids = { eggs: await make(names.eggs, "EGGS"), meat: await make(names.meat, "MEAT") };
+  await make(names.emptyEggs, "EGGS", 0); // sold out: not a current target
+  return { names, ids };
 }
 
 const areaBar = (page: Page) => page.getByRole("navigation", { name: "Ūkio sritys" });
@@ -81,11 +85,21 @@ test("Išlaida on an area's Išlaidos tab opens the area expense form", async ({
   );
 });
 
+// The target field only shows when the area has something to pick, so this
+// creates a group per area and a mother hen. Incubation cycles have no delete
+// endpoint, so "Perinimo ciklas (neprivaloma)" is pinned by the
+// AREA_EXPENSE_TARGETS unit test instead of leaving test cycles behind.
 test("each area labels its target", async ({ page }) => {
+  await createGroups(page);
+  const hen = await page.request.post("/api/mother-hens", {
+    data: { name: `E2E perekšlė ${Date.now()}` },
+  });
+  expect(hen.ok()).toBe(true);
+  created.henIds.push((await hen.json()).id as string);
+
   for (const [area, label] of [
     ["eggs", "Dedeklių grupė (neprivaloma)"],
     ["hens", "Perekšlė (neprivaloma)"],
-    ["incubation", "Perinimo ciklas (neprivaloma)"],
     ["meat", "Mėsinių grupė (neprivaloma)"],
   ] as const) {
     await page.goto(`/expenses/new?area=${area}`);
@@ -104,9 +118,10 @@ test("an Eggs expense on an Eggs group is saved and returns to the area", async 
   const { names, ids } = await createGroups(page);
   await page.goto("/expenses/new?area=eggs");
 
-  // Only this area's groups are offered.
+  // Only this area's current groups are offered: not Mėsa's, not a sold-out one.
   await page.getByLabel("Dedeklių grupė (neprivaloma)").click();
   await expect(page.getByRole("option", { name: new RegExp(names.meat) })).toHaveCount(0);
+  await expect(page.getByRole("option", { name: new RegExp(names.emptyEggs) })).toHaveCount(0);
   await page.getByRole("option", { name: new RegExp(names.eggs) }).click();
 
   const description = `E2E išlaida ${Date.now()}`;

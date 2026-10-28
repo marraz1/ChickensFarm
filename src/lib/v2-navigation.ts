@@ -112,9 +112,23 @@ export function groupAreaShortLabel(area: GroupArea): string {
   return NAV_ITEMS.find((item) => item.key === slug)!.label;
 }
 
-// Group and trade screens are shared by the areas; `?area=` says which one
-// the farmer came from, so the bar keeps that area highlighted.
-const AREA_AWARE_PREFIXES = ["/bird-groups", "/birds/purchases", "/birds/sales"];
+// Screens shared by the areas, where `?area=` says which one the farmer came
+// from, so the bar keeps that area highlighted. `group` screens accept the
+// areas a bird group can live in (#186); `any` screens accept every area,
+// Perekšlės included (#192). Only screens that actually work in that area are
+// listed — the farm-wide expense list is not filtered, so it is not here.
+const AREA_PARAM_SCREENS: readonly { prefix: string; accepts: "group" | "any" }[] = [
+  { prefix: "/bird-groups", accepts: "group" },
+  { prefix: "/birds/purchases", accepts: "group" },
+  { prefix: "/birds/sales", accepts: "group" },
+  { prefix: "/expenses/new", accepts: "any" },
+];
+
+function areaFromParam(areaParam: string | null | undefined, accepts: "group" | "any") {
+  if (accepts === "any") return areaParam && isAreaSlug(areaParam) ? areaParam : null;
+  const groupArea = groupAreaFromParam(areaParam);
+  return groupArea ? groupAreaSlug(groupArea) : null;
+}
 
 /** The bottom-bar item to highlight for a URL, or null when none applies. */
 export function navKeyForPath(pathname: string, areaParam?: string | null): NavKey | null {
@@ -123,15 +137,9 @@ export function navKeyForPath(pathname: string, areaParam?: string | null): NavK
   const area = /^\/areas\/([^/]+)/.exec(pathname)?.[1];
   if (area !== undefined) return isAreaSlug(area) ? area : null;
 
-  const groupArea = groupAreaFromParam(areaParam);
-  if (groupArea && AREA_AWARE_PREFIXES.some((p) => underPrefix(pathname, p))) {
-    return groupAreaSlug(groupArea);
-  }
-  // Farm-wide record screens opened from inside an area (#192): any area,
-  // Perekšlės included, since expenses can belong to every one of them.
-  if (areaParam && isAreaSlug(areaParam) && underPrefix(pathname, "/expenses")) {
-    return areaParam;
-  }
+  const screen = AREA_PARAM_SCREENS.find((s) => underPrefix(pathname, s.prefix));
+  const fromParam = screen ? areaFromParam(areaParam, screen.accepts) : null;
+  if (fromParam) return fromParam;
 
   let best: { length: number; key: NavKey | null } | null = null;
   for (const [prefix, key] of ROUTE_AREAS) {

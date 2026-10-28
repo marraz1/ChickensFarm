@@ -107,6 +107,7 @@ import {
   updateMotherHen,
 } from "@/lib/services/mother-hens";
 import { finalizeHatch, getIncubationCycle, recordCandling } from "@/lib/services/incubation";
+import { listExpenseTargetOptions } from "@/lib/services/expense-targets";
 
 const FARM_A_ID = "farm-a";
 const FARM_B_ID = "farm-b";
@@ -703,6 +704,48 @@ describe("incubation cycles", () => {
 // #179: an expense or a loss can point at a bird group, a mother hen or an
 // incubation cycle. Each of those references must be checked against the
 // caller's farm, exactly like the birdGroupId links above.
+// #192: the target choices on an area's expense form only ever list the
+// active farm's own, current targets. (Bird groups are covered end to end:
+// the in-memory fake returns rows without their breed.)
+describe("expense target options", () => {
+  beforeEach(async () => {
+    await seedTwoFarms();
+    // The fake applies no column defaults, so the "current" markers are explicit.
+    for (const [id, farmId, diedAt] of [
+      ["hen-a", FARM_A_ID, null],
+      ["hen-a-dead", FARM_A_ID, new Date("2025-03-01")],
+      ["hen-b", FARM_B_ID, null],
+    ] as const) {
+      await fakePrisma.motherHen.create({
+        data: { id, farmId, birdGroupId: null, name: id, diedAt },
+      });
+    }
+    for (const [id, farmId, growthCompletedAt] of [
+      ["cycle-a", FARM_A_ID, null],
+      ["cycle-a-done", FARM_A_ID, new Date("2025-03-01")],
+      ["cycle-b", FARM_B_ID, null],
+    ] as const) {
+      await fakePrisma.incubationCycle.create({
+        data: { id, farmId, name: id, startDate: new Date("2025-01-01"), growthCompletedAt },
+      });
+    }
+  });
+
+  it("lists only this farm's living mother hens", async () => {
+    const ids = (await listExpenseTargetOptions(FARM_A_ID, "hens")).map((o) => o.id);
+    expect(ids).toEqual(["hen-a"]);
+    const other = (await listExpenseTargetOptions(FARM_B_ID, "hens")).map((o) => o.id);
+    expect(other).toEqual(["hen-b"]);
+  });
+
+  it("lists only this farm's incubation cycles still being tracked", async () => {
+    const ids = (await listExpenseTargetOptions(FARM_A_ID, "incubation")).map((o) => o.id);
+    expect(ids).toEqual(["cycle-a"]);
+    const other = (await listExpenseTargetOptions(FARM_B_ID, "incubation")).map((o) => o.id);
+    expect(other).toEqual(["cycle-b"]);
+  });
+});
+
 describe("expense and loss targets (farm areas)", () => {
   beforeEach(async () => {
     await seedTwoFarms();

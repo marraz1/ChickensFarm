@@ -1,14 +1,12 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
 import { AreaTabPending } from "@/components/v2/area-tab-pending";
-import { isAreaSlug } from "@/lib/v2-navigation";
 
 // The area's Išlaidos tab. "Išlaida" opens the area expense form (#192); the
 // list itself comes with #194, until then the body links to the farm-wide list.
+// The area layout has already turned an unknown slug into a 404.
 export default async function AreaExpensesPage({ params }: { params: Promise<{ area: string }> }) {
   const { area } = await params;
-  if (!isAreaSlug(area)) notFound();
 
   return (
     <div className="flex flex-col gap-3">
