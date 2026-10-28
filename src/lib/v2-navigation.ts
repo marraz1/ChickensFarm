@@ -6,6 +6,7 @@
 // their own URLs and are mapped onto an area here. Pure on purpose (no React,
 // no runtime imports), so it is unit-tested without a DOM.
 import type { FarmArea } from "@/generated/prisma/client";
+import type { BirdGroupArea } from "@/lib/validation/farm-areas";
 
 export const AREA_SLUGS = {
   eggs: "EGGS",
@@ -71,8 +72,13 @@ function underPrefix(pathname: string, prefix: string): boolean {
 
 // Areas a bird group can live in, by their URL slug (#186). A group is never
 // in Perekšlės (a mother hen is an individual bird), so "hens" is not one.
-const GROUP_AREA_SLUGS = { eggs: "EGGS", meat: "MEAT", incubation: "INC" } as const;
-export type GroupArea = (typeof GROUP_AREA_SLUGS)[keyof typeof GROUP_AREA_SLUGS];
+const GROUP_AREA_SLUGS = {
+  eggs: "EGGS",
+  meat: "MEAT",
+  incubation: "INC",
+} as const satisfies Record<string, BirdGroupArea>;
+// The same union as the validation enum (one source of truth for group areas).
+export type GroupArea = BirdGroupArea;
 export type GroupAreaSlug = keyof typeof GROUP_AREA_SLUGS;
 
 /** `?area=` on group and trade screens → the group area, or null for "all". */
@@ -81,10 +87,29 @@ export function groupAreaFromParam(value: string | string[] | undefined | null):
   return GROUP_AREA_SLUGS[value as GroupAreaSlug];
 }
 
+/**
+ * A stored group's area as a GroupArea. The bird_groups_area_check constraint
+ * keeps it to EGGS, MEAT or INC; anything else would read as Kiaušiniai rather
+ * than produce an `?area=undefined` link.
+ */
+export function toGroupArea(area: string): GroupArea {
+  return area === "MEAT" || area === "INC" ? area : "EGGS";
+}
+
+const GROUP_AREA_TO_SLUG: Record<GroupArea, GroupAreaSlug> = {
+  EGGS: "eggs",
+  MEAT: "meat",
+  INC: "incubation",
+};
+
 export function groupAreaSlug(area: GroupArea): GroupAreaSlug {
-  return (Object.keys(GROUP_AREA_SLUGS) as GroupAreaSlug[]).find(
-    (slug) => GROUP_AREA_SLUGS[slug] === area,
-  )!;
+  return GROUP_AREA_TO_SLUG[area];
+}
+
+/** Short area name as the bottom bar shows it ("Kiaušiniai", "Mėsa", "Perinimas"). */
+export function groupAreaShortLabel(area: GroupArea): string {
+  const slug = groupAreaSlug(area);
+  return NAV_ITEMS.find((item) => item.key === slug)!.label;
 }
 
 // Group and trade screens are shared by the areas; `?area=` says which one

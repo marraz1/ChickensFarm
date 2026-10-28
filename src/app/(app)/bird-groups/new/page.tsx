@@ -3,7 +3,7 @@ import { listBreeds } from "@/lib/services/breeds";
 import { listBirdGroups } from "@/lib/services/bird-groups";
 import { PageHeader } from "@/components/layout/page-header";
 import { BirdGroupForm } from "@/components/forms/bird-group-form";
-import { groupAreaFromParam, groupAreaSlug } from "@/lib/v2-navigation";
+import { groupAreaFromParam, groupAreaSlug, toGroupArea } from "@/lib/v2-navigation";
 
 export default async function NewBirdGroupPage({
   searchParams,
@@ -14,7 +14,9 @@ export default async function NewBirdGroupPage({
   // Perinimas is never preset: hatched groups come from finishing a hatch.
   const preset = groupAreaFromParam((await searchParams).area);
   const area = preset === "INC" ? null : preset;
-  const listPath = area ? `/bird-groups?area=${groupAreaSlug(area)}` : "/bird-groups";
+  // Back and after-save go to the list the farmer came from, Jauniklių grupės
+  // included, so the bar keeps the same area lit.
+  const listPath = preset ? `/bird-groups?area=${groupAreaSlug(preset)}` : "/bird-groups";
   const { farm } = await requireActiveFarm();
   const [breeds, groups] = await Promise.all([listBreeds(farm.id), listBirdGroups(farm.id)]);
 
@@ -29,6 +31,7 @@ export default async function NewBirdGroupPage({
             breedId: g.breedId,
             sex: g.sex,
             category: g.category,
+            area: toGroupArea(g.area),
           }))}
           defaultValues={area ? { area } : undefined}
           onSuccessPath={listPath}

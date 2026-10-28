@@ -5,7 +5,13 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { birdTypeLabels, sexLabels, birdCategoryLabels } from "@/lib/labels";
 import { formatDateLT } from "@/lib/format";
-import { groupAreaFromParam, groupAreaSlug, type GroupArea } from "@/lib/v2-navigation";
+import {
+  groupAreaFromParam,
+  groupAreaShortLabel,
+  groupAreaSlug,
+  toGroupArea,
+  type GroupArea,
+} from "@/lib/v2-navigation";
 import { Plus } from "lucide-react";
 
 function computeAge(birthOrAcquiredDate: Date): string {
@@ -23,13 +29,6 @@ const AREA_LIST_TITLES: Record<GroupArea, string> = {
   EGGS: "Dedeklių grupės",
   MEAT: "Mėsinių grupės",
   INC: "Jauniklių grupės",
-};
-
-// Short area tag on each card of the unfiltered list.
-const AREA_TAGS: Record<GroupArea, string> = {
-  EGGS: "Kiaušiniai",
-  MEAT: "Mėsa",
-  INC: "Perinimas",
 };
 
 export default async function BirdGroupsPage({
@@ -106,7 +105,12 @@ export default async function BirdGroupsPage({
           </p>
         )}
         {groups.map((group) => (
-          <Link key={group.id} href={`/bird-groups/${group.id}${query}`}>
+          // Each card opens with its own group's area, so the bar is right even
+          // from the unfiltered list.
+          <Link
+            key={group.id}
+            href={`/bird-groups/${group.id}?area=${groupAreaSlug(toGroupArea(group.area))}`}
+          >
             <Card className="p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium">{group.name || group.breed.name}</p>
@@ -114,7 +118,7 @@ export default async function BirdGroupsPage({
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">
                 {group.breed.name} · {birdTypeLabels[group.breed.birdType]}
-                {!area && ` · ${AREA_TAGS[group.area as GroupArea]}`}
+                {!area && ` · ${groupAreaShortLabel(toGroupArea(group.area))}`}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {group.category !== "OTHER" ? `${birdCategoryLabels[group.category]} · ` : ""}

@@ -7,6 +7,7 @@ export const farmAreaEnum = z.enum(["EGGS", "HENS", "INC", "MEAT", "SHARED"]);
 // individual bird) and SHARED is for costs only; the bird_groups_area_check
 // constraint enforces the same rule in the database.
 export const birdGroupAreaEnum = z.enum(["EGGS", "MEAT", "INC"]);
+export type BirdGroupArea = z.infer<typeof birdGroupAreaEnum>;
 
 // An expense's or loss's optional target: a bird group, a mother hen or an
 // incubation cycle. On create, a missing or empty id means "none". On update,

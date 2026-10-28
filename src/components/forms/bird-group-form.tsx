@@ -20,11 +20,17 @@ import { birdGroupAreaEnum } from "@/lib/validation/farm-areas";
 import { sexLabels, birdCategoryLabels, farmAreaLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import type { GroupArea } from "@/lib/v2-navigation";
 import type { Sex, BirdCategory } from "@/generated/prisma/client";
 
 type Breed = { id: string; name: string };
-type ExistingGroup = { id: string; breedId: string; sex: Sex; category: BirdCategory };
-type GroupArea = "EGGS" | "MEAT" | "INC";
+type ExistingGroup = {
+  id: string;
+  breedId: string;
+  sex: Sex;
+  category: BirdCategory;
+  area: GroupArea;
+};
 
 // The form insists on an area (#186); the API keeps it optional for older
 // callers and defaults to Kiaušiniai. An unchosen radio group submits null,
@@ -83,9 +89,16 @@ export function BirdGroupForm({
   const category = watch("category");
 
   // F4 — warn (not block) when an identical breed+lytis+kategorija group already
-  // exists, so the user can decide to keep the duplicate or edit the existing one.
+  // exists in the same area, so the user can decide to keep the duplicate or
+  // edit the existing one. Same birds in Kiaušiniai and Mėsa are two groups by
+  // design (#186), not a duplicate.
   const duplicate = existingGroups.find(
-    (g) => g.id !== groupId && g.breedId === breedId && g.sex === sex && g.category === category,
+    (g) =>
+      g.id !== groupId &&
+      g.area === area &&
+      g.breedId === breedId &&
+      g.sex === sex &&
+      g.category === category,
   );
 
   async function onSubmit(data: BirdGroupFormValues) {

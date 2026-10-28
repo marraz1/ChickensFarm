@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireActiveFarm } from "@/lib/session";
 import { getBirdGroupWithEvents } from "@/lib/services/bird-groups";
 import { PageHeader } from "@/components/layout/page-header";
@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { birdTypeLabels, sexLabels, birdCategoryLabels } from "@/lib/labels";
 import { formatDateLT, formatRelativeLT } from "@/lib/format";
 import { Pencil } from "lucide-react";
-import { groupAreaSlug, type GroupArea } from "@/lib/v2-navigation";
+import { groupAreaSlug, toGroupArea } from "@/lib/v2-navigation";
 
 const EVENT_LABELS: Record<string, string> = {
   INITIAL: "Grupė sukurta",
@@ -21,15 +21,21 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default async function BirdGroupDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ groupId: string }>;
+  searchParams: Promise<{ area?: string | string[] }>;
 }) {
   const { groupId } = await params;
   const { farm } = await requireActiveFarm();
   const group = await getBirdGroupWithEvents(farm.id, groupId);
   if (!group) notFound();
-  // Back to the group's own area list; `?area=` also keeps that area lit in the bar (#186).
-  const areaQuery = `?area=${groupAreaSlug(group.area as GroupArea)}`;
+  // The bar highlights shared group screens by `?area=` (#186). Whatever link
+  // led here (an unfiltered list, a save after moving the group, a back link),
+  // pin the URL to the group's own area so the right area stays lit.
+  const slug = groupAreaSlug(toGroupArea(group.area));
+  if ((await searchParams).area !== slug) redirect(`/bird-groups/${group.id}?area=${slug}`);
+  const areaQuery = `?area=${slug}`;
 
   return (
     <div>
