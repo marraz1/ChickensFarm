@@ -108,12 +108,18 @@ export async function collectSnapshot(db: Queryable, plan: CopyPlan): Promise<Sn
   return snapshot;
 }
 
-/** Money compared as exact decimals ("12.50" equals "12.5"). */
-function sameAmount(a: string, b: string): boolean {
+/**
+ * Money compared as exact decimals ("12.50" equals "12.5", "-0" equals "0").
+ * The sign is kept apart from the digits: BigInt("-0") is 0n, so folding it
+ * into the integer part would make "-0.50" equal "0.50".
+ */
+export function sameAmount(a: string, b: string): boolean {
   const norm = (s: string) => {
-    const [int, frac = ""] = s.trim().split(".");
-    const f = frac.replace(/0+$/, "");
-    return `${BigInt(int || "0")}${f ? `.${f}` : ""}`;
+    const t = s.trim();
+    const negative = t.startsWith("-");
+    const [int, frac = ""] = t.replace(/^[-+]/, "").split(".");
+    const digits = `${BigInt(int || "0")}${frac.replace(/0+$/, "") ? `.${frac.replace(/0+$/, "")}` : ""}`;
+    return negative && digits !== "0" ? `-${digits}` : digits;
   };
   return norm(a) === norm(b);
 }

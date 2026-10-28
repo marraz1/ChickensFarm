@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checksumSql, compareSnapshots, farmCountSql, type Snapshot } from "./verify";
+import { checksumSql, compareSnapshots, farmCountSql, sameAmount, type Snapshot } from "./verify";
 
 const table = (name: string, ...columns: string[]) => ({
   name,
@@ -18,6 +18,28 @@ function snapshot(): Snapshot {
     },
   };
 }
+
+describe("sameAmount", () => {
+  it.each([
+    ["12.50", "12.5"],
+    ["80.00", "80"],
+    ["0.00", "0"],
+    ["-0.00", "0"],
+    ["-3.10", "-3.1"],
+    ["007.20", "7.2"],
+  ])("%s equals %s", (a, b) => {
+    expect(sameAmount(a, b)).toBe(true);
+  });
+
+  it.each([
+    ["-0.50", "0.50"],
+    ["-5.00", "5.00"],
+    ["0.01", "0.10"],
+    ["12.50", "12.51"],
+  ])("%s differs from %s", (a, b) => {
+    expect(sameAmount(a, b)).toBe(false);
+  });
+});
 
 describe("compareSnapshots", () => {
   it("finds nothing when both sides agree", () => {

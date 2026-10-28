@@ -143,6 +143,14 @@ last run is lost. It runs in one transaction, which commits only when the copy m
 Any difference rolls V2 back unchanged and exits 1. Running it twice gives the same data as
 running it once.
 
+**Run it when nobody is using V2.** Emptying the tables locks every one of them until the
+transaction ends, so V2 requests wait for the whole copy and check, which takes seconds at
+today's size.
+
+The JSON report and the job summary list table names, row counts and farm ids. On a
+mismatch they also show the differing values, money amounts included, so treat a failed
+run's report as farm data.
+
 ### From GitHub (normal)
 
 **Actions → V2 data copy → Run workflow:**
