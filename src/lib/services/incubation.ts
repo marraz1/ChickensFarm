@@ -14,7 +14,8 @@ export function listIncubationCycles(farmId: string) {
     where: { farmId },
     include: {
       eggSourceGroup: { include: { breed: true } },
-      growthLogs: { orderBy: { logDate: "desc" }, take: 1 },
+      // Latest first; two entries on one day → the one written last (a loss's).
+      growthLogs: { orderBy: [{ logDate: "desc" }, { createdAt: "desc" }], take: 1 },
     },
     // Active cycles (not yet hatched) first, then most recent.
     orderBy: [{ hatchDate: { sort: "asc", nulls: "first" } }, { startDate: "desc" }],
@@ -27,7 +28,7 @@ export function getIncubationCycle(farmId: string, cycleId: string) {
     include: {
       eggSourceGroup: { include: { breed: true } },
       resultingGroup: { include: { breed: true } },
-      growthLogs: { orderBy: { logDate: "desc" } },
+      growthLogs: { orderBy: [{ logDate: "desc" }, { createdAt: "desc" }] },
     },
   });
 }

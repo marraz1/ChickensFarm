@@ -3,7 +3,8 @@ import { requireActiveFarm } from "@/lib/session";
 import { getLoss } from "@/lib/services/losses";
 import { listBirdGroups } from "@/lib/services/bird-groups";
 import { PageHeader } from "@/components/layout/page-header";
-import { LossForm } from "@/components/forms/loss-form";
+import { LossForm, type LossLockedTarget } from "@/components/forms/loss-form";
+import { formatDateLT } from "@/lib/format";
 import { DeleteRecordButton } from "@/components/forms/delete-record-button";
 import { isAreaSlug } from "@/lib/v2-navigation";
 
@@ -24,6 +25,20 @@ export default async function EditLossPage({
   const returnPath =
     typeof area === "string" && isAreaSlug(area) ? `/areas/${area}/losses` : "/losses";
 
+  // A hen's or cycle's loss changed her or the cycle's growth record, so what
+  // was lost and how many are fixed (and a cycle loss's date, #195).
+  const lockedTarget: LossLockedTarget | undefined = loss.motherHen
+    ? { label: "Perekšlė", value: loss.motherHen.name, lockDate: false }
+    : loss.incubationCycle
+      ? {
+          label: "Perinimo ciklas",
+          value:
+            loss.incubationCycle.name ||
+            `Ciklas nuo ${formatDateLT(loss.incubationCycle.startDate)}`,
+          lockDate: true,
+        }
+      : undefined;
+
   return (
     <div>
       <PageHeader title="Koreguoti nuostolį" backHref={returnPath} />
@@ -39,6 +54,7 @@ export default async function EditLossPage({
             comment: loss.comment ?? "",
           }}
           onSuccessPath={returnPath}
+          lockedTarget={lockedTarget}
         />
         <DeleteRecordButton
           endpoint={`/api/losses/${loss.id}`}

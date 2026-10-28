@@ -158,6 +158,17 @@ test("a mother hen's loss marks her dead", async ({ page }) => {
   }[];
   expect(hens.find((h) => h.id === henId)?.diedAt).toBeTruthy();
 
+  // Editing it shows her, but neither she nor the quantity can be changed.
+  const losses = (await (await page.request.get("/api/losses")).json()) as {
+    id: string;
+    comment: string | null;
+  }[];
+  const lossId = losses.find((l) => l.comment?.includes(created.tag))?.id;
+  await page.goto(`/losses/${lossId}/edit?area=hens`);
+  await expect(page.getByText(henName, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Kiekis")).toHaveAttribute("readonly", "");
+  await expect(page.getByText("Paukščių grupė (neprivaloma)")).toHaveCount(0);
+
   // A dead hen is no longer offered.
   await page.goto("/losses/new?area=hens");
   await page.getByLabel("Perekšlė").click();

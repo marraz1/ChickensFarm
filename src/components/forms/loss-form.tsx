@@ -40,6 +40,12 @@ export type LossAreaContext = {
   };
 };
 
+/**
+ * Editing a hen's or cycle's loss (#195): what was lost and how many cannot
+ * change (nor a cycle loss's date), so they are shown, not offered.
+ */
+export type LossLockedTarget = { label: string; value: string; lockDate: boolean };
+
 const zodLossResolver = zodResolver(createLossSchema) as Resolver<CreateLossInput>;
 
 export function LossForm({
@@ -48,17 +54,20 @@ export function LossForm({
   defaultValues,
   onSuccessPath = "/losses",
   areaContext,
+  lockedTarget,
 }: {
   birdGroups?: BirdGroupOption[];
   lossId?: string;
   defaultValues?: Partial<CreateLossInput>;
   onSuccessPath?: string;
   areaContext?: LossAreaContext;
+  lockedTarget?: LossLockedTarget;
 }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const target = areaContext?.target;
-  const isHen = target?.field === "motherHenId";
+  // A mother hen is one bird (the server requires exactly 1).
+  const quantityLocked = target?.field === "motherHenId" || !!lockedTarget;
 
   // In an area the target is required; say which one is missing in the
   // area's own words rather than the schema's generic message.
@@ -157,9 +166,28 @@ export function LossForm({
         </>
       )}
 
+      {lockedTarget && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">{lockedTarget.label}</span>
+          <div className="flex min-h-11 items-center rounded-lg border bg-muted/40 px-3 text-sm font-medium">
+            {lockedTarget.value}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {lockedTarget.lockDate ? "Objekto, datos ir kiekio" : "Objekto ir kiekio"} pakeisti
+            negalima. Jei reikia, ištrinkite įrašą ir įrašykite iš naujo.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="lossDate">Data</Label>
-        <Input id="lossDate" type="date" className="h-11" {...register("lossDate")} />
+        <Input
+          id="lossDate"
+          type="date"
+          readOnly={lockedTarget?.lockDate}
+          className="h-11"
+          {...register("lossDate")}
+        />
         {errors.lossDate && <p className="text-sm text-destructive">{errors.lossDate.message}</p>}
       </div>
 
@@ -170,8 +198,7 @@ export function LossForm({
           type="number"
           inputMode="numeric"
           min={1}
-          // A mother hen is one bird (the server requires exactly 1).
-          readOnly={isHen}
+          readOnly={quantityLocked}
           className="h-11"
           {...register("quantity", { valueAsNumber: true })}
         />
@@ -200,7 +227,7 @@ export function LossForm({
         </div>
       </div>
 
-      {!areaContext && birdGroups.length > 0 && (
+      {!areaContext && !lockedTarget && birdGroups.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="birdGroupId">Paukščių grupė (neprivaloma)</Label>
           <Select

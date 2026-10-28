@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { adjustBirdGroupQuantityTx } from "@/lib/services/bird-groups";
+import { assertDiedAtNotFuture } from "@/lib/services/mother-hens";
 import { ValidationError } from "@/lib/errors";
 import {
   resolveTargetArea,
@@ -23,7 +24,13 @@ export function listLosses(farmId: string) {
 }
 
 export function getLoss(farmId: string, id: string) {
-  return prisma.loss.findFirst({ where: { id, farmId } });
+  return prisma.loss.findFirst({
+    where: { id, farmId },
+    include: {
+      motherHen: { select: { name: true } },
+      incubationCycle: { select: { name: true, startDate: true } },
+    },
+  });
 }
 
 // A mother hen is one bird, so a loss against her is always exactly one.
@@ -53,11 +60,26 @@ async function resolveLossArea(
 
 // ---- Mother hens: a loss is her death (#195) --------------------------------
 
-async function markHenDeadTx(tx: TxClient, farmId: string, henId: string, date: Date) {
+async function markHenDeadTx(tx: TxClient, farmId: string, henId: string, lossDate: string) {
   const hen = await tx.motherHen.findFirst({ where: { id: henId, farmId } });
   if (!hen) throw new ValidationError("Pasirinkta perekšlė nerasta");
   if (hen.diedAt) throw new ValidationError("Ši perekšlė jau pažymėta kaip nugaišusi");
-  await tx.motherHen.update({ where: { id: henId }, data: { diedAt: date } });
+  assertDiedAtNotFuture(lossDate);
+  await tx.motherHen.update({ where: { id: henId }, data: { diedAt: new Date(lossDate) } });
+}
+
+/**
+ * Whether this loss is what marked the hen dead: her death date is the loss
+ * date. A loss recorded before #195 left her alive, and a death recorded on
+ * her own form may be another day; neither is this loss's to move or undo.
+ */
+async function henDiedOfLossTx(
+  tx: TxClient,
+  farmId: string,
+  loss: { motherHenId: string; lossDate: Date },
+) {
+  const hen = await tx.motherHen.findFirst({ where: { id: loss.motherHenId, farmId } });
+  return hen?.diedAt?.getTime() === loss.lossDate.getTime();
 }
 
 // ---- Incubation cycles: a loss lowers the live chick count (#195) -----------
@@ -65,26 +87,33 @@ async function markHenDeadTx(tx: TxClient, farmId: string, henId: string, date: 
 // Both places that hold it move together, as decided on #195: a growth entry
 // with the lower live count (what the cycle page shows as "dabar gyvų") and
 // the hatched group's head count (with its history event).
+//
+// The growth entry takes the loss's id as its own, so deleting the loss finds
+// exactly the entry it wrote (a loss recorded before #195 has none, and had
+// no effect to undo). A backdated loss also lowers every later entry, so the
+// latest one, the live count, always reflects it.
 
-/** The cycle's live chick count: its latest growth entry, else what hatched. */
-async function liveChicksTx(
-  tx: TxClient,
-  cycle: { id: string; hatchedCount: number | null },
-): Promise<number> {
-  // Picked in code rather than by orderBy: a cycle has a handful of entries,
-  // and this reads the same in the tests' in-memory fake as in Postgres.
-  const logs = await tx.incubationGrowthLog.findMany({ where: { incubationCycleId: cycle.id } });
-  const latest = logs.reduce<(typeof logs)[number] | null>(
-    (best, log) =>
-      !best ||
-      log.logDate.getTime() > best.logDate.getTime() ||
-      (log.logDate.getTime() === best.logDate.getTime() &&
-        log.createdAt.getTime() >= best.createdAt.getTime())
-        ? log
-        : best,
-    null,
-  );
-  return latest?.aliveCount ?? cycle.hatchedCount ?? 0;
+type GrowthLog = { id: string; logDate: Date; createdAt: Date; aliveCount: number };
+
+// Oldest first, by date, then by when it was written: the same order the
+// cycle pages read (incubation.ts). Sorted in code because the tests'
+// in-memory Prisma ignores orderBy; a cycle has a handful of entries.
+function byGrowthOrder(a: GrowthLog, b: GrowthLog) {
+  return a.logDate.getTime() - b.logDate.getTime() || a.createdAt.getTime() - b.createdAt.getTime();
+}
+
+async function growthLogsTx(tx: TxClient, cycleId: string): Promise<GrowthLog[]> {
+  const logs = await tx.incubationGrowthLog.findMany({ where: { incubationCycleId: cycleId } });
+  return logs.sort(byGrowthOrder);
+}
+
+async function shiftGrowthLogsTx(tx: TxClient, logs: GrowthLog[], delta: number) {
+  for (const log of logs) {
+    await tx.incubationGrowthLog.update({
+      where: { id: log.id },
+      data: { aliveCount: log.aliveCount + delta },
+    });
+  }
 }
 
 async function findCycleTx(tx: TxClient, farmId: string, cycleId: string) {
@@ -106,18 +135,26 @@ async function recordCycleLossTx(
   }
   if (cycle.growthCompletedAt) throw new ValidationError("Sekimas jau užbaigtas");
 
-  const alive = await liveChicksTx(tx, cycle);
-  if (loss.quantity > alive) {
+  // Alive on the loss date: the last entry up to that day, else what hatched.
+  // Every later entry drops too, and none of them may go below zero.
+  const logs = await growthLogsTx(tx, cycle.id);
+  const day = loss.lossDate.getTime();
+  const earlier = logs.filter((l) => l.logDate.getTime() <= day);
+  const later = logs.filter((l) => l.logDate.getTime() > day);
+  const aliveThen = earlier.at(-1)?.aliveCount ?? cycle.hatchedCount;
+  if ([aliveThen, ...later.map((l) => l.aliveCount)].some((alive) => loss.quantity > alive)) {
     throw new ValidationError("Nuostolis didesnis nei gyvų jauniklių skaičius");
   }
   await tx.incubationGrowthLog.create({
     data: {
+      id: loss.id,
       incubationCycleId: cycle.id,
       logDate: loss.lossDate,
-      aliveCount: alive - loss.quantity,
+      aliveCount: aliveThen - loss.quantity,
       note,
     },
   });
+  await shiftGrowthLogsTx(tx, later, -loss.quantity);
   if (cycle.resultingGroupId) {
     await adjustBirdGroupQuantityTx(tx, {
       birdGroupId: cycle.resultingGroupId,
@@ -132,7 +169,11 @@ async function recordCycleLossTx(
   }
 }
 
-/** Undoes a cycle loss: a correcting growth entry, and the birds back to the group. */
+/**
+ * Undoes a cycle loss: removes its growth entry, gives every later entry the
+ * chicks back, and returns the birds to the hatched group. Refused once
+ * tracking is finished: the group's birds have been handed on by then.
+ */
 async function undoCycleLossTx(
   tx: TxClient,
   farmId: string,
@@ -140,16 +181,15 @@ async function undoCycleLossTx(
   loss: { id: string; incubationCycleId: string; quantity: number },
 ) {
   const cycle = await findCycleTx(tx, farmId, loss.incubationCycleId);
-  const alive = await liveChicksTx(tx, cycle);
-  const note = "Nuostolio įrašas ištrintas";
-  await tx.incubationGrowthLog.create({
-    data: {
-      incubationCycleId: cycle.id,
-      logDate: new Date(new Date().toISOString().slice(0, 10)),
-      aliveCount: alive + loss.quantity,
-      note,
-    },
-  });
+  const logs = await growthLogsTx(tx, cycle.id);
+  const index = logs.findIndex((l) => l.id === loss.id);
+  if (index === -1) return; // recorded before #195: it changed nothing
+  if (cycle.growthCompletedAt) {
+    throw new ValidationError("Sekimas jau užbaigtas, šio nuostolio ištrinti negalima");
+  }
+
+  await tx.incubationGrowthLog.delete({ where: { id: loss.id } });
+  await shiftGrowthLogsTx(tx, logs.slice(index + 1), loss.quantity);
   if (cycle.resultingGroupId) {
     await adjustBirdGroupQuantityTx(tx, {
       birdGroupId: cycle.resultingGroupId,
@@ -158,7 +198,7 @@ async function undoCycleLossTx(
       eventType: "MANUAL_ADJUSTMENT",
       sourceType: "loss",
       sourceId: loss.id,
-      note,
+      note: "Nuostolio įrašas ištrintas",
       userId,
     });
   }
@@ -204,7 +244,7 @@ export async function createLoss(farmId: string, userId: string, input: CreateLo
         userId,
       });
     }
-    if (loss.motherHenId) await markHenDeadTx(tx, farmId, loss.motherHenId, lossDate);
+    if (loss.motherHenId) await markHenDeadTx(tx, farmId, loss.motherHenId, input.lossDate);
     if (loss.incubationCycleId) {
       await recordCycleLossTx(
         tx,
@@ -259,15 +299,23 @@ export async function updateLoss(
     const target = targetFromInput(input, loss);
     assertHenLossQuantity(target, input.quantity);
 
+    const lossDate = new Date(input.lossDate);
+
     // A hen's or cycle's loss changed the hen or the cycle's growth record;
     // moving it elsewhere or changing its size cannot be re-applied safely.
-    // Date, reason and comment stay editable (#195).
+    // Reason and comment stay editable, and a hen loss's date too (#195).
     if (loss.motherHenId || loss.incubationCycleId) {
       if (!sameTarget(target, loss) || input.quantity !== loss.quantity) {
         throw new ValidationError(
           "Perekšlės ar ciklo nuostolio objekto ir kiekio pakeisti negalima. Ištrinkite ir įrašykite iš naujo.",
         );
       }
+    }
+    // The cycle's growth history is dated by the loss.
+    if (loss.incubationCycleId && lossDate.getTime() !== loss.lossDate.getTime()) {
+      throw new ValidationError(
+        "Ciklo nuostolio datos pakeisti negalima. Ištrinkite ir įrašykite iš naujo.",
+      );
     }
 
     // Same target → keep the stored area: the group may since have moved to
@@ -278,7 +326,6 @@ export async function updateLoss(
         ? loss.area
         : await resolveLossArea(tx, farmId, target, input.area);
     const newGroupId = target.birdGroupId;
-    const lossDate = new Date(input.lossDate);
 
     // Reconcile the group-quantity effect. Same group → apply just the net
     // change; group changed → give the old group its birds back and take the new
@@ -313,8 +360,16 @@ export async function updateLoss(
       }
     }
 
-    // A hen's death date follows the loss date.
-    if (loss.motherHenId && lossDate.getTime() !== loss.lossDate.getTime()) {
+    // A hen's death date follows the loss date, if this loss is her death.
+    if (
+      loss.motherHenId &&
+      lossDate.getTime() !== loss.lossDate.getTime() &&
+      (await henDiedOfLossTx(tx, farmId, {
+        motherHenId: loss.motherHenId,
+        lossDate: loss.lossDate,
+      }))
+    ) {
+      assertDiedAtNotFuture(input.lossDate);
       await tx.motherHen.update({ where: { id: loss.motherHenId }, data: { diedAt: lossDate } });
     }
 
@@ -338,7 +393,13 @@ export async function deleteLoss(farmId: string, lossId: string, userId: string)
     if (!loss) throw new ValidationError("Nuostolio įrašas nerastas");
 
     await restoreLossQuantityTx(tx, farmId, userId, loss);
-    if (loss.motherHenId) {
+    if (
+      loss.motherHenId &&
+      (await henDiedOfLossTx(tx, farmId, {
+        motherHenId: loss.motherHenId,
+        lossDate: loss.lossDate,
+      }))
+    ) {
       await tx.motherHen.updateMany({
         where: { id: loss.motherHenId, farmId },
         data: { diedAt: null },
