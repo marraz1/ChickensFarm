@@ -8,6 +8,7 @@ import {
   AREA_RECORD_LINKS,
   groupAreaFromParam,
   AREA_EXPENSE_TARGETS,
+  AREA_LOSS_TARGETS,
 } from "./v2-navigation";
 
 describe("NAV_ITEMS", () => {
@@ -158,6 +159,12 @@ describe("navKeyForPath with an area", () => {
     // An expense opened from an area's list keeps that area (#194).
     ["/expenses/abc/edit", "hens", "hens"],
     ["/expenses/abc/edit", null, "overview"],
+    // #195: the loss form and a loss opened from an area keep that area.
+    ["/losses/new", "incubation", "incubation"],
+    ["/losses/new", "hens", "hens"],
+    ["/losses/abc/edit", "meat", "meat"],
+    ["/losses/new", null, "overview"],
+    ["/losses", "eggs", "overview"],
   ] as const)("%s?area=%s → %s", (path, area, key) => {
     expect(navKeyForPath(path, area)).toBe(key);
   });
@@ -171,5 +178,31 @@ describe("AREA_EXPENSE_TARGETS", () => {
     ["meat", "birdGroupId", "Mėsinių grupė (neprivaloma)"],
   ] as const)("%s → %s labelled %s", (area, field, label) => {
     expect(AREA_EXPENSE_TARGETS[area]).toEqual({ field, label });
+  });
+});
+
+describe("AREA_LOSS_TARGETS", () => {
+  it.each([
+    ["eggs", "birdGroupId", "Dedeklių grupė", "Kiekis", "Pasirinkite dedeklių grupę"],
+    ["hens", "motherHenId", "Perekšlė", "Kiekis", "Pasirinkite perekšlę"],
+    [
+      "incubation",
+      "incubationCycleId",
+      "Perinimo ciklas",
+      "Jauniklių",
+      "Pasirinkite perinimo ciklą",
+    ],
+    ["meat", "birdGroupId", "Mėsinių grupė", "Kiekis", "Pasirinkite mėsinių grupę"],
+  ] as const)("%s → %s labelled %s", (area, field, label, quantityLabel, requiredMessage) => {
+    expect(AREA_LOSS_TARGETS[area]).toMatchObject({ field, label, quantityLabel, requiredMessage });
+  });
+
+  it("spells out what the loss does to its target", () => {
+    expect(AREA_LOSS_TARGETS.eggs.hint).toBe(
+      "Grupės kiekis bus sumažintas ir įrašytas į istoriją.",
+    );
+    expect(AREA_LOSS_TARGETS.meat.hint).toBe(AREA_LOSS_TARGETS.eggs.hint);
+    expect(AREA_LOSS_TARGETS.hens.hint).toBe("Perekšlė bus pažymėta kaip nugaišusi.");
+    expect(AREA_LOSS_TARGETS.incubation.hint).toBe("Gyvų jauniklių skaičius cikle bus sumažintas.");
   });
 });

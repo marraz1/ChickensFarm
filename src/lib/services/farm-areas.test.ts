@@ -18,7 +18,7 @@ vi.mock("@/lib/prisma", async () => {
 import { fakePrisma, resetFakePrisma } from "./fake-prisma";
 import { ValidationError } from "@/lib/errors";
 import { createExpense, getExpense, updateExpense } from "@/lib/services/expenses";
-import { createLoss, getLoss, updateLoss } from "@/lib/services/losses";
+import { createLoss, deleteLoss, getLoss, updateLoss } from "@/lib/services/losses";
 import {
   createBirdGroup,
   deleteBirdGroup,
@@ -198,6 +198,11 @@ describe("loss targets", () => {
   });
 
   it("can target a mother hen or an incubation cycle without touching any group", async () => {
+    // A cycle loss needs hatched chicks (#195); this cycle has no hatched group.
+    await fakePrisma.incubationCycle.update({
+      where: { id: "cycle-1" },
+      data: { hatchedCount: 6 },
+    });
     await expect(
       createLoss(FARM_ID, USER_ID, { ...loss, motherHenId: "hen-1" }),
     ).resolves.toMatchObject({ area: "HENS", motherHenId: "hen-1", birdGroupId: null });
@@ -398,5 +403,186 @@ describe("mother hen references", () => {
     expect(createMotherHenSchema.safeParse({ name: "Margė", diedAt: "2024-02-29" }).success).toBe(
       true,
     );
+  });
+});
+
+// #195: what a loss does to what was lost, and its area check.
+describe("loss effects by target", () => {
+  // Read the history directly: the in-memory fake does not load relations.
+  const groupEvents = async (id: string) =>
+    (await fakePrisma.birdGroupEvent.findMany({ where: { birdGroupId: id } })).map(
+      (e) => e.eventType,
+    );
+
+  async function hatch(cycleId: string, hatchedCount: number, resultingGroupId?: string) {
+    await fakePrisma.incubationCycle.update({
+      where: { id: cycleId },
+      data: { hatchedCount, ...(resultingGroupId ? { resultingGroupId } : {}) },
+    });
+  }
+  const growthLogs = async (cycleId: string) =>
+    (await fakePrisma.incubationGrowthLog.findMany({ where: { incubationCycleId: cycleId } }))
+      .map((l) => Number(l.aliveCount))
+      .sort((a, b) => b - a);
+
+  describe("a group", () => {
+    it("loses birds in its own area and records the loss in its history", async () => {
+      await createLoss(FARM_ID, USER_ID, {
+        ...loss,
+        quantity: 3,
+        area: "EGGS",
+        birdGroupId: "eggs-group",
+      });
+      await expect(getBirdGroupWithEvents(FARM_ID, "eggs-group")).resolves.toMatchObject({
+        quantity: 7,
+      });
+      expect(await groupEvents("eggs-group")).toContain("LOSS");
+    });
+
+    it("cannot lose more birds than it has", async () => {
+      await expect(
+        createLoss(FARM_ID, USER_ID, { ...loss, quantity: 11, birdGroupId: "eggs-group" }),
+      ).rejects.toThrow();
+      await expect(getBirdGroupWithEvents(FARM_ID, "eggs-group")).resolves.toMatchObject({
+        quantity: 10,
+      });
+    });
+
+    it("from another area is refused with a Lithuanian message", async () => {
+      await expect(
+        createLoss(FARM_ID, USER_ID, { ...loss, area: "EGGS", birdGroupId: "meat-group" }),
+      ).rejects.toThrow("Pasirinktas įrašas priklauso kitai sričiai");
+      await expect(getBirdGroupWithEvents(FARM_ID, "meat-group")).resolves.toMatchObject({
+        quantity: 10,
+      });
+    });
+  });
+
+  describe("a mother hen", () => {
+    it("is marked dead on the loss date", async () => {
+      await createLoss(FARM_ID, USER_ID, { ...loss, area: "HENS", motherHenId: "hen-1" });
+      await expect(getMotherHenWithLogs(FARM_ID, "hen-1")).resolves.toMatchObject({
+        diedAt: new Date(loss.lossDate),
+      });
+    });
+
+    it("cannot die twice", async () => {
+      await createLoss(FARM_ID, USER_ID, { ...loss, motherHenId: "hen-1" });
+      await expect(createLoss(FARM_ID, USER_ID, { ...loss, motherHenId: "hen-1" })).rejects.toThrow(
+        "Ši perekšlė jau pažymėta kaip nugaišusi",
+      );
+    });
+
+    it("comes back when the loss is deleted, and follows a date change", async () => {
+      const l = await createLoss(FARM_ID, USER_ID, { ...loss, motherHenId: "hen-1" });
+      await updateLoss(FARM_ID, l.id, USER_ID, {
+        ...loss,
+        lossDate: "2025-02-03",
+        motherHenId: "hen-1",
+      });
+      await expect(getMotherHenWithLogs(FARM_ID, "hen-1")).resolves.toMatchObject({
+        diedAt: new Date("2025-02-03"),
+      });
+      await deleteLoss(FARM_ID, l.id, USER_ID);
+      await expect(getMotherHenWithLogs(FARM_ID, "hen-1")).resolves.toMatchObject({
+        diedAt: null,
+      });
+    });
+
+    it("keeps her loss on her: the target cannot be changed", async () => {
+      const l = await createLoss(FARM_ID, USER_ID, { ...loss, motherHenId: "hen-1" });
+      await expect(
+        updateLoss(FARM_ID, l.id, USER_ID, { ...loss, birdGroupId: "eggs-group" }),
+      ).rejects.toThrow("Ištrinkite ir įrašykite iš naujo");
+    });
+  });
+
+  describe("an incubation cycle", () => {
+    it("lowers the live chick count and the hatched group together", async () => {
+      await seedGroup("chicks", "INC", 6);
+      await hatch("cycle-1", 6, "chicks");
+
+      await createLoss(FARM_ID, USER_ID, {
+        ...loss,
+        quantity: 2,
+        area: "INC",
+        incubationCycleId: "cycle-1",
+      });
+
+      expect(await growthLogs("cycle-1")).toEqual([4]);
+      await expect(getBirdGroupWithEvents(FARM_ID, "chicks")).resolves.toMatchObject({
+        quantity: 4,
+      });
+      expect(await groupEvents("chicks")).toContain("LOSS");
+    });
+
+    it("counts from the latest growth entry", async () => {
+      await hatch("cycle-1", 10);
+      await fakePrisma.incubationGrowthLog.create({
+        data: { incubationCycleId: "cycle-1", logDate: new Date("2025-01-20"), aliveCount: 8 },
+      });
+      await fakePrisma.incubationGrowthLog.create({
+        data: { incubationCycleId: "cycle-1", logDate: new Date("2025-01-25"), aliveCount: 5 },
+      });
+
+      await createLoss(FARM_ID, USER_ID, { ...loss, quantity: 1, incubationCycleId: "cycle-1" });
+      expect(await growthLogs("cycle-1")).toEqual([8, 5, 4]);
+
+      await expect(
+        createLoss(FARM_ID, USER_ID, { ...loss, quantity: 5, incubationCycleId: "cycle-1" }),
+      ).rejects.toThrow("Nuostolis didesnis nei gyvų jauniklių skaičius");
+    });
+
+    it("needs hatched chicks and tracking still running", async () => {
+      await expect(
+        createLoss(FARM_ID, USER_ID, { ...loss, incubationCycleId: "cycle-1" }),
+      ).rejects.toThrow("Šis ciklas dar neturi išsiritusių jauniklių");
+
+      await fakePrisma.incubationCycle.update({
+        where: { id: "cycle-1" },
+        data: { hatchedCount: 6, growthCompletedAt: new Date("2025-03-01") },
+      });
+      await expect(
+        createLoss(FARM_ID, USER_ID, { ...loss, incubationCycleId: "cycle-1" }),
+      ).rejects.toThrow("Sekimas jau užbaigtas");
+    });
+
+    it("gives everything back when the loss is deleted", async () => {
+      await seedGroup("chicks", "INC", 6);
+      await hatch("cycle-1", 6, "chicks");
+      const l = await createLoss(FARM_ID, USER_ID, {
+        ...loss,
+        quantity: 2,
+        incubationCycleId: "cycle-1",
+      });
+
+      await deleteLoss(FARM_ID, l.id, USER_ID);
+
+      expect(await growthLogs("cycle-1")).toEqual([6, 4]); // the correction on top
+      await expect(getBirdGroupWithEvents(FARM_ID, "chicks")).resolves.toMatchObject({
+        quantity: 6,
+      });
+    });
+
+    it("cannot change its size afterwards", async () => {
+      await hatch("cycle-1", 6);
+      const l = await createLoss(FARM_ID, USER_ID, {
+        ...loss,
+        quantity: 2,
+        incubationCycleId: "cycle-1",
+      });
+      await expect(
+        updateLoss(FARM_ID, l.id, USER_ID, { ...loss, quantity: 3, incubationCycleId: "cycle-1" }),
+      ).rejects.toThrow("Ištrinkite ir įrašykite iš naujo");
+      // Date, reason and comment stay editable.
+      await expect(
+        updateLoss(FARM_ID, l.id, USER_ID, {
+          ...loss,
+          quantity: 2,
+          reasonType: "PREDATOR",
+          incubationCycleId: "cycle-1",
+        }),
+      ).resolves.toMatchObject({ reasonType: "PREDATOR" });
+    });
   });
 });

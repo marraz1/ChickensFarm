@@ -108,7 +108,7 @@ import {
   updateMotherHen,
 } from "@/lib/services/mother-hens";
 import { finalizeHatch, getIncubationCycle, recordCandling } from "@/lib/services/incubation";
-import { listExpenseTargetOptions } from "@/lib/services/expense-targets";
+import { listAreaTargetOptions } from "@/lib/services/area-targets";
 
 const FARM_A_ID = "farm-a";
 const FARM_B_ID = "farm-b";
@@ -733,17 +733,84 @@ describe("expense target options", () => {
   });
 
   it("lists only this farm's living mother hens", async () => {
-    const ids = (await listExpenseTargetOptions(FARM_A_ID, "hens")).map((o) => o.id);
+    const ids = (await listAreaTargetOptions(FARM_A_ID, "hens", "expense")).map((o) => o.id);
     expect(ids).toEqual(["hen-a"]);
-    const other = (await listExpenseTargetOptions(FARM_B_ID, "hens")).map((o) => o.id);
+    const other = (await listAreaTargetOptions(FARM_B_ID, "hens", "expense")).map((o) => o.id);
     expect(other).toEqual(["hen-b"]);
   });
 
   it("lists only this farm's incubation cycles still being tracked", async () => {
-    const ids = (await listExpenseTargetOptions(FARM_A_ID, "incubation")).map((o) => o.id);
+    const ids = (await listAreaTargetOptions(FARM_A_ID, "incubation", "expense")).map((o) => o.id);
     expect(ids).toEqual(["cycle-a"]);
-    const other = (await listExpenseTargetOptions(FARM_B_ID, "incubation")).map((o) => o.id);
+    const other = (await listAreaTargetOptions(FARM_B_ID, "incubation", "expense")).map(
+      (o) => o.id,
+    );
     expect(other).toEqual(["cycle-b"]);
+  });
+});
+
+// #195: what a loss can be recorded against, and what it may never touch.
+describe("loss targets and effects across farms", () => {
+  beforeEach(async () => {
+    await seedTwoFarms();
+    await fakePrisma.motherHen.create({
+      data: { id: "hen-a", farmId: FARM_A_ID, birdGroupId: null, name: "hen-a", diedAt: null },
+    });
+    // Explicit nulls: the in-memory fake applies no column defaults.
+    for (const [id, farmId, hatchedCount] of [
+      ["cycle-a-hatched", FARM_A_ID, 6],
+      ["cycle-a-waiting", FARM_A_ID, null],
+      ["cycle-b-hatched", FARM_B_ID, 4],
+    ] as const) {
+      await fakePrisma.incubationCycle.create({
+        data: {
+          id,
+          farmId,
+          name: id,
+          startDate: new Date("2025-01-01"),
+          hatchedCount,
+          growthCompletedAt: null,
+          resultingGroupId: null,
+        },
+      });
+    }
+  });
+
+  it("offers only this farm's hatched cycles for a loss", async () => {
+    const ids = (await listAreaTargetOptions(FARM_A_ID, "incubation", "loss")).map((o) => o.id);
+    expect(ids).toEqual(["cycle-a-hatched"]);
+    const other = (await listAreaTargetOptions(FARM_B_ID, "incubation", "loss")).map((o) => o.id);
+    expect(other).toEqual(["cycle-b-hatched"]);
+  });
+
+  it("never marks another farm's mother hen dead", async () => {
+    await expect(
+      createLoss(FARM_B_ID, USER_B_ID, {
+        lossDate: "2025-02-01",
+        quantity: 1,
+        reasonType: "DISEASE",
+        area: "HENS",
+        motherHenId: "hen-a",
+      }),
+    ).rejects.toThrow(ValidationError);
+    await expect(fakePrisma.motherHen.findFirst({ where: { id: "hen-a" } })).resolves.toMatchObject(
+      { diedAt: null },
+    );
+  });
+
+  it("never lowers another farm's chick count", async () => {
+    await expect(
+      createLoss(FARM_B_ID, USER_B_ID, {
+        lossDate: "2025-02-01",
+        quantity: 1,
+        reasonType: "DISEASE",
+        area: "INC",
+        incubationCycleId: "cycle-a-hatched",
+      }),
+    ).rejects.toThrow(ValidationError);
+    await expect(
+      fakePrisma.incubationGrowthLog.count({ where: { incubationCycleId: "cycle-a-hatched" } }),
+    ).resolves.toBe(0);
   });
 });
 

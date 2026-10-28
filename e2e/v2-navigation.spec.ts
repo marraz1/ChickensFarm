@@ -75,9 +75,17 @@ test("bar items, area tabs and the profile button are at least 44px tall on a ph
   await page.goto("/");
   await page.goto("/areas/eggs");
 
+  // locator.all() does not wait: it returns whatever is rendered at that
+  // instant. Wait for every bar item and tab first, or a page still settling
+  // under load yields fewer than 10 targets.
+  const barLinks = areaBar(page).getByRole("link");
+  const tabLinks = page.getByRole("navigation", { name: "Srities skirtukai" }).getByRole("link");
+  await expect(barLinks).toHaveCount(5);
+  await expect(tabLinks).toHaveCount(4);
+
   const targets = [
-    ...(await areaBar(page).getByRole("link").all()),
-    ...(await page.getByRole("navigation", { name: "Srities skirtukai" }).getByRole("link").all()),
+    ...(await barLinks.all()),
+    ...(await tabLinks.all()),
     page.getByRole("button", { name: "Profilis" }),
   ];
   expect(targets).toHaveLength(10);
