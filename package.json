@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "postinstall": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
+    "v2:migrate": "tsx scripts/v2-migrate/index.ts",
     "db:seed:e2e": "tsx prisma/seed-e2e.ts"
   },
   "dependencies": {
