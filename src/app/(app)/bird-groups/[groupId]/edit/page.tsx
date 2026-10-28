@@ -5,6 +5,7 @@ import { listBreeds } from "@/lib/services/breeds";
 import { PageHeader } from "@/components/layout/page-header";
 import { BirdGroupForm } from "@/components/forms/bird-group-form";
 import { DeleteBirdGroupButton } from "@/components/forms/delete-bird-group-button";
+import { toGroupArea } from "@/lib/v2-navigation";
 
 export default async function EditBirdGroupPage({
   params,
@@ -26,7 +27,13 @@ export default async function EditBirdGroupPage({
       <div className="flex flex-col gap-6 px-4">
         <BirdGroupForm
           breeds={breeds}
-          existingGroups={groups.map((g) => ({ id: g.id, breedId: g.breedId, sex: g.sex, category: g.category }))}
+          existingGroups={groups.map((g) => ({
+            id: g.id,
+            breedId: g.breedId,
+            sex: g.sex,
+            category: g.category,
+            area: toGroupArea(g.area),
+          }))}
           groupId={group.id}
           defaultValues={{
             breedId: group.breedId,
@@ -36,7 +43,9 @@ export default async function EditBirdGroupPage({
             quantity: group.quantity,
             birthOrAcquiredDate: group.birthOrAcquiredDate.toISOString().slice(0, 10),
             notes: group.notes ?? "",
+            area: toGroupArea(group.area),
           }}
+          // The detail page pins `?area=` to the group's (possibly new) area itself.
           onSuccessPath={`/bird-groups/${group.id}`}
         />
         <DeleteBirdGroupButton groupId={group.id} />

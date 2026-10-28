@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireActiveFarm } from "@/lib/session";
 import { getBirdGroupWithEvents } from "@/lib/services/bird-groups";
 import { PageHeader } from "@/components/layout/page-header";
@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { birdTypeLabels, sexLabels, birdCategoryLabels } from "@/lib/labels";
 import { formatDateLT, formatRelativeLT } from "@/lib/format";
 import { Pencil } from "lucide-react";
+import { groupAreaSlug, toGroupArea } from "@/lib/v2-navigation";
 
 const EVENT_LABELS: Record<string, string> = {
   INITIAL: "Grupė sukurta",
@@ -20,22 +21,30 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default async function BirdGroupDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ groupId: string }>;
+  searchParams: Promise<{ area?: string | string[] }>;
 }) {
   const { groupId } = await params;
   const { farm } = await requireActiveFarm();
   const group = await getBirdGroupWithEvents(farm.id, groupId);
   if (!group) notFound();
+  // The bar highlights shared group screens by `?area=` (#186). Whatever link
+  // led here (an unfiltered list, a save after moving the group, a back link),
+  // pin the URL to the group's own area so the right area stays lit.
+  const slug = groupAreaSlug(toGroupArea(group.area));
+  if ((await searchParams).area !== slug) redirect(`/bird-groups/${group.id}?area=${slug}`);
+  const areaQuery = `?area=${slug}`;
 
   return (
     <div>
       <PageHeader
         title={group.name || group.breed.name}
-        backHref="/bird-groups"
+        backHref={`/bird-groups${areaQuery}`}
         action={
           <Link
-            href={`/bird-groups/${group.id}/edit`}
+            href={`/bird-groups/${group.id}/edit${areaQuery}`}
             className="flex h-11 items-center gap-1 rounded-lg border px-3 text-sm font-medium"
           >
             <Pencil size={16} aria-hidden /> Koreguoti

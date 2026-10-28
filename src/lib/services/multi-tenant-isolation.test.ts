@@ -62,6 +62,7 @@ import {
   createBirdGroup,
   deleteBirdGroup,
   getBirdGroupWithEvents,
+  listBirdGroups,
   updateBirdGroup,
 } from "@/lib/services/bird-groups";
 import {
@@ -237,6 +238,29 @@ describe("bird groups", () => {
 
   it("does not return another farm's bird group", async () => {
     await expect(getBirdGroupWithEvents(FARM_B_ID, "group-a")).resolves.toBeNull();
+  });
+
+  // #186: the area lists ("Dedeklių grupės", "Mėsinių grupės") stay farm-scoped.
+  it("never lists another farm's groups in an area list", async () => {
+    // The in-memory fake applies no column defaults, so give farm A an
+    // explicit Mėsa group next to group-a.
+    await fakePrisma.birdGroup.create({
+      data: {
+        id: "group-a-meat",
+        farmId: FARM_A_ID,
+        breedId: "breed-a",
+        sex: "MALE",
+        category: "COCKEREL",
+        area: "MEAT",
+        quantity: 4,
+        birthOrAcquiredDate: new Date("2025-01-01"),
+      },
+    });
+
+    await expect(listBirdGroups(FARM_B_ID, "MEAT")).resolves.toEqual([]);
+    await expect(listBirdGroups(FARM_B_ID)).resolves.toEqual([]);
+    const own = await listBirdGroups(FARM_A_ID, "MEAT");
+    expect(own.map((g) => g.id)).toEqual(["group-a-meat"]);
   });
 
   it("refuses to update another farm's bird group", async () => {

@@ -1,7 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { LayoutGrid, Egg, Heart, Thermometer, Drumstick } from "lucide-react";
 import { NAV_ITEMS, navKeyForPath, type NavKey } from "@/lib/v2-navigation";
 import { cn } from "@/lib/utils";
@@ -18,10 +19,26 @@ const ICONS: Record<NavKey, typeof Egg> = {
  * V2 bottom bar (docs/V2_app_designs/V2Nav): one item per farm area plus the
  * farm overview. There is no add button — each area's page header carries its
  * own primary action instead.
+ *
+ * Group and trade screens are shared by Kiaušiniai and Mėsa, so `?area=` on
+ * them picks the highlighted item (#186). Reading search params needs a
+ * Suspense boundary; until it resolves, the bar highlights by path alone.
  */
 export function BottomTabBar() {
-  const active = navKeyForPath(usePathname());
+  const pathname = usePathname();
+  return (
+    <Suspense fallback={<Bar active={navKeyForPath(pathname)} />}>
+      <BarWithArea pathname={pathname} />
+    </Suspense>
+  );
+}
 
+function BarWithArea({ pathname }: { pathname: string }) {
+  const area = useSearchParams().get("area");
+  return <Bar active={navKeyForPath(pathname, area)} />;
+}
+
+function Bar({ active }: { active: NavKey | null }) {
   return (
     <nav
       aria-label="Ūkio sritys"

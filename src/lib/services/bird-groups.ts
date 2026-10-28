@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, BirdGroupEventType } from "@/generated/prisma/client";
 import type { CreateBirdGroupInput, UpdateBirdGroupInput } from "@/lib/validation/bird-groups";
+import type { BirdGroupArea } from "@/lib/validation/farm-areas";
 import { ValidationError, ConcurrentModificationError } from "@/lib/errors";
 import { birdTypeOrder, birdCategoryOrder } from "@/lib/labels";
 
@@ -149,9 +150,10 @@ export async function getFlockComposition(farmId: string) {
   return composition;
 }
 
-export function listBirdGroups(farmId: string) {
+/** The farm's groups, optionally only one area's (Kiaušiniai, Mėsa or Perinimas, #186). */
+export function listBirdGroups(farmId: string, area?: BirdGroupArea | null) {
   return prisma.birdGroup.findMany({
-    where: { farmId },
+    where: { farmId, ...(area ? { area } : {}) },
     include: { breed: true },
     orderBy: { createdAt: "desc" },
   });
