@@ -39,11 +39,25 @@ if (!auditPath) {
 
 const data = JSON.parse(readFileSync(auditPath, "utf8"));
 
+// `npm audit --audit-level=high --json` only changes npm's exit code; the JSON
+// still lists every advisory. So filter on each advisory's own severity here
+// (the `via` objects carry it), and only report the rest (#212).
+const GATED = new Set(["high", "critical"]);
+
 const found = new Set();
+const belowGate = new Map(); // url -> severity
 for (const advisory of Object.values(data.vulnerabilities || {})) {
   for (const via of advisory.via || []) {
-    if (typeof via === "object" && via.url) found.add(via.url);
+    if (typeof via !== "object" || !via.url) continue;
+    if (GATED.has(via.severity)) found.add(via.url);
+    else belowGate.set(via.url, via.severity);
   }
+}
+
+if (belowGate.size > 0) {
+  console.log("Below the high/critical gate (not failing):");
+  for (const [url, severity] of belowGate) console.log(`  [${severity}] ${url}`);
+  console.log("");
 }
 
 const unaccepted = [...found].filter((url) => !ACCEPTED.some((a) => url.includes(a.id)));
