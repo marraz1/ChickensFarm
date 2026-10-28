@@ -796,18 +796,18 @@ describe("area expense list", () => {
   });
 
   it("never shows another farm's expenses or purchases", async () => {
-    const eggsB = await getAreaExpenses(FARM_B_ID, "eggs", now);
+    const eggsB = await getAreaExpenses(FARM_B_ID, "EGGS", { now });
     expect(eggsB.rows.map((r) => r.key).sort()).toEqual(["expense-exp-b-eggs", "purchase-buy-b"]);
     expect(eggsB.total).toBe(20);
 
-    const eggsA = await getAreaExpenses(FARM_A_ID, "eggs", now);
+    const eggsA = await getAreaExpenses(FARM_A_ID, "EGGS", { now });
     expect(eggsA.rows.map((r) => r.key).sort()).toEqual(["expense-exp-a-eggs", "purchase-buy-a"]);
   });
 
   it("keeps each area to its own expenses, purchases in Kiaušiniai only", async () => {
-    const meatA = await getAreaExpenses(FARM_A_ID, "meat", now);
+    const meatA = await getAreaExpenses(FARM_A_ID, "MEAT", { now });
     expect(meatA.rows.map((r) => r.key)).toEqual(["expense-exp-a-meat"]);
-    await expect(getAreaExpenses(FARM_A_ID, "hens", now)).resolves.toMatchObject({ rows: [] });
+    await expect(getAreaExpenses(FARM_A_ID, "HENS", { now })).resolves.toMatchObject({ rows: [] });
   });
 });
 

@@ -7,25 +7,27 @@ import {
   targetFromInput,
 } from "@/lib/services/farm-areas";
 import type { CreateExpenseInput } from "@/lib/validation/expenses";
-import type { ExpenseCategory } from "@/generated/prisma/client";
+import type { ExpenseCategory, FarmArea } from "@/generated/prisma/client";
 import { listBirdTransactions } from "@/lib/services/bird-transactions";
 import {
   areaCountsPurchases,
+  birdGroupLabel,
   buildAreaExpenseSummary,
   type AreaExpenseSummary,
 } from "@/lib/area-expenses";
-import { AREA_SLUGS, type AreaSlug } from "@/lib/v2-navigation";
+import { currentYearLT } from "@/lib/format";
 
 /**
  * An area's Išlaidos tab (#194): its expenses (and, for Kiaušiniai, the farm's
  * bird purchases) as the year card plus the full list. Farm-scoped throughout.
+ * Loads the area's whole history — fine at a farm's scale; #198 moves the year
+ * totals into the database when it adds period switching.
  */
 export async function getAreaExpenses(
   farmId: string,
-  slug: AreaSlug,
-  now: Date = new Date(),
+  area: Exclude<FarmArea, "SHARED">,
+  options: { now?: Date; linkQuery?: string } = {},
 ): Promise<AreaExpenseSummary> {
-  const area = AREA_SLUGS[slug];
   const [expenses, purchases] = await Promise.all([
     prisma.expense.findMany({
       where: { farmId, area },
@@ -40,7 +42,8 @@ export async function getAreaExpenses(
 
   return buildAreaExpenseSummary({
     area,
-    year: now.getUTCFullYear(),
+    year: currentYearLT(options.now),
+    linkQuery: options.linkQuery,
     expenses: expenses.map((e) => ({
       id: e.id,
       category: e.category,
@@ -51,11 +54,7 @@ export async function getAreaExpenses(
       // Optional chaining: a target can be gone (SetNull) and tests use a
       // fake that returns rows without their relations.
       targetName:
-        e.birdGroup?.name ||
-        e.birdGroup?.breed?.name ||
-        e.motherHen?.name ||
-        e.incubationCycle?.name ||
-        null,
+        birdGroupLabel(e.birdGroup) || e.motherHen?.name || e.incubationCycle?.name || null,
     })),
     purchases: purchases.map((p) => ({
       id: p.id,
@@ -63,7 +62,7 @@ export async function getAreaExpenses(
       quantity: p.quantity,
       transactionDate: p.transactionDate,
       createdAt: p.createdAt,
-      groupLabel: p.birdGroup?.name || p.birdGroup?.breed?.name || null,
+      groupLabel: birdGroupLabel(p.birdGroup),
     })),
   });
 }

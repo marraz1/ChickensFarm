@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { requireActiveFarm } from "@/lib/session";
 import { getAreaExpenses } from "@/lib/services/expenses";
 import { formatEUR } from "@/lib/format";
-import { isAreaSlug } from "@/lib/v2-navigation";
+import { AREA_SLUGS, isAreaSlug } from "@/lib/v2-navigation";
 
 // The area's Išlaidos tab (#194, V2-<Area>-Expenses): the year's total with a
 // per-category breakdown, and every expense of the area, newest first.
@@ -15,7 +15,10 @@ export default async function AreaExpensesPage({ params }: { params: Promise<{ a
   // The area layout already 404s an unknown slug; this narrows the type.
   if (!isAreaSlug(area)) notFound();
   const { farm } = await requireActiveFarm();
-  const { year, total, breakdown, rows } = await getAreaExpenses(farm.id, area);
+  // Rows carry ?area= so the edit screens return here and keep the area lit.
+  const { year, total, breakdown, rows } = await getAreaExpenses(farm.id, AREA_SLUGS[area], {
+    linkQuery: `?area=${area}`,
+  });
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-4">
@@ -34,7 +37,7 @@ export default async function AreaExpensesPage({ params }: { params: Promise<{ a
         </p>
       ) : (
         <>
-          <Card className="gap-2 p-4" aria-label={`Išlaidos · ${year} m.`}>
+          <Card className="gap-2 p-4" role="region" aria-label={`Išlaidos · ${year} m.`}>
             <p className="text-sm text-muted-foreground">Išlaidos · {year} m.</p>
             <p className="text-2xl font-semibold tabular-nums">{formatEUR(total)}</p>
             {breakdown.length === 0 ? (
@@ -81,6 +84,15 @@ export default async function AreaExpensesPage({ params }: { params: Promise<{ a
           </ul>
         </>
       )}
+
+      {/* "Bendra" expenses belong to no area, so no Išlaidos tab lists them;
+          until the farm overview shows them (#201), the farm-wide list does. */}
+      <Link
+        href="/expenses"
+        className="flex min-h-11 items-center justify-center text-sm font-medium text-primary"
+      >
+        Visos ūkio išlaidos
+      </Link>
     </div>
   );
 }

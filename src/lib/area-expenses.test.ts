@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  birdGroupLabel,
   buildAreaExpenseSummary,
   type AreaExpenseInput,
   type AreaPurchaseInput,
 } from "./area-expenses";
-import { formatLongDateLT } from "./format";
+import { currentYearLT, formatLongDateLT } from "./format";
 
 const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`); // as @db.Date comes back
 let seq = 0;
@@ -189,5 +190,54 @@ describe("buildAreaExpenseSummary — the list", () => {
       href: `/birds/purchases/${buy.id}/edit`,
     });
     expect(byKey[`purchase-${unlinked.id}`].detail).toBe("2 vnt. · iš pirkimų");
+  });
+});
+
+describe("buildAreaExpenseSummary — review fixes", () => {
+  it("adds the area to row links so edit screens return to it", () => {
+    const e = expense();
+    const p = purchase();
+    const s = buildAreaExpenseSummary({
+      area: "EGGS",
+      year: 2026,
+      expenses: [e],
+      purchases: [p],
+      linkQuery: "?area=eggs",
+    });
+    const hrefs = Object.fromEntries(s.rows.map((r) => [r.key, r.href]));
+    expect(hrefs[`expense-${e.id}`]).toBe(`/expenses/${e.id}/edit?area=eggs`);
+    expect(hrefs[`purchase-${p.id}`]).toBe(`/birds/purchases/${p.id}/edit?area=eggs`);
+  });
+
+  it("keeps the total equal to the listed parts when a category nets to zero", () => {
+    const s = buildAreaExpenseSummary({
+      area: "MEAT",
+      year: 2026,
+      expenses: [
+        expense({ category: "FEED", amount: "20" }),
+        expense({ category: "OTHER", amount: "5" }),
+        expense({ category: "OTHER", amount: "-5" }),
+      ],
+      purchases: [],
+    });
+    expect(s.breakdown).toEqual([{ label: "Pašarai", amount: 20 }]);
+    expect(s.total).toBe(s.breakdown.reduce((sum, b) => sum + b.amount, 0));
+  });
+});
+
+describe("birdGroupLabel", () => {
+  it("prefers the group's name, then its breed's", () => {
+    expect(birdGroupLabel({ name: "Vištidė A", breed: { name: "Brama" } })).toBe("Vištidė A");
+    expect(birdGroupLabel({ name: null, breed: { name: "Brama" } })).toBe("Brama");
+    expect(birdGroupLabel({ name: "", breed: null })).toBeNull();
+    expect(birdGroupLabel(null)).toBeNull();
+  });
+});
+
+describe("currentYearLT", () => {
+  it("turns the year at Lithuanian midnight, not UTC midnight", () => {
+    // 2026-12-31 22:30 UTC is already 2027-01-01 00:30 in Vilnius (UTC+2).
+    expect(currentYearLT(new Date("2026-12-31T22:30:00Z"))).toBe(2027);
+    expect(currentYearLT(new Date("2026-12-31T21:30:00Z"))).toBe(2026);
   });
 });

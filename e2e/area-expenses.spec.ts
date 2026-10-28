@@ -75,7 +75,7 @@ const todayLocal = () => {
 
 test("Išlaida on an area's Išlaidos tab opens the area expense form", async ({ page }) => {
   await page.goto("/areas/eggs/expenses");
-  await page.getByRole("link", { name: "Išlaida" }).click();
+  await page.getByRole("link", { name: "Išlaida", exact: true }).click();
 
   await expect(page).toHaveURL(/\/expenses\/new\?area=eggs$/);
   await expect(page.getByRole("heading", { name: "Nauja išlaida" })).toBeVisible();
@@ -188,19 +188,30 @@ test("the Išlaidos tab lists the area's expenses and Kiaušiniai's bird purchas
   await expect(card.getByText("Paukščių pirkimai", { exact: true })).toBeVisible();
 
   const row = page.getByRole("link").filter({ hasText: description });
-  await expect(row).toHaveAttribute("href", /\/expenses\/.+\/edit$/);
+  await expect(row).toHaveAttribute("href", /\/expenses\/.+\/edit\?area=eggs$/);
   await expect(row).toContainText("Pašarai ·");
   await expect(row).toContainText(names.eggs);
   await expect(row).toContainText(/12,50\s€/);
 
-  const purchaseRow = page.locator(`a[href="/birds/purchases/${purchaseId}/edit"]`);
+  const purchaseRow = page.locator(`a[href^="/birds/purchases/${purchaseId}/edit"]`);
   await expect(purchaseRow).toContainText("Paukščių pirkimas ·");
   await expect(purchaseRow).toContainText("4 vnt. · iš pirkimų");
   await expect(purchaseRow).toContainText(/34,00\s€/);
 
+  // Opened from the area, the expense returns to the area and keeps it lit.
+  await row.click();
+  await expect(page).toHaveURL(/\/expenses\/.+\/edit\?area=eggs$/, { timeout: 15_000 });
+  await expect(page.getByRole("link", { name: "Grįžti" })).toHaveAttribute(
+    "href",
+    "/areas/eggs/expenses",
+  );
+  await expect(
+    page.getByRole("navigation", { name: "Ūkio sritys" }).getByRole("link", { name: "Kiaušiniai" }),
+  ).toHaveAttribute("aria-current", "page");
+
   // Bird purchases count in Kiaušiniai only (#194 decision).
   await page.goto("/areas/meat/expenses");
-  await expect(page.locator(`a[href="/birds/purchases/${purchaseId}/edit"]`)).toHaveCount(0);
+  await expect(page.locator(`a[href^="/birds/purchases/${purchaseId}/edit"]`)).toHaveCount(0);
 });
 
 test("an area with no expenses says so", async ({ page }) => {
@@ -213,5 +224,5 @@ test("an area with no expenses says so", async ({ page }) => {
   await page.goto("/areas/hens/expenses");
   await expect(page.getByText("Šioje srityje dar nėra išlaidų.")).toBeVisible();
   // The way to add one is still there.
-  await expect(page.getByRole("link", { name: "Išlaida" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Išlaida", exact: true })).toBeVisible();
 });

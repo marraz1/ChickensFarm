@@ -1,25 +1,26 @@
 import { addLocalDays, formatSendTime, getLocalNow } from "@/lib/notification-schedule";
 
-export function formatDateLT(date: Date | string): string {
+// Dates are read in UTC because `@db.Date` values come back at 00:00Z;
+// formatting them in local time would show the previous day west of UTC.
+function formatUTCDateLT(date: Date | string, options: Intl.DateTimeFormatOptions): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("lt-LT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(d);
+  return new Intl.DateTimeFormat("lt-LT", { ...options, timeZone: "UTC" }).format(d);
 }
 
-// "2026 m. spalio 25 d." — the long form the V2 lists use (#194). UTC, like
-// formatDateLT, because `@db.Date` values come back at 00:00Z.
+export function formatDateLT(date: Date | string): string {
+  return formatUTCDateLT(date, { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/** "2026 m. spalio 25 d." — the long form the V2 lists use (#194). */
 export function formatLongDateLT(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("lt-LT", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(d);
+  return formatUTCDateLT(date, { year: "numeric", month: "long", day: "numeric" });
+}
+
+/** The current calendar year on the farm's clock (Lithuania), not the server's UTC. */
+export function currentYearLT(now: Date = new Date()): number {
+  return Number(
+    new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Europe/Vilnius" }).format(now),
+  );
 }
 
 // Parses a user-entered decimal that may use the Lithuanian comma separator
