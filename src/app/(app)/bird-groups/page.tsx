@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { birdTypeLabels, sexLabels, birdCategoryLabels } from "@/lib/labels";
 import { formatDateLT } from "@/lib/format";
+import { groupAreaFromParam, groupAreaSlug, type GroupArea } from "@/lib/v2-navigation";
 import { Plus } from "lucide-react";
 
 function computeAge(birthOrAcquiredDate: Date): string {
@@ -17,21 +18,43 @@ function computeAge(birthOrAcquiredDate: Date): string {
   return `${Math.floor(months / 12)} m.`;
 }
 
-export default async function BirdGroupsPage() {
+// Titles of the area-filtered lists, as the V2 area screens name them (#186).
+const AREA_LIST_TITLES: Record<GroupArea, string> = {
+  EGGS: "Dedeklių grupės",
+  MEAT: "Mėsinių grupės",
+  INC: "Jauniklių grupės",
+};
+
+// Short area tag on each card of the unfiltered list.
+const AREA_TAGS: Record<GroupArea, string> = {
+  EGGS: "Kiaušiniai",
+  MEAT: "Mėsa",
+  INC: "Perinimas",
+};
+
+export default async function BirdGroupsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ area?: string | string[] }>;
+}) {
+  const area = groupAreaFromParam((await searchParams).area);
+  const slug = area ? groupAreaSlug(area) : null;
   const { farm } = await requireActiveFarm();
   const [groups, composition] = await Promise.all([
-    listBirdGroups(farm.id),
-    getFlockComposition(farm.id),
+    listBirdGroups(farm.id, area),
+    // The flock breakdown covers the whole farm, so it belongs on the full list only.
+    area ? Promise.resolve([]) : getFlockComposition(farm.id),
   ]);
+  const query = slug ? `?area=${slug}` : "";
 
   return (
     <div>
       <PageHeader
-        title="Paukščių grupės"
-        backHref="/birds"
+        title={area ? AREA_LIST_TITLES[area] : "Paukščių grupės"}
+        backHref={slug ? `/areas/${slug}` : "/birds"}
         action={
           <Link
-            href="/bird-groups/new"
+            href={`/bird-groups/new${query}`}
             className="flex h-11 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
           >
             <Plus size={16} aria-hidden /> Nauja
@@ -59,7 +82,9 @@ export default async function BirdGroupsPage() {
                             .join(" · ")}
                         </p>
                       </div>
-                      <span className="shrink-0 text-sm font-medium tabular-nums">{breed.total}</span>
+                      <span className="shrink-0 text-sm font-medium tabular-nums">
+                        {breed.total}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -75,11 +100,13 @@ export default async function BirdGroupsPage() {
         )}
         {groups.length === 0 && (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Dar nepridėta nė viena paukščių grupė.
+            {area
+              ? "Šioje srityje dar nėra paukščių grupių."
+              : "Dar nepridėta nė viena paukščių grupė."}
           </p>
         )}
         {groups.map((group) => (
-          <Link key={group.id} href={`/bird-groups/${group.id}`}>
+          <Link key={group.id} href={`/bird-groups/${group.id}${query}`}>
             <Card className="p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium">{group.name || group.breed.name}</p>
@@ -87,6 +114,7 @@ export default async function BirdGroupsPage() {
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">
                 {group.breed.name} · {birdTypeLabels[group.breed.birdType]}
+                {!area && ` · ${AREA_TAGS[group.area as GroupArea]}`}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {group.category !== "OTHER" ? `${birdCategoryLabels[group.category]} · ` : ""}

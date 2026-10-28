@@ -149,9 +149,10 @@ export async function getFlockComposition(farmId: string) {
   return composition;
 }
 
-export function listBirdGroups(farmId: string) {
+/** The farm's groups, optionally only one area's (Kiaušiniai, Mėsa or Perinimas, #186). */
+export function listBirdGroups(farmId: string, area?: "EGGS" | "MEAT" | "INC" | null) {
   return prisma.birdGroup.findMany({
-    where: { farmId },
+    where: { farmId, ...(area ? { area } : {}) },
     include: { breed: true },
     orderBy: { createdAt: "desc" },
   });

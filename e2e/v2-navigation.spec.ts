@@ -1,25 +1,19 @@
 import { expect, test, type Page } from "@playwright/test";
+import { AUTH_FILE } from "./auth-file";
 
 // V2 area navigation (#185). Needs the seeded user, like signed-in.spec.ts;
 // skipped without it.
 const email = process.env.E2E_USER_EMAIL;
-const password = process.env.E2E_USER_PASSWORD;
+const password = process.env.E2E_USER_PASSWORD; // read by auth.setup.ts; checked here to skip
 
 test.skip(!email || !password, "E2E_USER_EMAIL / E2E_USER_PASSWORD not set");
-
-async function signIn(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("El. paštas").fill(email!);
-  await page.getByLabel("Slaptažodis").fill(password!);
-  await page.getByRole("button", { name: "Prisijungti" }).click();
-  // First sign-in on a cold deployment can take well past the 5s default.
-  await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
-}
+// Signed in once by e2e/auth.setup.ts; logins are rate-limited.
+test.use({ storageState: AUTH_FILE });
 
 const areaBar = (page: Page) => page.getByRole("navigation", { name: "Ūkio sritys" });
 
 test("the bottom bar lists the farm areas and has no add button", async ({ page }) => {
-  await signIn(page);
+  await page.goto("/");
 
   await expect(areaBar(page).getByRole("link")).toHaveText([
     "Apžvalga",
@@ -37,7 +31,7 @@ test("the bottom bar lists the farm areas and has no add button", async ({ page 
 });
 
 test("an area shows its four tabs and keeps the bar item active", async ({ page }) => {
-  await signIn(page);
+  await page.goto("/");
 
   await areaBar(page).getByRole("link", { name: "Kiaušiniai" }).click();
   await expect(
@@ -65,7 +59,7 @@ test("an area shows its four tabs and keeps the bar item active", async ({ page 
 });
 
 test("a reused V1 screen sits under its area", async ({ page }) => {
-  await signIn(page);
+  await page.goto("/");
 
   await page.goto("/eggs/collections");
   await expect(areaBar(page).getByRole("link", { name: "Kiaušiniai" })).toHaveAttribute(
@@ -78,7 +72,7 @@ test("bar items, area tabs and the profile button are at least 44px tall on a ph
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await signIn(page);
+  await page.goto("/");
   await page.goto("/areas/eggs");
 
   const targets = [
@@ -95,7 +89,7 @@ test("bar items, area tabs and the profile button are at least 44px tall on a ph
 });
 
 test("an unknown area is a 404", async ({ page }) => {
-  await signIn(page);
+  await page.goto("/");
 
   const response = await page.goto("/areas/unknown");
   expect(response?.status()).toBe(404);

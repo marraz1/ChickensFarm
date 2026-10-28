@@ -6,6 +6,7 @@ import {
   isAreaSlug,
   navKeyForPath,
   AREA_RECORD_LINKS,
+  groupAreaFromParam,
 } from "./v2-navigation";
 
 describe("NAV_ITEMS", () => {
@@ -105,12 +106,45 @@ describe("AREA_RECORD_LINKS", () => {
   it("keeps each link inside the area it is listed under", () => {
     for (const [area, links] of Object.entries(AREA_RECORD_LINKS)) {
       for (const { href } of links) {
-        // Group lists are shared until groups are split by area (#186).
-        if (href === "/bird-groups") continue;
         // Meat-bird sales use the same V1 sales list as laying birds for now.
         if (area === "meat" && href === "/birds/sales") continue;
-        expect(navKeyForPath(href)).toBe(area);
+        const url = new URL(href, "http://x");
+        expect(navKeyForPath(url.pathname, url.searchParams.get("area"))).toBe(area);
       }
     }
+  });
+});
+
+describe("groupAreaFromParam", () => {
+  it.each([
+    ["eggs", "EGGS"],
+    ["meat", "MEAT"],
+    ["incubation", "INC"],
+  ] as const)("%s → %s", (param, area) => {
+    expect(groupAreaFromParam(param)).toBe(area);
+  });
+
+  it.each([undefined, null, "", "hens", "EGGS", "toString", ["eggs"]])(
+    "%j means all areas",
+    (param) => {
+      expect(groupAreaFromParam(param as string | string[] | null | undefined)).toBeNull();
+    },
+  );
+});
+
+describe("navKeyForPath with an area", () => {
+  it.each([
+    ["/bird-groups", "meat", "meat"],
+    ["/bird-groups/g1/edit", "meat", "meat"],
+    ["/bird-groups/new", "incubation", "incubation"],
+    ["/birds/purchases/new", "meat", "meat"],
+    ["/birds/sales/new", "eggs", "eggs"],
+    ["/bird-groups", null, "eggs"],
+    ["/bird-groups", "hens", "eggs"],
+    // The area only steers the shared group and trade screens.
+    ["/eggs/collections", "meat", "eggs"],
+    ["/mother-hens", "meat", "hens"],
+  ] as const)("%s?area=%s → %s", (path, area, key) => {
+    expect(navKeyForPath(path, area)).toBe(key);
   });
 });

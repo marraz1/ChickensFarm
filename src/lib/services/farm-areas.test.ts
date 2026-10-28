@@ -24,6 +24,7 @@ import {
   deleteBirdGroup,
   getBirdGroupWithEvents,
   GroupHasReferencesError,
+  listBirdGroups,
   updateBirdGroup,
 } from "@/lib/services/bird-groups";
 import {
@@ -242,6 +243,18 @@ describe("bird group area", () => {
     quantity: 3,
     birthOrAcquiredDate: "2025-03-01",
   };
+
+  // #186: "Dedeklių grupės" and "Mėsinių grupės" each list only their area.
+  it("lists one area's groups, or all of them without an area", async () => {
+    await seedGroup("inc-group", "INC");
+    const ids = async (area?: "EGGS" | "MEAT" | "INC") =>
+      (await listBirdGroups(FARM_ID, area)).map((g) => g.id).sort();
+
+    await expect(ids("EGGS")).resolves.toEqual(["eggs-group"]);
+    await expect(ids("MEAT")).resolves.toEqual(["meat-group"]);
+    await expect(ids("INC")).resolves.toEqual(["inc-group"]);
+    await expect(ids()).resolves.toEqual(["eggs-group", "inc-group", "meat-group"]);
+  });
 
   it("defaults to Kiaušiniai and accepts Mėsa", async () => {
     await expect(createBirdGroup(FARM_ID, USER_ID, group)).resolves.toMatchObject({ area: "EGGS" });

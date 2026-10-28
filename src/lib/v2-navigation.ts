@@ -69,12 +69,39 @@ function underPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
+// Areas a bird group can live in, by their URL slug (#186). A group is never
+// in Perekšlės (a mother hen is an individual bird), so "hens" is not one.
+const GROUP_AREA_SLUGS = { eggs: "EGGS", meat: "MEAT", incubation: "INC" } as const;
+export type GroupArea = (typeof GROUP_AREA_SLUGS)[keyof typeof GROUP_AREA_SLUGS];
+export type GroupAreaSlug = keyof typeof GROUP_AREA_SLUGS;
+
+/** `?area=` on group and trade screens → the group area, or null for "all". */
+export function groupAreaFromParam(value: string | string[] | undefined | null): GroupArea | null {
+  if (typeof value !== "string" || !Object.hasOwn(GROUP_AREA_SLUGS, value)) return null;
+  return GROUP_AREA_SLUGS[value as GroupAreaSlug];
+}
+
+export function groupAreaSlug(area: GroupArea): GroupAreaSlug {
+  return (Object.keys(GROUP_AREA_SLUGS) as GroupAreaSlug[]).find(
+    (slug) => GROUP_AREA_SLUGS[slug] === area,
+  )!;
+}
+
+// Group and trade screens are shared by the areas; `?area=` says which one
+// the farmer came from, so the bar keeps that area highlighted.
+const AREA_AWARE_PREFIXES = ["/bird-groups", "/birds/purchases", "/birds/sales"];
+
 /** The bottom-bar item to highlight for a URL, or null when none applies. */
-export function navKeyForPath(pathname: string): NavKey | null {
+export function navKeyForPath(pathname: string, areaParam?: string | null): NavKey | null {
   if (pathname === "/") return "overview";
 
   const area = /^\/areas\/([^/]+)/.exec(pathname)?.[1];
   if (area !== undefined) return isAreaSlug(area) ? area : null;
+
+  const groupArea = groupAreaFromParam(areaParam);
+  if (groupArea && AREA_AWARE_PREFIXES.some((p) => underPrefix(pathname, p))) {
+    return groupAreaSlug(groupArea);
+  }
 
   let best: { length: number; key: NavKey | null } | null = null;
   for (const [prefix, key] of ROUTE_AREAS) {
@@ -94,14 +121,15 @@ export const AREA_RECORD_LINKS: Record<AreaSlug, readonly { href: string; label:
     { href: "/eggs/consumptions", label: "Suvartoti kiaušiniai" },
     { href: "/birds/purchases", label: "Paukščių pirkimai" },
     { href: "/birds/sales", label: "Paukščių pardavimai" },
-    { href: "/bird-groups", label: "Dedeklių grupės" },
+    { href: "/bird-groups?area=eggs", label: "Dedeklių grupės" },
     { href: "/eggs/reports", label: "Kiaušinių ataskaita" },
   ],
   hens: [{ href: "/mother-hens", label: "Perekšlės" }],
   incubation: [{ href: "/incubation", label: "Perinimo ciklai" }],
   meat: [
     { href: "/birds/consumptions", label: "Suvartota mėsai" },
-    { href: "/bird-groups", label: "Mėsinių grupės" },
+    { href: "/bird-groups?area=meat", label: "Mėsinių grupės" },
+    { href: "/birds/purchases/new?area=meat", label: "Pirkti jauniklių auginti" },
     { href: "/birds/sales", label: "Paukščių pardavimai" },
   ],
 };

@@ -26,7 +26,15 @@ export default defineConfig({
         }
       : undefined,
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    // Signs the e2e user in once; specs reuse that session (see e2e/auth.setup.ts).
+    { name: "setup", testMatch: /auth\.setup\.ts/ },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
+  ],
   webServer: remoteBaseURL
     ? undefined
     : {

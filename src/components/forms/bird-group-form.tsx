@@ -14,13 +14,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { z } from "zod";
 import { updateBirdGroupSchema, type UpdateBirdGroupInput } from "@/lib/validation/bird-groups";
-import { sexLabels, birdCategoryLabels } from "@/lib/labels";
+import { birdGroupAreaEnum } from "@/lib/validation/farm-areas";
+import { sexLabels, birdCategoryLabels, farmAreaLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { Sex, BirdCategory } from "@/generated/prisma/client";
 
 type Breed = { id: string; name: string };
 type ExistingGroup = { id: string; breedId: string; sex: Sex; category: BirdCategory };
+type GroupArea = "EGGS" | "MEAT" | "INC";
+
+// The form insists on an area (#186); the API keeps it optional for older
+// callers and defaults to Kiaušiniai. An unchosen radio group submits null,
+// so the field accepts null and the object-level check turns a missing area
+// into one readable message.
+const birdGroupFormSchema = updateBirdGroupSchema
+  .extend({ area: birdGroupAreaEnum.nullish() })
+  .superRefine((data, ctx) => {
+    if (!data.area) ctx.addIssue({ code: "custom", path: ["area"], message: "Pasirinkite sritį" });
+  });
+type BirdGroupFormValues = z.input<typeof birdGroupFormSchema>;
 
 export function BirdGroupForm({
   breeds,
@@ -35,6 +50,11 @@ export function BirdGroupForm({
   defaultValues?: Partial<UpdateBirdGroupInput>;
   onSuccessPath: string;
 }) {
+  // A farmer files a group under Kiaušiniai or Mėsa. Perinimas holds hatched
+  // chicks and is only offered while editing a group that is still there, so
+  // it can be moved out.
+  const areaOptions: GroupArea[] =
+    defaultValues?.area === "INC" ? ["EGGS", "MEAT", "INC"] : ["EGGS", "MEAT"];
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -44,8 +64,8 @@ export function BirdGroupForm({
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<UpdateBirdGroupInput>({
-    resolver: zodResolver(updateBirdGroupSchema),
+  } = useForm<BirdGroupFormValues>({
+    resolver: zodResolver(birdGroupFormSchema),
     defaultValues: {
       breedId: "",
       name: "",
@@ -58,16 +78,17 @@ export function BirdGroupForm({
   });
 
   const breedId = watch("breedId");
+  const area = watch("area");
   const sex = watch("sex");
   const category = watch("category");
 
   // F4 — warn (not block) when an identical breed+lytis+kategorija group already
   // exists, so the user can decide to keep the duplicate or edit the existing one.
   const duplicate = existingGroups.find(
-    (g) => g.id !== groupId && g.breedId === breedId && g.sex === sex && g.category === category
+    (g) => g.id !== groupId && g.breedId === breedId && g.sex === sex && g.category === category,
   );
 
-  async function onSubmit(data: UpdateBirdGroupInput) {
+  async function onSubmit(data: BirdGroupFormValues) {
     setServerError(null);
     const res = await fetch(groupId ? `/api/bird-groups/${groupId}` : "/api/bird-groups", {
       method: groupId ? "PATCH" : "POST",
@@ -86,18 +107,42 @@ export function BirdGroupForm({
   }
 
   if (breeds.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Pirmiausia pridėkite bent vieną veislę.
-      </p>
-    );
+    return <p className="text-sm text-muted-foreground">Pirmiausia pridėkite bent vieną veislę.</p>;
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="mb-1.5 text-sm font-medium">Sritis</legend>
+        <div className="flex flex-col gap-2">
+          {areaOptions.map((option) => (
+            <label
+              key={option}
+              className={cn(
+                "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 text-sm",
+                area === option && "border-primary bg-primary/5",
+              )}
+            >
+              <input
+                type="radio"
+                value={option}
+                className="size-4 accent-primary"
+                {...register("area")}
+              />
+              {farmAreaLabels[option]}
+            </label>
+          ))}
+        </div>
+        {errors.area && <p className="text-sm text-destructive">{errors.area.message}</p>}
+      </fieldset>
+
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="breedId">Veislė</Label>
-        <Select items={Object.fromEntries(breeds.map((b) => [b.id, b.name]))} value={breedId ?? ""} onValueChange={(v) => v && setValue("breedId", v, { shouldValidate: true })}>
+        <Select
+          items={Object.fromEntries(breeds.map((b) => [b.id, b.name]))}
+          value={breedId ?? ""}
+          onValueChange={(v) => v && setValue("breedId", v, { shouldValidate: true })}
+        >
           <SelectTrigger id="breedId" className="h-11 w-full">
             <SelectValue placeholder="Pasirinkite veislę" />
           </SelectTrigger>
@@ -120,7 +165,11 @@ export function BirdGroupForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="category">Kategorija</Label>
-        <Select items={birdCategoryLabels} value={category} onValueChange={(v) => v && setValue("category", v as BirdCategory)}>
+        <Select
+          items={birdCategoryLabels}
+          value={category}
+          onValueChange={(v) => v && setValue("category", v as BirdCategory)}
+        >
           <SelectTrigger id="category" className="h-11 w-full">
             <SelectValue />
           </SelectTrigger>
@@ -159,13 +208,25 @@ export function BirdGroupForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="quantity">Kiekis</Label>
-        <Input id="quantity" type="number" inputMode="numeric" min={0} className="h-11" {...register("quantity", { valueAsNumber: true })} />
+        <Input
+          id="quantity"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          className="h-11"
+          {...register("quantity", { valueAsNumber: true })}
+        />
         {errors.quantity && <p className="text-sm text-destructive">{errors.quantity.message}</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="birthOrAcquiredDate">Gimimo / įsigijimo data</Label>
-        <Input id="birthOrAcquiredDate" type="date" className="h-11" {...register("birthOrAcquiredDate")} />
+        <Input
+          id="birthOrAcquiredDate"
+          type="date"
+          className="h-11"
+          {...register("birthOrAcquiredDate")}
+        />
         {errors.birthOrAcquiredDate && (
           <p className="text-sm text-destructive">{errors.birthOrAcquiredDate.message}</p>
         )}
