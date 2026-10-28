@@ -64,9 +64,12 @@ export function FarmSwitcher({ farms, activeFarm }: { farms: Farm[]; activeFarm:
         type="button"
         onClick={() => router.push("/profile")}
         aria-label="Profilis"
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-accent"
+        // 44px hit area (V2 touch-target rule) around the 36px avatar circle.
+        className="-mr-1 flex h-11 w-11 items-center justify-center"
       >
-        <User size={18} className="text-accent-foreground" aria-hidden />
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent">
+          <User size={18} className="text-accent-foreground" aria-hidden />
+        </span>
       </button>
     </div>
   );

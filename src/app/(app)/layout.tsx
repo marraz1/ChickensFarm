@@ -18,8 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
       </header>
 
-      {/* Bottom padding clears the tab bar only — the add button sits inside it
-          now, so no extra room is needed above the bar. */}
+      {/* Bottom padding clears the fixed V2 area bar. */}
       <main className="mx-auto w-full max-w-md flex-1 pb-20">{children}</main>
 
       {activeFarm && <BottomTabBar />}
