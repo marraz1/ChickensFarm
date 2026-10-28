@@ -74,6 +74,19 @@ describe("GET /api/health — unauthenticated (what an uptime monitor sees)", ()
     expect(res.status).toBe(503);
     expect(json.status).toBe("degraded");
   });
+
+  // #181: the V2 beta has no CRON_SECRET, so the public body is the only one
+  // that can show it is the beta.
+  it("says it is the V2 beta, and only there", async () => {
+    queryRaw.mockResolvedValue([{ "?column?": 1 }]);
+
+    vi.stubEnv("APP_STAGE", "beta");
+    expect((await (await GET(request())).json()).stage).toBe("beta");
+
+    vi.stubEnv("APP_STAGE", "");
+    const plain = await (await GET(request())).json();
+    expect(Object.keys(plain).sort()).toEqual(["status", "time"]);
+  });
 });
 
 describe("GET /api/health — authenticated (deploy pipeline / operator)", () => {

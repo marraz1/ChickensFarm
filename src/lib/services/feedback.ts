@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { appVersionTag } from "@/lib/app-stage";
 import type { FeedbackInput } from "@/lib/validation/feedback";
 
 /**
@@ -14,7 +15,8 @@ export function createFeedback(
   userId: string,
   farmId: string | null,
   input: FeedbackInput,
-  appVersion: string | null = process.env.APP_VERSION ?? null,
+  // "0.1.13-beta" when sent from the V2 beta, so its reports can be told apart.
+  appVersion: string | null = appVersionTag(),
 ) {
   return prisma.feedback.create({
     data: {

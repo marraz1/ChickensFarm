@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { NotificationSettingsForm } from "@/components/forms/notification-settings-form";
 import { formatRelativeLT, formatZonedDateTimeLT } from "@/lib/format";
 import { pushPublicKey } from "@/lib/push";
+import { isBeta } from "@/lib/app-stage";
 
 export default async function NotificationSettingsPage() {
   const user = await requireUser();
@@ -16,6 +17,13 @@ export default async function NotificationSettingsPage() {
     <div>
       <PageHeader title="Pranešimai" backHref="/profile" />
       <div className="flex flex-col gap-6 px-4">
+        {isBeta() && (
+          <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+            V2 beta versijoje dienos priminimai nesiunčiami – juos siunčia pagrindinė programėlė.
+            Čia pakeisti nustatymai jos nepaveikia ir bus perrašyti kito duomenų kopijavimo metu.
+            Priminimų laiką ar el. paštą keiskite pagrindinėje programėlėje.
+          </p>
+        )}
         <NotificationSettingsForm
           // No row until the first save — the form falls back to its defaults.
           defaultValues={
