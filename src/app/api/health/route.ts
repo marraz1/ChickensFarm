@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isEmailConfigured } from "@/lib/email";
 import { pushPublicKey, vapidSubject } from "@/lib/push";
 import { evaluateDue } from "@/lib/notification-schedule";
-import { appStage } from "@/lib/app-stage";
+import { isBeta } from "@/lib/app-stage";
 
 // Nothing here may be cached: a cached "ok" from a previous deployment is worse
 // than no health check at all.
@@ -130,7 +130,10 @@ export async function GET(req: Request) {
 
   if (!detailed) {
     return NextResponse.json(
-      { status, time: new Date().toISOString() },
+      // The beta has no CRON_SECRET, so the detailed body below is never
+      // reachable there; `stage` is not sensitive, so the beta says so here.
+      // Absent rather than null elsewhere, so V1's public body is unchanged.
+      { status, time: new Date().toISOString(), ...(isBeta() ? { stage: "beta" } : {}) },
       { status: status === "ok" ? 200 : 503 },
     );
   }
@@ -145,7 +148,7 @@ export async function GET(req: Request) {
       // is being served".
       version: process.env.APP_VERSION ?? null,
       // "beta" on the V2 beta (#181); null on V1 and on V2 after cutover.
-      stage: appStage(),
+      stage: isBeta() ? "beta" : null,
       commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
       environment: process.env.VERCEL_ENV ?? null,
       region: process.env.VERCEL_REGION ?? null,

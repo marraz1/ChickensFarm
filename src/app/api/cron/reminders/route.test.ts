@@ -21,6 +21,8 @@ const call = (auth?: string) =>
   );
 
 beforeEach(() => {
+  // Not the beta unless a case says so, whatever the shell exports.
+  vi.stubEnv("APP_STAGE", "");
   runReminderBatch.mockReset();
   runReminderBatch.mockResolvedValue({ due: 0, sent: 0 });
 });

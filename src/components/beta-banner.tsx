@@ -1,4 +1,4 @@
-import { appStage } from "@/lib/app-stage";
+import { isBeta } from "@/lib/app-stage";
 
 /**
  * Shown on every page of the V2 beta (#181): beta data is reloaded from V1 by
@@ -6,7 +6,7 @@ import { appStage } from "@/lib/app-stage";
  * dismissible on purpose — the warning has to stay true while it applies.
  */
 export function BetaBanner() {
-  if (appStage() !== "beta") return null;
+  if (!isBeta()) return null;
   return (
     <div
       role="note"

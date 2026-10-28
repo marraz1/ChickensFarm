@@ -70,8 +70,13 @@ Steps 1–5 are done by hand in the Neon, Vercel and GitHub dashboards.
 
    `APP_STAGE=beta` shows the banner "Beta: duomenys gali būti perrašyti" on every page,
    labels the version on the profile screen "V2 beta", and makes `/api/cron/reminders`
-   answer 503 even if a `CRON_SECRET` is ever set (#181). **Remove it at cutover (#182)**,
-   when V2 becomes the production app.
+   answer 503 even if a `CRON_SECRET` is ever set (#181). The public `/api/health` body
+   includes `"stage": "beta"` there.
+
+   **At cutover (#182), when V2 becomes the production app, remove both of these together:**
+   - `APP_STAGE` from the V2 Vercel project (Production and Preview);
+   - the `E2E_EXPECT_BETA` line from `.github/workflows/ci.yml`. Otherwise every V2 PR's
+     `e2e/beta.spec.ts` keeps expecting the banner and fails.
 
 5. **Settings → Deployment Protection → Protection Bypass for Automation:** generate a secret
    and store it as the repository secret `VERCEL_AUTOMATION_BYPASS_SECRET`. Without it CI's
