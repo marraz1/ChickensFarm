@@ -10,14 +10,22 @@ test.skip(!email || !password, "E2E_USER_EMAIL / E2E_USER_PASSWORD not set");
 // Signed in once by e2e/auth.setup.ts; logins are rate-limited.
 test.use({ storageState: AUTH_FILE });
 
-type Created = { breedId?: string; groupIds: string[]; expenseIds: string[]; henIds: string[] };
-let created: Created = { groupIds: [], expenseIds: [], henIds: [] };
+type Created = {
+  breedId?: string;
+  groupIds: string[];
+  expenseIds: string[];
+  henIds: string[];
+  purchaseIds: string[];
+};
+const none = (): Created => ({ groupIds: [], expenseIds: [], henIds: [], purchaseIds: [] });
+let created: Created = none();
 
 test.beforeEach(() => {
-  created = { groupIds: [], expenseIds: [], henIds: [] };
+  created = none();
 });
 
 test.afterEach(async ({ page }) => {
+  for (const id of created.purchaseIds) await page.request.delete(`/api/bird-transactions/${id}`);
   for (const id of created.expenseIds) await page.request.delete(`/api/expenses/${id}`);
   for (const id of created.henIds) await page.request.delete(`/api/mother-hens/${id}`);
   for (const id of created.groupIds) await page.request.delete(`/api/bird-groups/${id}`);
@@ -143,4 +151,67 @@ test("an Eggs expense on an Eggs group is saved and returns to the area", async 
   created.expenseIds.push(saved!.id);
   expect(saved).toMatchObject({ area: "EGGS", birdGroupId: ids.eggs });
   expect(Number(saved!.amount)).toBe(12.5);
+});
+
+// #194: an area's Išlaidos tab.
+test("the Išlaidos tab lists the area's expenses and Kiaušiniai's bird purchases", async ({
+  page,
+}) => {
+  const { names, ids } = await createGroups(page);
+  const today = todayLocal();
+  const description = `E2E sąrašas ${Date.now()}`;
+
+  const exp = await page.request.post("/api/expenses", {
+    data: {
+      expenseDate: today,
+      category: "FEED",
+      amount: 12.5,
+      area: "EGGS",
+      birdGroupId: ids.eggs,
+      description,
+    },
+  });
+  expect(exp.ok()).toBe(true);
+  created.expenseIds.push((await exp.json()).id as string);
+
+  const buy = await page.request.post("/api/bird-transactions", {
+    data: { type: "PURCHASE", transactionDate: today, quantity: 4, unitPrice: 8.5 },
+  });
+  expect(buy.ok()).toBe(true);
+  const purchaseId = (await buy.json()).id as string;
+  created.purchaseIds.push(purchaseId);
+
+  await page.goto("/areas/eggs/expenses");
+  const card = page.getByLabel(`Išlaidos · ${new Date().getFullYear()} m.`);
+  await expect(card).toBeVisible();
+  await expect(card.getByText("Pašarai", { exact: true })).toBeVisible();
+  await expect(card.getByText("Paukščių pirkimai", { exact: true })).toBeVisible();
+
+  const row = page.getByRole("link").filter({ hasText: description });
+  await expect(row).toHaveAttribute("href", /\/expenses\/.+\/edit$/);
+  await expect(row).toContainText("Pašarai ·");
+  await expect(row).toContainText(names.eggs);
+  await expect(row).toContainText(/12,50\s€/);
+
+  const purchaseRow = page.locator(`a[href="/birds/purchases/${purchaseId}/edit"]`);
+  await expect(purchaseRow).toContainText("Paukščių pirkimas ·");
+  await expect(purchaseRow).toContainText("4 vnt. · iš pirkimų");
+  await expect(purchaseRow).toContainText(/34,00\s€/);
+
+  // Bird purchases count in Kiaušiniai only (#194 decision).
+  await page.goto("/areas/meat/expenses");
+  await expect(page.locator(`a[href="/birds/purchases/${purchaseId}/edit"]`)).toHaveCount(0);
+});
+
+test("an area with no expenses says so", async ({ page }) => {
+  const all = (await (await page.request.get("/api/expenses")).json()) as { area: string }[];
+  test.skip(
+    all.some((e) => e.area === "HENS"),
+    "the e2e farm has Perekšlės expenses",
+  );
+
+  await page.goto("/areas/hens/expenses");
+  await expect(page.getByText("Šioje srityje dar nėra išlaidų.")).toBeVisible();
+  // The way to add one is still there.
+  await expect(page.getByRole("link", { name: "Išlaida" })).toBeVisible();
 });

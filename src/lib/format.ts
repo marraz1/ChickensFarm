@@ -10,6 +10,18 @@ export function formatDateLT(date: Date | string): string {
   }).format(d);
 }
 
+// "2026 m. spalio 25 d." — the long form the V2 lists use (#194). UTC, like
+// formatDateLT, because `@db.Date` values come back at 00:00Z.
+export function formatLongDateLT(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("lt-LT", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(d);
+}
+
 // Parses a user-entered decimal that may use the Lithuanian comma separator
 // ("1,50" → 1.5). Returns NaN for empty/invalid input so callers/validators can
 // decide how to treat it.

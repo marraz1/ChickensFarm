@@ -94,6 +94,7 @@ import {
 import {
   createExpense,
   deleteExpense,
+  getAreaExpenses,
   getExpense,
   listExpenses,
   updateExpense,
@@ -743,6 +744,70 @@ describe("expense target options", () => {
     expect(ids).toEqual(["cycle-a"]);
     const other = (await listExpenseTargetOptions(FARM_B_ID, "incubation")).map((o) => o.id);
     expect(other).toEqual(["cycle-b"]);
+  });
+});
+
+// #194: an area's Išlaidos tab lists only the active farm's expenses and, for
+// Kiaušiniai, only its own bird purchases.
+describe("area expense list", () => {
+  const now = new Date("2026-10-28T12:00:00Z");
+
+  beforeEach(async () => {
+    await seedTwoFarms();
+    for (const [id, farmId, area] of [
+      ["exp-a-eggs", FARM_A_ID, "EGGS"],
+      ["exp-a-meat", FARM_A_ID, "MEAT"],
+      ["exp-b-eggs", FARM_B_ID, "EGGS"],
+    ] as const) {
+      await fakePrisma.expense.create({
+        data: {
+          id,
+          farmId,
+          area,
+          birdGroupId: null,
+          motherHenId: null,
+          incubationCycleId: null,
+          expenseDate: new Date("2026-10-01"),
+          category: "FEED",
+          amount: 10,
+          description: null,
+          createdAt: new Date("2026-10-01T10:00:00Z"),
+        },
+      });
+    }
+    for (const [id, farmId] of [
+      ["buy-a", FARM_A_ID],
+      ["buy-b", FARM_B_ID],
+    ] as const) {
+      await fakePrisma.birdTransaction.create({
+        data: {
+          id,
+          farmId,
+          birdGroupId: null,
+          type: "PURCHASE",
+          transactionDate: new Date("2026-10-02"),
+          quantity: 2,
+          unitPrice: 5,
+          totalAmount: 10,
+          createdAt: new Date("2026-10-02T10:00:00Z"),
+        },
+      });
+    }
+  });
+
+  it("never shows another farm's expenses or purchases", async () => {
+    const eggsB = await getAreaExpenses(FARM_B_ID, "eggs", now);
+    expect(eggsB.rows.map((r) => r.key).sort()).toEqual(["expense-exp-b-eggs", "purchase-buy-b"]);
+    expect(eggsB.total).toBe(20);
+
+    const eggsA = await getAreaExpenses(FARM_A_ID, "eggs", now);
+    expect(eggsA.rows.map((r) => r.key).sort()).toEqual(["expense-exp-a-eggs", "purchase-buy-a"]);
+  });
+
+  it("keeps each area to its own expenses, purchases in Kiaušiniai only", async () => {
+    const meatA = await getAreaExpenses(FARM_A_ID, "meat", now);
+    expect(meatA.rows.map((r) => r.key)).toEqual(["expense-exp-a-meat"]);
+    await expect(getAreaExpenses(FARM_A_ID, "hens", now)).resolves.toMatchObject({ rows: [] });
   });
 });
 

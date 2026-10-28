@@ -185,12 +185,12 @@ export const AREA_EXPENSE_TARGETS: Record<AreaSlug, { field: ExpenseTargetField;
     meat: { field: "birdGroupId", label: "Mėsinių grupė (neprivaloma)" },
   };
 
-// Farm-wide V1 screen each not-yet-built area tab points to meanwhile.
+// Farm-wide V1 screen each not-yet-built area tab points to meanwhile
+// (Išlaidos has its own list since #194).
 export const AREA_TAB_FALLBACK: Record<
-  Exclude<AreaTabSegment, null>,
+  Exclude<AreaTabSegment, null | "expenses">,
   { href: string; label: string }
 > = {
-  expenses: { href: "/expenses", label: "Visos ūkio išlaidos" },
   losses: { href: "/losses", label: "Visi ūkio nuostoliai" },
   finance: { href: "/finance/profit-loss", label: "Ūkio pelnas / nuostoliai" },
 };
