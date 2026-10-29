@@ -98,3 +98,44 @@ test("Išlaida opens the general expense form", async ({ page }) => {
   });
   await expect(page.getByRole("heading", { name: "Nauja išlaida" })).toBeVisible();
 });
+
+test("the general expense form asks for the area and files a shared cost under Bendra", async ({
+  page,
+}) => {
+  const description = `E2E bendra ${Date.now()}`;
+  await page.goto("/expenses/new");
+  // The form submits through its script; a click before hydration would not.
+  await page.waitForLoadState("networkidle");
+
+  const areas = page.getByRole("group", { name: "Sritis" });
+  await expect(areas.getByRole("radio")).toHaveCount(5);
+  for (const name of [
+    "Kiaušiniai ir prekyba",
+    "Perekšlės",
+    "Perinimas",
+    "Mėsiniai paukščiai",
+    "Bendra (visam ūkiui)",
+  ]) {
+    await expect(areas.getByRole("radio", { name })).not.toBeChecked();
+  }
+
+  await page.getByLabel("Data").fill(quietDay());
+  await page.getByLabel("Suma (€)").fill("4,50");
+  await page.getByLabel("Aprašymas").fill(description);
+  await page.getByRole("button", { name: "Išsaugoti" }).click();
+  await expect(page.getByText("Pasirinkite sritį")).toBeVisible();
+  await expect(page).toHaveURL((url) => url.pathname === "/expenses/new");
+
+  await areas.getByRole("radio", { name: "Bendra (visam ūkiui)" }).check();
+  await page.getByRole("button", { name: "Išsaugoti" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/expenses", { timeout: 15_000 });
+
+  const all = (await (await page.request.get("/api/expenses")).json()) as {
+    id: string;
+    area: string;
+    description: string | null;
+  }[];
+  const saved = all.find((e) => e.description === description);
+  expect(saved?.area).toBe("SHARED");
+  if (saved) expenseIds.push(saved.id);
+});

@@ -35,11 +35,12 @@ import {
 } from "@/lib/services/mother-hens";
 import { finalizeHatch, getIncubationCycle } from "@/lib/services/incubation";
 import { getProfitLossReport } from "@/lib/services/reports";
-import { createExpenseSchema } from "@/lib/validation/expenses";
+import { createExpenseSchema, newExpenseSchema } from "@/lib/validation/expenses";
+import { getFarmFinance } from "@/lib/services/area-finance";
 import { createLossSchema } from "@/lib/validation/losses";
 import { createBirdGroupSchema } from "@/lib/validation/bird-groups";
 import { createMotherHenSchema } from "@/lib/validation/mother-hens";
-import { farmAreaLabels } from "@/lib/labels";
+import { expenseAreaChoices, farmAreaLabels } from "@/lib/labels";
 
 const FARM_ID = "farm-1";
 const USER_ID = "user-1";
@@ -152,6 +153,61 @@ describe("expense area", () => {
       createExpenseSchema.safeParse({ ...expense, birdGroupId: "a", incubationCycleId: "b" })
         .success,
     ).toBe(false);
+  });
+
+  // #193: the general form's "Sritis" has no default and offers "Bendra".
+  it("makes a new expense name its area, Bendra included", () => {
+    const missing = newExpenseSchema.safeParse(expense);
+    expect(missing.success).toBe(false);
+    expect(missing.error?.issues[0]).toMatchObject({
+      path: ["area"],
+      message: "Pasirinkite sritį",
+    });
+    for (const area of ["EGGS", "HENS", "INC", "MEAT", "SHARED"]) {
+      expect(newExpenseSchema.safeParse({ ...expense, area }).success).toBe(true);
+    }
+    expect(newExpenseSchema.safeParse({ ...expense, area: "OTHER" }).success).toBe(false);
+    // An update may still leave the area out and keep the stored one.
+    expect(createExpenseSchema.safeParse(expense).success).toBe(true);
+  });
+
+  it("offers the five areas under Sritis, Bendra last as the design names it", () => {
+    expect(expenseAreaChoices.map((c) => c.label)).toEqual([
+      "Kiaušiniai ir prekyba",
+      "Perekšlės",
+      "Perinimas",
+      "Mėsiniai paukščiai",
+      "Bendra (visam ūkiui)",
+    ]);
+  });
+
+  it("counts a Bendra expense in the farm total and in no area", async () => {
+    const period = {
+      from: new Date("2025-01-01"),
+      to: new Date("2025-12-31"),
+      today: new Date("2025-06-01"),
+    };
+    await createExpense(FARM_ID, { ...expense, amount: 40, area: "SHARED" });
+
+    const farm = await getFarmFinance(FARM_ID, period);
+    expect(farm.total.expenses).toBe(40);
+    expect(farm.areas.SHARED.expenses).toBe(40);
+    for (const area of ["EGGS", "HENS", "INC", "MEAT"] as const) {
+      expect(farm.areas[area].expenses).toBe(0);
+    }
+  });
+
+  it("moves an expense to Bendra when the general form clears its target", async () => {
+    const created = await createExpense(FARM_ID, { ...expense, birdGroupId: "eggs-group" });
+    await expect(
+      updateExpense(FARM_ID, created.id as string, {
+        ...expense,
+        area: "SHARED",
+        birdGroupId: null,
+        motherHenId: null,
+        incubationCycleId: null,
+      }),
+    ).resolves.toMatchObject({ area: "SHARED", birdGroupId: null });
   });
 
   it("keeps area and target on an update that leaves them out (the V1 form)", async () => {

@@ -35,6 +35,8 @@ export default async function EditExpensePage({
             category: expense.category,
             amount: Number(expense.amount),
             description: expense.description ?? "",
+            // Shown under "Sritis", so the expense can be moved (#193).
+            area: expense.area,
           }}
           onSuccessPath={returnPath}
         />
