@@ -21,6 +21,12 @@ export function isAreaSlug(value: string): value is AreaSlug {
   return Object.hasOwn(AREA_SLUGS, value);
 }
 
+/** A stored area's URL slug; "Bendra" has no area screens, so null. */
+export function areaSlugFor(area: FarmArea): AreaSlug | null {
+  const entry = Object.entries(AREA_SLUGS).find(([, a]) => a === area);
+  return entry ? (entry[0] as AreaSlug) : null;
+}
+
 export type NavKey = "overview" | AreaSlug;
 
 // Short labels from V2Nav; page titles use farmAreaLabels' long forms.

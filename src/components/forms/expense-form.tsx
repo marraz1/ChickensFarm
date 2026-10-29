@@ -16,10 +16,10 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import type { z } from "zod";
-import { createExpenseSchema, type CreateExpenseInput } from "@/lib/validation/expenses";
-import { expenseCategoryLabels } from "@/lib/labels";
+import { newExpenseSchema, type CreateExpenseInput } from "@/lib/validation/expenses";
+import { expenseAreaChoices, expenseCategoryLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
-import type { ExpenseTargetField } from "@/lib/v2-navigation";
+import { areaSlugFor, type ExpenseTargetField } from "@/lib/v2-navigation";
 import type { FarmArea } from "@/generated/prisma/client";
 
 /**
@@ -29,11 +29,7 @@ import type { FarmArea } from "@/generated/prisma/client";
 export type ExpenseAreaContext = {
   area: FarmArea;
   areaLabel: string;
-  /**
-   * "Keisti": the general expense form. Choosing another area there arrives
-   * with #193 (its "Sritis" chooser); until then it is the V1 form, which
-   * files an expense without a target under "Bendra".
-   */
+  /** "Keisti": the general expense form, whose "Sritis" offers every area (#193). */
   changeHref: string;
   target: {
     field: ExpenseTargetField;
@@ -43,17 +39,26 @@ export type ExpenseAreaContext = {
 };
 
 const NO_TARGET = "";
+const AREA_HINT = "Išlaida bus įskaičiuota į šios srities ir viso ūkio finansus.";
+// A "Bendra" cost belongs to no area (finance rule 1).
+const SHARED_HINT = "Išlaida bus įskaičiuota į viso ūkio finansus.";
 
 export function ExpenseForm({
   expenseId,
   defaultValues,
   onSuccessPath = "/expenses",
   areaContext,
+  followMovedArea = false,
+  targetLabel = null,
 }: {
   expenseId?: string;
   defaultValues?: Partial<CreateExpenseInput>;
   onSuccessPath?: string;
   areaContext?: ExpenseAreaContext;
+  /** Edit opened from an area's tab: after a move, open the new area's tab. */
+  followMovedArea?: boolean;
+  /** What the stored expense points at, named in the warning before a move. */
+  targetLabel?: string | null;
 } = {}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -64,8 +69,10 @@ export function ExpenseForm({
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<z.input<typeof createExpenseSchema>, unknown, CreateExpenseInput>({
-    resolver: zodResolver(createExpenseSchema),
+  } = useForm<z.input<typeof newExpenseSchema>, unknown, CreateExpenseInput>({
+    // The area is always sent: fixed from an area, else chosen under "Sritis"
+    // (#193), which has no default, so a cost is never filed by accident.
+    resolver: zodResolver(newExpenseSchema),
     defaultValues: {
       expenseDate: todayInputValue(),
       category: "FEED",
@@ -77,13 +84,22 @@ export function ExpenseForm({
   const category = watch("category");
   const targetField = areaContext?.target.field;
   const targetId = targetField ? (watch(targetField) ?? NO_TARGET) : NO_TARGET;
+  const chosenArea = watch("area");
+  // The general form has no target picker: moving an expense to another area
+  // drops the target, which belongs to the old one and would be refused there.
+  const isMove = (area: unknown) =>
+    !areaContext && expenseId != null && area != null && area !== defaultValues?.area;
 
   async function onSubmit(data: CreateExpenseInput) {
     setServerError(null);
+    const movedWithoutPicker = isMove(data.area);
+    const body = movedWithoutPicker
+      ? { ...data, birdGroupId: null, motherHenId: null, incubationCycleId: null }
+      : data;
     const res = await fetch(expenseId ? `/api/expenses/${expenseId}` : "/api/expenses", {
       method: expenseId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -92,7 +108,12 @@ export function ExpenseForm({
       return;
     }
 
-    router.push(onSuccessPath);
+    let nextPath = onSuccessPath;
+    if (movedWithoutPicker && followMovedArea && data.area) {
+      const slug = areaSlugFor(data.area);
+      nextPath = slug ? `/areas/${slug}/expenses` : "/expenses";
+    }
+    router.push(nextPath);
     router.refresh();
   }
 
@@ -110,10 +131,40 @@ export function ExpenseForm({
               Keisti
             </Link>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Išlaida bus įskaičiuota į šios srities ir viso ūkio finansus.
-          </p>
+          <p className="text-xs text-muted-foreground">{AREA_HINT}</p>
         </div>
+      )}
+
+      {/* The general form (#193, V2-Expense-Form): the farmer picks the area. */}
+      {!areaContext && (
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1.5 text-sm font-medium">Sritis</legend>
+          <div className="rounded-lg border">
+            {expenseAreaChoices.map((choice) => (
+              <label
+                key={choice.value}
+                className="flex min-h-11 items-center gap-2.5 border-t px-3 text-sm first:border-t-0"
+              >
+                <input
+                  type="radio"
+                  value={choice.value}
+                  className="size-4 accent-primary"
+                  {...register("area")}
+                />
+                {choice.label}
+              </label>
+            ))}
+          </div>
+          {errors.area && <p className="text-sm text-destructive">{errors.area.message}</p>}
+          <p className="text-xs text-muted-foreground">
+            {chosenArea === "SHARED" ? SHARED_HINT : AREA_HINT}
+          </p>
+          {targetLabel && isMove(chosenArea) && (
+            <p role="status" className="text-sm text-amber-700">
+              Išlaida nebebus susieta su „{targetLabel}“.
+            </p>
+          )}
+        </fieldset>
       )}
 
       <div className="flex flex-col gap-1.5">

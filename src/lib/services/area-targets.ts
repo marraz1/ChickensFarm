@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { birdGroupOptions } from "@/lib/bird-group-options";
-import { cycleLabel } from "@/lib/labels";
+import { birdGroupLabel, cycleLabel } from "@/lib/labels";
 import type { AreaSlug } from "@/lib/v2-navigation";
 
 export type TargetOption = { id: string; label: string };
@@ -51,4 +51,42 @@ export async function listAreaTargetOptions(
         })
       ).map((cycle) => ({ id: cycle.id, label: cycleLabel(cycle) }));
   }
+}
+
+/**
+ * The name of what a stored expense points at — a group, a mother hen or an
+ * incubation cycle — or null when it has none. The general edit form warns
+ * with it before a move to another area drops the link (#193). Looked up by
+ * `{id, farmId}`, so another farm's row never names it.
+ */
+export async function expenseTargetLabel(
+  farmId: string,
+  expense: {
+    birdGroupId: string | null;
+    motherHenId: string | null;
+    incubationCycleId: string | null;
+  },
+): Promise<string | null> {
+  if (expense.birdGroupId) {
+    const group = await prisma.birdGroup.findFirst({
+      where: { id: expense.birdGroupId, farmId },
+      select: { name: true, breed: { select: { name: true } } },
+    });
+    return birdGroupLabel(group);
+  }
+  if (expense.motherHenId) {
+    const hen = await prisma.motherHen.findFirst({
+      where: { id: expense.motherHenId, farmId },
+      select: { name: true },
+    });
+    return hen?.name ?? null;
+  }
+  if (expense.incubationCycleId) {
+    const cycle = await prisma.incubationCycle.findFirst({
+      where: { id: expense.incubationCycleId, farmId },
+      select: { name: true, startDate: true },
+    });
+    return cycle ? cycleLabel(cycle) : null;
+  }
+  return null;
 }

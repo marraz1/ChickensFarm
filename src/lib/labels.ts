@@ -98,3 +98,11 @@ export const farmAreaLabels: Record<FarmArea, string> = {
 // Display order for area breakdowns, matching the V2 navigation; "Bendra"
 // comes last, after the areas it is shared between.
 export const farmAreaOrder: FarmArea[] = ["EGGS", "HENS", "INC", "MEAT", "SHARED"];
+
+/** The expense form's "Sritis" choices (#193, V2-Expense-Form), in display order. */
+export const expenseAreaChoices: { value: FarmArea; label: string }[] = farmAreaOrder.map(
+  (value) => ({
+    value,
+    label: value === "SHARED" ? "Bendra (visam ūkiui)" : farmAreaLabels[value],
+  }),
+);
