@@ -270,6 +270,16 @@ describe("getIncubationAreaOverview", () => {
     expect(o.active).toEqual({ count: 2, eggs: 42 });
   });
 
+  it("counts only the fertile eggs of a candled running cycle", async () => {
+    await seedCycle("candled", null, "2026-10-12", null, 24);
+    await fakePrisma.incubationCycle.update({
+      where: { id: "candled" },
+      data: { eggsFertile: 18, eggsInfertile: 6 },
+    });
+    const o = await getIncubationAreaOverview(FARM_ID, NOW);
+    expect(o.active).toEqual({ count: 1, eggs: 18 });
+  });
+
   it("measures efficiency over hatched cycles only", async () => {
     await seedCycle("a", null, "2026-08-01");
     await seedCycle("b", null, "2026-08-10");
@@ -307,9 +317,27 @@ describe("getIncubationAreaOverview", () => {
     await seedCycle("done", null, "2026-06-01");
     await hatch("raising", 10, 9);
     await hatch("done", 10, 8, true);
+    // Hatched with no chicks: nothing to raise, and it can never be finished.
+    await seedCycle("failed", null, "2026-07-01");
+    await hatch("failed", 10, 0);
 
     const o = await getIncubationAreaOverview(FARM_ID, NOW);
     expect(o.sheet).toEqual({ active: ["running"], growing: ["raising"] });
+  });
+
+  it("titles an unnamed old cycle by its start date", async () => {
+    await fakePrisma.incubationCycle.create({
+      data: {
+        id: "legacy",
+        farmId: FARM_ID,
+        name: null,
+        motherHenId: null,
+        startDate: day("2025-05-04"),
+        hatchDate: null,
+      },
+    });
+    const o = await getIncubationAreaOverview(FARM_ID, NOW);
+    expect(o.cards[0].name).toBe("Ciklas nuo 2025-05-04");
   });
 
   it("takes the balance from the Perinimas finances", async () => {

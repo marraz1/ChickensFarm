@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect as baseExpect, test, type Page } from "@playwright/test";
 import { AUTH_FILE } from "./auth-file";
 
 // The V2 area overviews (#187–#190): stat cards, the year's balance, the
@@ -10,11 +10,27 @@ const password = process.env.E2E_USER_PASSWORD; // read by auth.setup.ts; checke
 test.skip(!email || !password, "E2E_USER_EMAIL / E2E_USER_PASSWORD not set");
 // Signed in once by e2e/auth.setup.ts; logins are rate-limited.
 test.use({ storageState: AUTH_FILE });
+// An overview compiles on first visit under a cold dev server and reads many
+// figures; the default 5 s assertions failed in full parallel runs.
+test.describe.configure({ timeout: 60_000 });
+const expect = baseExpect.configure({ timeout: 15_000 });
+const slow = { timeout: 15_000 };
 
 const farmYear = () =>
   new Intl.DateTimeFormat("en", { timeZone: "Europe/Vilnius", year: "numeric" }).format(new Date());
 
 const sheet = (page: Page) => page.getByRole("dialog", { name: "Naujas įrašas" });
+
+/**
+ * Opens the "Naujas įrašas" sheet. The button is server-rendered, so a click
+ * that lands before the page hydrates does nothing; retry until it opens.
+ */
+async function openSheet(page: Page, button: string) {
+  await expect(async () => {
+    await page.getByRole("button", { name: button, exact: true }).click();
+    await expect(sheet(page)).toBeVisible({ timeout: 2_000 });
+  }).toPass(slow);
+}
 
 test.describe("Kiaušiniai (#187)", () => {
   test("shows egg stock, the laying flock, the balance and the records", async ({ page }) => {
@@ -49,7 +65,7 @@ test.describe("Kiaušiniai (#187)", () => {
     page,
   }) => {
     await page.goto("/areas/eggs");
-    await page.getByRole("button", { name: "Naujas" }).click();
+    await openSheet(page, "Naujas");
 
     await expect(sheet(page)).toBeVisible();
     await expect(sheet(page)).toContainText("Kiaušiniai ir prekyba");
@@ -67,7 +83,7 @@ test.describe("Kiaušiniai (#187)", () => {
     await sheet(page).getByRole("button", { name: "Uždaryti" }).click();
     await expect(sheet(page)).toBeHidden();
 
-    await page.getByRole("button", { name: "Naujas" }).click();
+    await openSheet(page, "Naujas");
     await sheet(page).getByRole("link", { name: "Surinkti kiaušinius" }).click();
     await expect(page).toHaveURL(/\/eggs\/collections\/new$/, { timeout: 15_000 });
   });
@@ -136,7 +152,7 @@ test.describe("Perekšlės (#188)", () => {
 
   test("Nauja opens the sheet with the hen actions", async ({ page }) => {
     await page.goto("/areas/hens");
-    await page.getByRole("button", { name: "Nauja" }).click();
+    await openSheet(page, "Nauja");
 
     await expect(sheet(page)).toContainText("Perekšlės");
     await expect(sheet(page).getByRole("link")).toHaveText([
@@ -199,7 +215,7 @@ test.describe("Perinimas (#189)", () => {
 
   test("Naujas ciklas opens the sheet, which leads to the new-cycle form", async ({ page }) => {
     await page.goto("/areas/incubation");
-    await page.getByRole("button", { name: "Naujas ciklas" }).click();
+    await openSheet(page, "Naujas ciklas");
 
     await expect(sheet(page)).toContainText("Perinimas");
     await expect(sheet(page).getByRole("link")).toHaveText([

@@ -47,7 +47,8 @@ test("an area shows its four tabs and keeps the bar item active", async ({ page 
   ]);
 
   await tabs.getByRole("link", { name: "Išlaidos" }).click();
-  await expect(page).toHaveURL(/\/areas\/eggs\/expenses$/);
+  // The tab may compile on first visit under a cold dev server.
+  await expect(page).toHaveURL(/\/areas\/eggs\/expenses$/, { timeout: 15_000 });
   await expect(tabs.getByRole("link", { name: "Išlaidos" })).toHaveAttribute(
     "aria-current",
     "page",

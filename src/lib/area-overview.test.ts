@@ -38,11 +38,17 @@ describe("hatchEfficiency", () => {
   });
 
   it("has no rate before any fertile eggs have hatched", () => {
-    expect(hatchEfficiency([running, { ...running, eggsFertile: 10 }]).rate).toBeNull();
-    // A hatch recorded without candling has no fertile count to divide by.
+    expect(hatchEfficiency([running, { ...running, eggsFertile: 10 }])).toMatchObject({
+      rate: null,
+      anyHatched: false,
+    });
+  });
+
+  it("tells a hatch recorded without candling apart from no hatch at all", () => {
+    // No fertile count to divide by, but something did hatch.
     expect(
-      hatchEfficiency([{ hatchDate: d("2026-09-01"), eggsFertile: null, hatchedCount: 9 }]).rate,
-    ).toBeNull();
+      hatchEfficiency([{ hatchDate: d("2026-09-01"), eggsFertile: null, hatchedCount: 9 }]),
+    ).toMatchObject({ rate: null, anyHatched: true });
   });
 });
 
@@ -55,6 +61,7 @@ describe("cycleCardLines", () => {
     sourceBreed: null,
     sourceDescription: null,
     latestAlive: null,
+    growthCompletedAt: null,
   };
   const today = d("2026-10-26");
 
@@ -82,6 +89,20 @@ describe("cycleCardLines", () => {
       result: "Išsirito 16 · dabar gyvų 15",
     });
     expect(cycleCardLines(hatched, today).result).toBe("Išsirito 16");
+  });
+
+  it("says when the chicks' raising is finished", () => {
+    const done = {
+      ...base,
+      hatchDate: d("2026-09-02"),
+      eggsFertile: 20,
+      hatchedCount: 16,
+      latestAlive: 15,
+      growthCompletedAt: d("2026-10-20"),
+    };
+    expect(cycleCardLines(done, today).result).toBe(
+      "Išsirito 16 · dabar gyvų 15 · auginimas baigtas",
+    );
   });
 });
 

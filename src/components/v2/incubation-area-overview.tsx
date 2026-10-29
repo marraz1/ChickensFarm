@@ -5,12 +5,17 @@ import { AreaNewSheet } from "@/components/v2/area-new-sheet";
 import { StatCard } from "@/components/v2/stat-card";
 import { countNounLT, formatShareLT } from "@/lib/format";
 import { farmAreaLabels } from "@/lib/labels";
-import { incubationSheetItems, type CycleStatus } from "@/lib/area-overview";
+import { EGGS, incubationSheetItems, type CycleStatus } from "@/lib/area-overview";
 import { AREA_NEW_RECORDS } from "@/lib/v2-navigation";
 import { cn } from "@/lib/utils";
 import type { IncubationOverview } from "@/lib/services/area-overview";
 
-const EGGS = ["kiaušinis", "kiaušiniai", "kiaušinių"] as const;
+/** The "Efektyvumas" line, or why there is no rate yet. */
+function efficiencyDetail(e: IncubationOverview["efficiency"]): string {
+  if (e.rate != null) return `Išsirito ${e.hatched} iš ${e.fertile} apvaisintų`;
+  // Hatches recorded without candling have no fertile count to divide by.
+  return e.anyHatched ? "Be apšvietimo duomenų" : "Dar nėra išsiritimų";
+}
 
 // The same colours as the V1 cycle list.
 const BADGE: Record<CycleStatus, string> = {
@@ -47,11 +52,7 @@ export function IncubationAreaOverview({ data }: { data: IncubationOverview }) {
         <StatCard
           label="Efektyvumas"
           value={efficiency.rate == null ? "—" : formatShareLT(efficiency.rate)}
-          detail={
-            efficiency.rate == null
-              ? "Dar nėra išsiritimų"
-              : `Išsirito ${efficiency.hatched} iš ${efficiency.fertile} apvaisintų`
-          }
+          detail={efficiencyDetail(efficiency)}
         />
       </div>
 

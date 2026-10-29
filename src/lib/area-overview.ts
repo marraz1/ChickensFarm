@@ -20,7 +20,8 @@ export function sittingDay(startDate: Date, today: Date): number {
   return Math.max(1, Math.round((today.getTime() - startDate.getTime()) / 86_400_000) + 1);
 }
 
-const EGGS = ["kiaušinis", "kiaušiniai", "kiaušinių"] as const;
+/** "1 kiaušinis", "2 kiaušiniai", "12 kiaušinių" (countNounLT forms). */
+export const EGGS = ["kiaušinis", "kiaušiniai", "kiaušinių"] as const;
 
 /**
  * The "Peri dabar" line (#188): "8 kiaušiniai · 6-a diena" for one sitting
@@ -56,23 +57,26 @@ export function cycleStatus(cycle: CycleFacts): CycleStatus {
 /**
  * "Efektyvumas": chicks hatched out of the fertile eggs, over hatched cycles
  * only — a cycle candled but not hatched yet has fertile eggs and no result,
- * and would drag the rate down. `rate` is null with no fertile eggs yet.
+ * and would drag the rate down. `rate` is null with no fertile eggs yet;
+ * `anyHatched` tells "nothing hatched" from "hatched, but never candled".
  */
 export function hatchEfficiency(cycles: readonly CycleFacts[]) {
   let hatched = 0;
   let fertile = 0;
+  let anyHatched = false;
   for (const c of cycles) {
+    if (c.hatchDate) anyHatched = true;
     if (!c.hatchDate || c.eggsFertile == null || c.hatchedCount == null) continue;
     hatched += c.hatchedCount;
     fertile += c.eggsFertile;
   }
-  return { hatched, fertile, rate: fertile > 0 ? hatched / fertile : null };
+  return { hatched, fertile, rate: fertile > 0 ? hatched / fertile : null, anyHatched };
 }
 
 /**
  * The lines of a cycle card: when it started (and, while it runs, which day
- * it is), where the eggs came from, and once hatched how many chicks and how
- * many are alive now.
+ * it is), where the eggs came from, and once hatched how many chicks, how many
+ * are alive now and whether their raising is finished.
  */
 export function cycleCardLines(
   cycle: CycleFacts & {
@@ -82,6 +86,7 @@ export function cycleCardLines(
     sourceBreed: string | null;
     sourceDescription: string | null;
     latestAlive: number | null;
+    growthCompletedAt: Date | null;
   },
   today: Date,
 ): { started: string; source: string; result: string | null } {
@@ -106,6 +111,8 @@ export function cycleCardLines(
       ? [
           `Išsirito ${cycle.hatchedCount}`,
           cycle.latestAlive != null && `dabar gyvų ${cycle.latestAlive}`,
+          // Tells a finished raising from one still needing growth entries.
+          cycle.growthCompletedAt && "auginimas baigtas",
         ]
           .filter(Boolean)
           .join(" · ")

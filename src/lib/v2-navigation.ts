@@ -154,17 +154,17 @@ export function navKeyForPath(pathname: string, areaParam?: string | null): NavK
   return best?.key ?? null;
 }
 
-// The "Įrašai" list of each area's Apžvalga tab: the V1 screens that belong to
-// the area. `stat` names the figure an area overview shows beside the link
-// (#187 Kiaušiniai); areas whose overview is not built yet (#188–#190) show
-// the bare list.
+// The "Įrašai" list on the Apžvalga tabs that have one: the V1 screens that
+// belong to the area. `stat` names the figure the overview shows beside the
+// link (#187 Kiaušiniai); Mėsa shows the bare list until #190. Perekšlės and
+// Perinimas list their hens and cycles instead (#188, #189).
 export type EggsStatKey =
   "collected" | "eggSales" | "eggsConsumed" | "purchases" | "birdSales" | "groups";
 // #188–#190 add their areas' keys to this union.
 export type AreaStatKey = EggsStatKey;
 export type AreaRecordLink = { href: string; label: string; stat?: AreaStatKey };
 
-export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
+export const AREA_RECORD_LINKS: Record<"eggs" | "meat", readonly AreaRecordLink[]> = {
   eggs: [
     { href: "/eggs/collections", label: "Kiaušinių surinkimas", stat: "collected" },
     { href: "/eggs/sales", label: "Kiaušinių pardavimai", stat: "eggSales" },
@@ -175,8 +175,6 @@ export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
     // Not in the design; kept so the report stays reachable in V2.
     { href: "/eggs/reports", label: "Kiaušinių ataskaita" },
   ],
-  hens: [{ href: "/mother-hens", label: "Perekšlės" }],
-  incubation: [{ href: "/incubation", label: "Perinimo ciklai" }],
   meat: [
     { href: "/birds/consumptions", label: "Suvartota mėsai" },
     { href: "/bird-groups?area=meat", label: "Mėsinių grupės" },

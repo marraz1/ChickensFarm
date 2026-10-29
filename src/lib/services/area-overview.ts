@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { resolveFinancePeriod } from "@/lib/finance-period";
-import { formatDateLT } from "@/lib/format";
+import { cycleLabel } from "@/lib/labels";
 import {
   cycleCardLines,
   cycleStatus,
@@ -267,13 +267,15 @@ export async function getIncubationAreaOverview(
     year: year.year,
     active: {
       count: running.length,
-      eggs: running.reduce((sum, c) => sum + (c.eggsTotal ?? 0), 0),
+      // Once candled the infertile eggs are taken out: only fertile ones remain.
+      eggs: running.reduce((sum, c) => sum + (c.eggsFertile ?? c.eggsTotal ?? 0), 0),
     },
     efficiency: hatchEfficiency(cycles),
     cards: ordered.map((c) => ({
       id: c.id,
-      // Cycles from before names were required, labelled as the V1 list does.
-      name: c.name ?? `Pradėta ${formatDateLT(c.startDate)}`,
+      // Cycles from before names were required: "Ciklas nuo <date>", so the
+      // title does not repeat the "Pradėta …" line under it.
+      name: cycleLabel(c),
       status: cycleStatus(c),
       lines: cycleCardLines(
         {
@@ -289,7 +291,11 @@ export async function getIncubationAreaOverview(
     })),
     sheet: {
       active: running.map((c) => c.id),
-      growing: ordered.filter((c) => c.hatchDate && !c.growthCompletedAt).map((c) => c.id),
+      // Being raised: hatched with chicks, raising not finished. A hatch of 0
+      // chicks can never be finished, so it would otherwise stay here forever.
+      growing: ordered
+        .filter((c) => c.hatchDate && !c.growthCompletedAt && (c.hatchedCount ?? 0) > 0)
+        .map((c) => c.id),
     },
     balance,
   };
