@@ -7,7 +7,7 @@
 // went into. #198 (area finances) uses the same rule.
 import { toCents } from "@/lib/finance-math";
 import { expenseCategoryLabels } from "@/lib/labels";
-import { formatLongDateLT } from "@/lib/format";
+import { formatDateLT, formatLongDateLT } from "@/lib/format";
 import type { ExpenseCategory, FarmArea } from "@/generated/prisma/client";
 
 export type AreaExpenseInput = {
@@ -58,6 +58,11 @@ export function birdGroupLabel(
   group: { name: string | null; breed?: { name: string } | null } | null | undefined,
 ): string | null {
   return group?.name || group?.breed?.name || null;
+}
+
+/** An incubation cycle as lists name it: its own name, else when it started. */
+export function cycleLabel(cycle: { name: string | null; startDate: Date }): string {
+  return cycle.name || `Ciklas nuo ${formatDateLT(cycle.startDate)}`;
 }
 
 export function buildAreaExpenseSummary(input: {

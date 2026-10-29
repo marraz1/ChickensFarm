@@ -4,7 +4,7 @@ import { getLoss } from "@/lib/services/losses";
 import { listBirdGroups } from "@/lib/services/bird-groups";
 import { PageHeader } from "@/components/layout/page-header";
 import { LossForm, type LossLockedTarget } from "@/components/forms/loss-form";
-import { formatDateLT } from "@/lib/format";
+import { cycleLabel } from "@/lib/area-expenses";
 import { DeleteRecordButton } from "@/components/forms/delete-record-button";
 import { isAreaSlug } from "@/lib/v2-navigation";
 
@@ -32,9 +32,7 @@ export default async function EditLossPage({
     : loss.incubationCycle
       ? {
           label: "Perinimo ciklas",
-          value:
-            loss.incubationCycle.name ||
-            `Ciklas nuo ${formatDateLT(loss.incubationCycle.startDate)}`,
+          value: cycleLabel(loss.incubationCycle),
           lockDate: true,
         }
       : undefined;

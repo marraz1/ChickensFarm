@@ -9,7 +9,10 @@ import {
   type Target,
 } from "@/lib/services/farm-areas";
 import { lossReasonLabels } from "@/lib/labels";
-import type { Prisma } from "@/generated/prisma/client";
+import { birdGroupLabel, cycleLabel } from "@/lib/area-expenses";
+import { buildAreaLossSummary, type AreaLossSummary } from "@/lib/area-losses";
+import { currentYearLT } from "@/lib/format";
+import type { FarmArea, Prisma } from "@/generated/prisma/client";
 import type { CreateLossInput } from "@/lib/validation/losses";
 import type { LossReasonType } from "@/generated/prisma/client";
 
@@ -20,6 +23,41 @@ export function listLosses(farmId: string) {
     where: { farmId },
     include: { birdGroup: { include: { breed: true } } },
     orderBy: { lossDate: "desc" },
+  });
+}
+
+/** An area's Nuostoliai tab (#196): its losses, counted by cause for the year. */
+export async function getAreaLosses(
+  farmId: string,
+  area: Exclude<FarmArea, "SHARED">,
+  options: { now?: Date; linkQuery?: string } = {},
+): Promise<AreaLossSummary> {
+  const losses = await prisma.loss.findMany({
+    where: { farmId, area },
+    include: {
+      birdGroup: { select: { name: true, breed: { select: { name: true } } } },
+      motherHen: { select: { name: true } },
+      incubationCycle: { select: { name: true, startDate: true } },
+    },
+  });
+
+  return buildAreaLossSummary({
+    year: currentYearLT(options.now),
+    linkQuery: options.linkQuery,
+    losses: losses.map((l) => ({
+      id: l.id,
+      reasonType: l.reasonType,
+      quantity: l.quantity,
+      lossDate: l.lossDate,
+      createdAt: l.createdAt,
+      comment: l.comment,
+      // Optional chaining: a target can be gone (SetNull) and tests use a
+      // fake that returns rows without their relations.
+      targetName:
+        birdGroupLabel(l.birdGroup) ||
+        l.motherHen?.name ||
+        (l.incubationCycle ? cycleLabel(l.incubationCycle) : null),
+    })),
   });
 }
 

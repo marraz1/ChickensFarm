@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { birdGroupOptions } from "@/lib/bird-group-options";
-import { formatDateLT } from "@/lib/format";
+import { cycleLabel } from "@/lib/area-expenses";
 import type { AreaSlug } from "@/lib/v2-navigation";
 
 export type TargetOption = { id: string; label: string };
@@ -49,9 +49,6 @@ export async function listAreaTargetOptions(
           select: { id: true, name: true, startDate: true },
           orderBy: { startDate: "desc" },
         })
-      ).map((cycle) => ({
-        id: cycle.id,
-        label: cycle.name || `Ciklas nuo ${formatDateLT(cycle.startDate)}`,
-      }));
+      ).map((cycle) => ({ id: cycle.id, label: cycleLabel(cycle) }));
   }
 }
