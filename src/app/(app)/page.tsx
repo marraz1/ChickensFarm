@@ -6,7 +6,9 @@ import { resolveFinancePeriod, type SearchParam } from "@/lib/finance-period";
 import { Card } from "@/components/ui/card";
 import { PeriodSwitch } from "@/components/v2/period-switch";
 import { formatEUR, formatRelativeLT } from "@/lib/format";
-import { birdTypeLabels } from "@/lib/labels";
+import { birdTypeLabels, farmAreaOrder } from "@/lib/labels";
+import { AreaSplitCard } from "@/components/v2/area-split-card";
+import type { FarmArea } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
 import { Egg, AlertTriangle, Heart, Drumstick, Plus } from "lucide-react";
 
@@ -17,10 +19,10 @@ const ACTIVITY_ICONS = {
   MOTHER_HEN_LOG: Heart,
 } as const;
 
-// The V2 farm overview (V2-Overview). #201 adds its top: the title with
-// "Išlaida", the period switch and the farm result. The donut (#202), area
-// tiles (#203) and "Ūkis dabar"/"Daugiau statistikos" (#204) come later; until
-// then the V1 dashboard's counts and recent activity stay below the result.
+// The V2 farm overview (V2-Overview): the title with "Išlaida", the period
+// switch and the farm result (#201), then spending and income by area (#202).
+// The area tiles (#203) and "Ūkis dabar"/"Daugiau statistikos" (#204) come
+// later; until then the V1 dashboard's counts and recent activity stay below.
 export default async function OverviewPage({
   searchParams,
 }: {
@@ -39,8 +41,7 @@ export default async function OverviewPage({
     <div className="flex flex-col gap-3 pt-2">
       <div className="flex items-center justify-between gap-3 px-4">
         <h1 className="text-lg font-semibold">Ūkio apžvalga</h1>
-        {/* The general form: it files the expense under Bendra until #193 adds
-            the area chooser. */}
+        {/* The general form, which asks for the area, "Bendra" included (#193). */}
         <Link
           href="/expenses/new"
           className="flex h-11 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
@@ -77,6 +78,20 @@ export default async function OverviewPage({
             </div>
           </div>
         </Card>
+      </div>
+
+      <div className="px-4">
+        {/* Only the two figures the card draws, not each area's whole finance. */}
+        <AreaSplitCard
+          areas={
+            Object.fromEntries(
+              farmAreaOrder.map((a) => [
+                a,
+                { income: finance.areas[a].income, expenses: finance.areas[a].expenses },
+              ]),
+            ) as Record<FarmArea, { income: number; expenses: number }>
+          }
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 px-4">

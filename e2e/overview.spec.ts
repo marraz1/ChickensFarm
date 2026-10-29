@@ -105,6 +105,44 @@ test("the farm result adds the areas and Bendros išlaidos", async ({ page }) =>
   await expect(result.getByRole("region", { name: "Išlaidos", exact: true })).toContainText("5,00");
 });
 
+test("Pagal sritį splits the period's spending or income by area", async ({ page }) => {
+  const date = quietDay();
+  await createExpense(page, "MEAT", date, 3);
+  await createExpense(page, "SHARED", date, 1);
+
+  await page.goto(`/?period=range&from=${date}&to=${date}`);
+  const card = page.getByRole("region", { name: "Pagal sritį" });
+  const legendRow = (short: string) => card.getByRole("button", { name: new RegExp(`^${short}`) });
+
+  await expect(card).toContainText("Išlaidos iš viso");
+  await expect(card).toContainText("4,00");
+  await expect(legendRow("Mėsa")).toContainText("75,0");
+  await expect(legendRow("Bendros")).toContainText("25,0");
+  await expect(legendRow("Kiaušiniai")).toContainText("0,0");
+  // The text alternative names every area with its amount.
+  await expect(card.getByRole("img")).toHaveAccessibleName(
+    /^Išlaidos pagal sritį: Kiaušiniai .*Perekšlės .*Perinimas .*Mėsa 3,00.*Bendros 1,00/,
+  );
+
+  // The legend answers once the page has hydrated: tap until it focuses.
+  await expect(async () => {
+    if ((await legendRow("Mėsa").getAttribute("aria-pressed")) !== "true") {
+      await legendRow("Mėsa").click();
+    }
+    await expect(legendRow("Mėsa")).toHaveAttribute("aria-pressed", "true", { timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+  await expect(card).not.toContainText("Išlaidos iš viso");
+  await expect(card).toContainText("3,00");
+
+  await legendRow("Mėsa").click();
+  await expect(legendRow("Mėsa")).toHaveAttribute("aria-pressed", "false");
+  await expect(card).toContainText("Išlaidos iš viso");
+
+  await card.getByRole("button", { name: "Pajamos", exact: true }).click();
+  await expect(card).toContainText("Pajamos iš viso");
+  await expect(card.getByRole("img")).toHaveAccessibleName(/^Pajamos pagal sritį: /);
+});
+
 test("Išlaida opens the general expense form", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Išlaida", exact: true }).click();
