@@ -3,7 +3,7 @@ import { AUTH_FILE } from "./auth-file";
 
 // The farm overview's result (#201). Needs the seeded user; skipped without
 // it. The preview farm is shared, so exact amounts are checked over a one-day
-// "Laikotarpis" in 2001 that only the finance specs write to; the year and
+// "Laikotarpis" in 2002 that only this spec writes to; the year and
 // month views are checked by shape only. Expenses it creates are deleted again.
 const email = process.env.E2E_USER_EMAIL;
 const password = process.env.E2E_USER_PASSWORD; // read by auth.setup.ts; checked here to skip
@@ -19,7 +19,10 @@ test.beforeEach(() => {
 });
 
 test.afterEach(async ({ page }) => {
-  for (const id of expenseIds) await page.request.delete(`/api/expenses/${id}`);
+  // A failed delete would leave money on the shared preview farm.
+  for (const id of expenseIds) {
+    expect((await page.request.delete(`/api/expenses/${id}`)).ok()).toBe(true);
+  }
 });
 
 async function createExpense(page: Page, area: string, expenseDate: string, amount: number) {
@@ -33,11 +36,11 @@ async function createExpense(page: Page, area: string, expenseDate: string, amou
 const farmYear = () =>
   new Intl.DateTimeFormat("en", { timeZone: "Europe/Vilnius", year: "numeric" }).format(new Date());
 
-// A random day in 2001, so parallel runs rarely share one.
+// A random day in 2002 (area-finance.spec.ts uses 2001), so parallel runs rarely share one.
 function quietDay() {
   const month = 1 + Math.floor(Math.random() * 12);
   const dayOfMonth = 1 + Math.floor(Math.random() * 28);
-  return `2001-${String(month).padStart(2, "0")}-${String(dayOfMonth).padStart(2, "0")}`;
+  return `2002-${String(month).padStart(2, "0")}-${String(dayOfMonth).padStart(2, "0")}`;
 }
 
 const periodNav = (page: Page) => page.getByRole("navigation", { name: "Ataskaitos laikotarpis" });

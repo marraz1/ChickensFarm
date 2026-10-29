@@ -26,8 +26,7 @@ export default async function OverviewPage({
 }: {
   searchParams: Promise<{ period?: SearchParam; from?: SearchParam; to?: SearchParam }>;
 }) {
-  const query = await searchParams;
-  const { farm } = await requireActiveFarm();
+  const [query, { farm }] = await Promise.all([searchParams, requireActiveFarm()]);
   const period = resolveFinancePeriod(query);
   const [data, finance] = await Promise.all([
     getDashboardData(farm.id),

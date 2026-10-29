@@ -3,7 +3,7 @@ import { buildAreaFinance, type AreaFinance, type AreaFinanceInput } from "@/lib
 import { farmAreaOrder } from "@/lib/labels";
 import type { FarmArea } from "@/generated/prisma/client";
 
-type Period = { from: Date; to: Date; today: Date };
+type Period = AreaFinanceInput["period"];
 type Rows = Omit<AreaFinanceInput, "period">;
 
 /**
