@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // --- Story #188: the Perekšlės overview and broods under a hen ----------------
 //
@@ -17,7 +17,7 @@ import { ValidationError } from "@/lib/errors";
 import { getHensOverview } from "@/lib/services/area-overview";
 import { getAreaFinance } from "@/lib/services/area-finance";
 import { createIncubationCycle } from "@/lib/services/incubation";
-import { listHensFreeToSit } from "@/lib/services/mother-hens";
+import { deleteMotherHen, listHensFreeToSit } from "@/lib/services/mother-hens";
 import { resolveFinancePeriod } from "@/lib/finance-period";
 
 const FARM_ID = "farm-1";
@@ -106,6 +106,20 @@ describe("getHensOverview", () => {
     expect(o.cards.find((c) => c.name === "Rudė")?.status).toBe("Ilsisi");
   });
 
+  it("lists dead hens by when they died, the latest first", async () => {
+    // Added after Juoda but died before her.
+    await seedHen("sena", "Sena", "2026-07-01T10:00:00Z", "2026-03-01");
+    const o = await getHensOverview(FARM_ID, NOW);
+    expect(o.cards.slice(-2).map((c) => c.name)).toEqual(["Juoda", "Sena"]);
+  });
+
+  it("shows a hen's latest brood should the data ever hold two open ones", async () => {
+    await seedCycle("newer", "rita", "2026-10-26", null, 5);
+    await seedCycle("older", "rita", "2026-10-10", null, 9);
+    const o = await getHensOverview(FARM_ID, NOW);
+    expect(o.sitting).toEqual([{ name: "Rita", eggs: 5, day: 4 }]);
+  });
+
   it("counts each hen's diary entries", async () => {
     await seedLog("rita", "2026-10-01");
     await seedLog("rita", "2026-10-02");
@@ -177,15 +191,51 @@ describe("a brood under a hen", () => {
     });
   });
 
-  it("turns a lost race for the same hen into the readable refusal", async () => {
-    // Postgres fails the later of two serializable transactions with P2034.
-    const race = Object.assign(new Error("could not serialize access"), { code: "P2034" });
-    const spy = vi.spyOn(fakePrisma, "$transaction").mockRejectedValueOnce(race);
-    await expect(createIncubationCycle(FARM_ID, cycleInput("rita"))).rejects.toThrow(
-      new ValidationError("Ši perekšlė jau peri"),
+  it("refuses to delete a hen on an open brood, but allows it once it has hatched", async () => {
+    await seedCycle("c1", "rita", "2026-10-20");
+    await expect(deleteMotherHen(FARM_ID, "rita")).rejects.toThrow(
+      new ValidationError("Perekšlė peri – pirmiausia užbaikite perėjimą"),
     );
-    expect(spy).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
-    spy.mockRestore();
+
+    await fakePrisma.incubationCycle.update({
+      where: { id: "c1" },
+      data: { hatchDate: day("2026-10-28") },
+    });
+    await expect(deleteMotherHen(FARM_ID, "rita")).resolves.toBeUndefined();
+  });
+
+  describe("when Postgres fails the serializable save (P2034)", () => {
+    const conflict = () =>
+      Object.assign(new Error("could not serialize access"), { code: "P2034" });
+    afterEach(() => vi.restoreAllMocks());
+
+    it("retries a conflict with an unrelated save and starts the brood", async () => {
+      const spy = vi.spyOn(fakePrisma, "$transaction").mockRejectedValueOnce(conflict());
+      await expect(createIncubationCycle(FARM_ID, cycleInput("rita"))).resolves.toMatchObject({
+        motherHenId: "rita",
+      });
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
+    });
+
+    it("refuses on retry when the race was another brood for the same hen", async () => {
+      // The winning save committed her brood; this one was rolled back.
+      vi.spyOn(fakePrisma, "$transaction").mockImplementationOnce(async () => {
+        await seedCycle("winner", "rita", "2026-10-29");
+        throw conflict();
+      });
+      await expect(createIncubationCycle(FARM_ID, cycleInput("rita"))).rejects.toThrow(
+        new ValidationError("Ši perekšlė jau peri"),
+      );
+    });
+
+    it("gives up after three conflicts", async () => {
+      const spy = vi.spyOn(fakePrisma, "$transaction").mockRejectedValue(conflict());
+      await expect(createIncubationCycle(FARM_ID, cycleInput("rita"))).rejects.toMatchObject({
+        code: "P2034",
+      });
+      expect(spy).toHaveBeenCalledTimes(3);
+    });
   });
 
   it("offers only living hens that are not sitting, by name", async () => {

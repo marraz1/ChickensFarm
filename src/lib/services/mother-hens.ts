@@ -45,10 +45,14 @@ export async function assertHenCanSit(db: DbClient, farmId: string, motherHenId:
   if (sitting) throw new ValidationError("Ši perekšlė jau peri");
 }
 
-/** Whether one hen can be set on eggs now: alive and not sitting. */
-export async function canHenSit(farmId: string, hen: { id: string; diedAt: Date | null }) {
-  if (hen.diedAt) return false;
-  return !(await prisma.incubationCycle.findFirst({ where: openBroodsWhere(farmId, hen.id) }));
+/**
+ * Whether one hen is sitting now. Needs only her id, so a page can ask it
+ * alongside loading her; she can sit when she is alive and this is false.
+ */
+export async function isHenSitting(farmId: string, motherHenId: string) {
+  return !!(await prisma.incubationCycle.findFirst({
+    where: openBroodsWhere(farmId, motherHenId),
+  }));
 }
 
 /**
@@ -166,6 +170,11 @@ export async function deleteMotherHen(farmId: string, motherHenId: string) {
     throw new ValidationError(
       "Perekšlė susieta su išlaidomis ar nuostoliais, todėl jos ištrinti negalima",
     );
+  }
+  // An open brood would silently turn into an incubator cycle (#188). Once it
+  // has hatched the cycle only loses her name (SET NULL), as hatched groups do.
+  if (await prisma.incubationCycle.findFirst({ where: openBroodsWhere(farmId, motherHenId) })) {
+    throw new ValidationError("Perekšlė peri – pirmiausia užbaikite perėjimą");
   }
 
   // Diary entries (MotherHenLog) cascade away with the hen.

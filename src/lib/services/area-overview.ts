@@ -125,7 +125,7 @@ export type HensOverview = {
   hens: { id: string; name: string }[];
   /** Hens sitting now, each on her unhatched cycle. */
   sitting: { name: string; eggs: number | null; day: number }[];
-  /** Every hen; living first, a dead hen kept with "Nugaišusi". */
+  /** Every hen; living first (newest first), then the dead with "Nugaišusi", latest death first. */
   cards: HenCard[];
   balance: AreaFinance;
 };
@@ -164,11 +164,20 @@ export async function getHensOverview(
           _count: { _all: true },
         });
   const logsOf = new Map(logCounts.map((row) => [row.motherHenId, row._count._all]));
-  const cycleOf = new Map(activeCycles.map((c) => [c.motherHenId, c]));
+  // One open brood per hen is the rule (createIncubationCycle); should the data
+  // ever hold more, her latest one is shown, never an arbitrary one.
+  const cycleOf = new Map<string | null, (typeof activeCycles)[number]>();
+  for (const c of [...activeCycles].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())) {
+    cycleOf.set(c.motherHenId, c);
+  }
 
   // Newest first; sorted here too because the test double ignores orderBy.
   const ordered = [...hens].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const living = ordered.filter((h) => !h.diedAt);
+  // The most recently died first.
+  const dead = hens
+    .filter((h) => h.diedAt)
+    .sort((a, b) => b.diedAt!.getTime() - a.diedAt!.getTime());
 
   return {
     year: year.year,
@@ -183,7 +192,7 @@ export async function getHensOverview(
           day: sittingDay(cycle.startDate, year.today),
         };
       }),
-    cards: [...living, ...ordered.filter((h) => h.diedAt)].map((h) => ({
+    cards: [...living, ...dead].map((h) => ({
       id: h.id,
       name: h.name,
       photoUrl: h.photoUrl,

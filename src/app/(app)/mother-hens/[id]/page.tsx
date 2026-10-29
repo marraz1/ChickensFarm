@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActiveFarm } from "@/lib/session";
-import { canHenSit, getMotherHenWithLogs } from "@/lib/services/mother-hens";
+import { getMotherHenWithLogs, isHenSitting } from "@/lib/services/mother-hens";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { formatDateLT } from "@/lib/format";
@@ -10,10 +10,13 @@ import { Egg, Plus, Pencil } from "lucide-react";
 export default async function MotherHenDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { farm } = await requireActiveFarm();
-  const hen = await getMotherHenWithLogs(farm.id, id);
+  const [hen, sitting] = await Promise.all([
+    getMotherHenWithLogs(farm.id, id),
+    isHenSitting(farm.id, id),
+  ]);
   if (!hen) notFound();
   // Alive and not sitting already: she can be set on eggs (#188).
-  const canSit = await canHenSit(farm.id, hen);
+  const canSit = !hen.diedAt && !sitting;
 
   return (
     <div>
