@@ -154,16 +154,25 @@ export function navKeyForPath(pathname: string, areaParam?: string | null): NavK
   return best?.key ?? null;
 }
 
-// Interim content of each area's Apžvalga tab: links to the V1 screens that
-// belong to the area, until the area overview stories (#187–#190) replace it.
-export const AREA_RECORD_LINKS: Record<AreaSlug, readonly { href: string; label: string }[]> = {
+// The "Įrašai" list of each area's Apžvalga tab: the V1 screens that belong to
+// the area. `stat` names the figure an area overview shows beside the link
+// (#187 Kiaušiniai); areas whose overview is not built yet (#188–#190) show
+// the bare list.
+export type EggsStatKey =
+  "collected" | "eggSales" | "eggsConsumed" | "purchases" | "birdSales" | "groups";
+// #188–#190 add their areas' keys to this union.
+export type AreaStatKey = EggsStatKey;
+export type AreaRecordLink = { href: string; label: string; stat?: AreaStatKey };
+
+export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
   eggs: [
-    { href: "/eggs/collections", label: "Kiaušinių surinkimas" },
-    { href: "/eggs/sales", label: "Kiaušinių pardavimai" },
-    { href: "/eggs/consumptions", label: "Suvartoti kiaušiniai" },
-    { href: "/birds/purchases", label: "Paukščių pirkimai" },
-    { href: "/birds/sales", label: "Paukščių pardavimai" },
-    { href: "/bird-groups?area=eggs", label: "Dedeklių grupės" },
+    { href: "/eggs/collections", label: "Kiaušinių surinkimas", stat: "collected" },
+    { href: "/eggs/sales", label: "Kiaušinių pardavimai", stat: "eggSales" },
+    { href: "/eggs/consumptions", label: "Suvartoti kiaušiniai", stat: "eggsConsumed" },
+    { href: "/birds/purchases", label: "Paukščių pirkimai", stat: "purchases" },
+    { href: "/birds/sales", label: "Paukščių pardavimai", stat: "birdSales" },
+    { href: "/bird-groups?area=eggs", label: "Dedeklių grupės", stat: "groups" },
+    // Not in the design; kept so the report stays reachable in V2.
     { href: "/eggs/reports", label: "Kiaušinių ataskaita" },
   ],
   hens: [{ href: "/mother-hens", label: "Perekšlės" }],
@@ -173,6 +182,26 @@ export const AREA_RECORD_LINKS: Record<AreaSlug, readonly { href: string; label:
     { href: "/bird-groups?area=meat", label: "Mėsinių grupės" },
     { href: "/birds/purchases/new?area=meat", label: "Pirkti jauniklių auginti" },
     { href: "/birds/sales", label: "Paukščių pardavimai" },
+  ],
+};
+
+// The "Naujas įrašas" sheet of each area (V2-<Area>-New): every record the
+// area can add, then its expense and loss. Areas whose overview is not built
+// yet (#188–#190) have none and keep the bare list. Each built area is a
+// required key, so its overview reads it without a non-null assertion.
+type NewRecordLinks = readonly { href: string; label: string }[];
+export const AREA_NEW_RECORDS: { eggs: NewRecordLinks } & Partial<
+  Record<AreaSlug, NewRecordLinks>
+> = {
+  eggs: [
+    { href: "/eggs/collections/new", label: "Surinkti kiaušinius" },
+    { href: "/eggs/sales/new", label: "Parduoti kiaušinius" },
+    { href: "/eggs/consumptions/new", label: "Suvartoti kiaušinius" },
+    { href: "/birds/purchases/new?area=eggs", label: "Pirkti paukščių" },
+    { href: "/birds/sales/new?area=eggs", label: "Parduoti paukščių" },
+    { href: "/bird-groups/new?area=eggs", label: "Nauja dedeklių grupė" },
+    { href: "/expenses/new?area=eggs", label: "Nauja išlaida" },
+    { href: "/losses/new?area=eggs", label: "Registruoti nuostolį" },
   ],
 };
 

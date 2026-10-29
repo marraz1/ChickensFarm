@@ -23,8 +23,8 @@ export type AreaFinanceInput = {
   }[];
   /** Expenses per day and category. */
   expenses: { date: Date; category: ExpenseCategory; amount: unknown }[];
-  /** Birds of the area's groups used for the household's meat — a count, never income. */
-  homeUse: number;
+  /** Birds of the area's groups used for the household's meat, per day — a count, never income. */
+  homeUse: { date: Date; quantity: number }[];
   period: { from: Date; to: Date; today: Date };
 };
 
@@ -155,7 +155,7 @@ export function buildAreaFinance(input: AreaFinanceInput): AreaFinance {
     byCategory,
     months,
     spansYears: new Set(months.map((m) => m.year)).size > 1,
-    homeUse: input.homeUse,
+    homeUse: input.homeUse.reduce((sum, h) => (inPeriod(h.date) ? sum + h.quantity : sum), 0),
     hasRecords: recordCount > 0,
   };
 }
