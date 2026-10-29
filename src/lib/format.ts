@@ -16,6 +16,18 @@ export function formatLongDateLT(date: Date | string): string {
   return formatUTCDateLT(date, { year: "numeric", month: "long", day: "numeric" });
 }
 
+/**
+ * A count with its noun in the right Lithuanian form: "1 paukštis",
+ * "2 paukščiai", "11 paukščių". Forms are [1, 21…; 2–9, 22…; 0, 10–20…].
+ */
+export function countNounLT(n: number, [one, few, many]: readonly [string, string, string]) {
+  const last = n % 10;
+  const lastTwo = n % 100;
+  const teen = lastTwo >= 11 && lastTwo <= 19;
+  const noun = last === 1 && !teen ? one : last >= 2 && !teen ? few : many;
+  return `${n} ${noun}`;
+}
+
 /** The current calendar year on the farm's clock (Lithuania), not the server's UTC. */
 export function currentYearLT(now: Date = new Date()): number {
   return Number(

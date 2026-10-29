@@ -99,7 +99,14 @@ import {
   listExpenses,
   updateExpense,
 } from "@/lib/services/expenses";
-import { createLoss, deleteLoss, getLoss, listLosses, updateLoss } from "@/lib/services/losses";
+import {
+  createLoss,
+  deleteLoss,
+  getAreaLosses,
+  getLoss,
+  listLosses,
+  updateLoss,
+} from "@/lib/services/losses";
 import {
   addMotherHenLog,
   createMotherHen,
@@ -875,6 +882,84 @@ describe("area expense list", () => {
     const meatA = await getAreaExpenses(FARM_A_ID, "MEAT", { now });
     expect(meatA.rows.map((r) => r.key)).toEqual(["expense-exp-a-meat"]);
     await expect(getAreaExpenses(FARM_A_ID, "HENS", { now })).resolves.toMatchObject({ rows: [] });
+  });
+});
+
+describe("area loss list", () => {
+  const now = new Date("2026-10-28T12:00:00Z");
+
+  beforeEach(async () => {
+    await seedTwoFarms();
+    for (const [id, farmId, area] of [
+      ["loss-a-meat", FARM_A_ID, "MEAT"],
+      ["loss-a-eggs", FARM_A_ID, "EGGS"],
+      ["loss-b-meat", FARM_B_ID, "MEAT"],
+    ] as const) {
+      await fakePrisma.loss.create({
+        data: {
+          id,
+          farmId,
+          area,
+          birdGroupId: null,
+          motherHenId: null,
+          incubationCycleId: null,
+          lossDate: new Date("2026-10-01"),
+          quantity: 2,
+          reasonType: "PREDATOR",
+          comment: null,
+          createdAt: new Date("2026-10-01T10:00:00Z"),
+        },
+      });
+    }
+    // Meat used at home is never a loss.
+    await fakePrisma.birdConsumption.create({
+      data: {
+        id: "eaten-a",
+        farmId: FARM_A_ID,
+        birdGroupId: null,
+        consumptionDate: new Date("2026-10-03"),
+        quantity: 5,
+        createdAt: new Date("2026-10-03T10:00:00Z"),
+      },
+    });
+  });
+
+  it("never shows another farm's losses", async () => {
+    const meatB = await getAreaLosses(FARM_B_ID, "MEAT", { now });
+    expect(meatB.rows.map((r) => r.key)).toEqual(["loss-b-meat"]);
+    expect(meatB.total).toBe(2);
+  });
+
+  it("keeps each area to its own losses, without meat used at home", async () => {
+    const meatA = await getAreaLosses(FARM_A_ID, "MEAT", { now });
+    expect(meatA.rows.map((r) => r.key)).toEqual(["loss-a-meat"]);
+    expect(meatA.total).toBe(2);
+    await expect(getAreaLosses(FARM_A_ID, "HENS", { now })).resolves.toMatchObject({
+      rows: [],
+      total: 0,
+    });
+  });
+
+  it("counts only this year in the card but still lists last year's losses", async () => {
+    await fakePrisma.loss.create({
+      data: {
+        id: "loss-a-meat-2025",
+        farmId: FARM_A_ID,
+        area: "MEAT",
+        birdGroupId: null,
+        motherHenId: null,
+        incubationCycleId: null,
+        lossDate: new Date("2025-12-31"),
+        quantity: 5,
+        reasonType: "DISEASE",
+        comment: null,
+        createdAt: new Date("2025-12-31T10:00:00Z"),
+      },
+    });
+    const meatA = await getAreaLosses(FARM_A_ID, "MEAT", { now });
+    expect(meatA.total).toBe(2);
+    expect(meatA.byReason.map((r) => r.count)).toEqual([0, 2, 0]);
+    expect(meatA.rows.map((r) => r.key)).toEqual(["loss-a-meat", "loss-a-meat-2025"]);
   });
 });
 

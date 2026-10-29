@@ -8,8 +8,14 @@ import {
   targetFromInput,
   type Target,
 } from "@/lib/services/farm-areas";
-import { lossReasonLabels } from "@/lib/labels";
-import type { Prisma } from "@/generated/prisma/client";
+import { birdGroupLabel, cycleLabel, lossReasonLabels } from "@/lib/labels";
+import {
+  AREA_LOSS_LIST_LIMIT,
+  buildAreaLossSummary,
+  type AreaLossSummary,
+} from "@/lib/area-losses";
+import { currentYearLT } from "@/lib/format";
+import type { FarmArea, Prisma } from "@/generated/prisma/client";
 import type { CreateLossInput } from "@/lib/validation/losses";
 import type { LossReasonType } from "@/generated/prisma/client";
 
@@ -20,6 +26,58 @@ export function listLosses(farmId: string) {
     where: { farmId },
     include: { birdGroup: { include: { breed: true } } },
     orderBy: { lossDate: "desc" },
+  });
+}
+
+/** An area's Nuostoliai tab (#196): its losses, counted by cause for the year. */
+export async function getAreaLosses(
+  farmId: string,
+  area: Exclude<FarmArea, "SHARED">,
+  options: { now?: Date; linkQuery?: string } = {},
+): Promise<AreaLossSummary> {
+  const year = currentYearLT(options.now);
+  const [yearGroups, losses] = await Promise.all([
+    // The card: this year's birds per cause, counted in the database.
+    prisma.loss.groupBy({
+      by: ["reasonType"],
+      where: {
+        farmId,
+        area,
+        lossDate: { gte: new Date(Date.UTC(year, 0, 1)), lt: new Date(Date.UTC(year + 1, 0, 1)) },
+      },
+      _sum: { quantity: true },
+    }),
+    // The list: the newest records only, plus one to tell there are more.
+    prisma.loss.findMany({
+      where: { farmId, area },
+      include: {
+        birdGroup: { select: { name: true, breed: { select: { name: true } } } },
+        motherHen: { select: { name: true } },
+        incubationCycle: { select: { name: true, startDate: true } },
+      },
+      orderBy: [{ lossDate: "desc" }, { createdAt: "desc" }],
+      take: AREA_LOSS_LIST_LIMIT + 1,
+    }),
+  ]);
+
+  return buildAreaLossSummary({
+    year,
+    yearCounts: Object.fromEntries(yearGroups.map((g) => [g.reasonType, g._sum.quantity ?? 0])),
+    linkQuery: options.linkQuery,
+    losses: losses.map((l) => ({
+      id: l.id,
+      reasonType: l.reasonType,
+      quantity: l.quantity,
+      lossDate: l.lossDate,
+      createdAt: l.createdAt,
+      comment: l.comment,
+      // Optional chaining: a target can be gone (SetNull) and tests use a
+      // fake that returns rows without their relations.
+      targetName:
+        birdGroupLabel(l.birdGroup) ||
+        l.motherHen?.name ||
+        (l.incubationCycle ? cycleLabel(l.incubationCycle) : null),
+    })),
   });
 }
 

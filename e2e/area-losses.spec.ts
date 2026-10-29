@@ -1,11 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { AUTH_FILE } from "./auth-file";
 
-// Recording a loss against what was lost (#195). Needs the seeded user;
-// skipped without it. Creates its own breed, groups, hen and losses and
-// deletes them again (losses first: they block deleting a hen and restore
-// what they changed). Incubation cycles have no delete endpoint, so cycle
-// losses are covered by the service tests instead.
+// Recording a loss against what was lost (#195) and the area loss list
+// (#196). Needs the seeded user; skipped without it. Creates its own breed,
+// groups, hen and losses and deletes them again (losses first: they block
+// deleting a hen and restore what they changed). Incubation cycles have no
+// delete endpoint, so cycle losses are covered by the service tests instead.
 const email = process.env.E2E_USER_EMAIL;
 const password = process.env.E2E_USER_PASSWORD; // read by auth.setup.ts; checked here to skip
 
@@ -173,4 +173,55 @@ test("a mother hen's loss marks her dead", async ({ page }) => {
   await page.goto("/losses/new?area=hens");
   await page.getByLabel("Perekšlė").click();
   await expect(page.getByRole("option", { name: henName })).toHaveCount(0);
+});
+
+// #196: the area's Nuostoliai tab counts the year's losses by cause and lists
+// them. The app counts years on the farm's clock, so the test does too.
+const farmToday = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vilnius" }).format(new Date());
+
+test("an area's Nuostoliai tab counts its losses by cause and lists them", async ({ page }) => {
+  const group = await createGroup(page, "EGGS", 4);
+  const today = farmToday();
+  const year = today.slice(0, 4);
+  const res = await page.request.post("/api/losses", {
+    data: {
+      lossDate: today,
+      quantity: 2,
+      reasonType: "PREDATOR",
+      area: "EGGS",
+      birdGroupId: group.id,
+      comment: `vanagas ${created.tag}`,
+    },
+  });
+  expect(res.ok()).toBe(true);
+  const lossId = (await res.json()).id as string;
+
+  await page.goto("/areas/eggs/losses");
+  const card = page.getByRole("region", { name: `Nugaišo · ${year} m.` });
+  await expect(card).toBeVisible();
+  await expect(card.getByText("Plėšrūnas", { exact: true })).toBeVisible();
+  await expect(card.getByText("Liga", { exact: true })).toBeVisible();
+  await expect(card.getByText("Kita", { exact: true })).toBeVisible();
+  // The placeholder is gone.
+  await expect(page.getByText("Ši skiltis dar kuriama V2 beta versijoje.")).toHaveCount(0);
+
+  await expect(page.getByRole("heading", { name: "Įrašai" })).toBeVisible();
+  const row = page.getByRole("link").filter({ hasText: `${group.name} · vanagas ${created.tag}` });
+  await expect(row).toContainText("Plėšrūnas ·");
+  await expect(row).toContainText("−2");
+  await row.click();
+  await expect(page).toHaveURL(
+    (url) => url.pathname + url.search === `/losses/${lossId}/edit?area=eggs`,
+    {
+      timeout: 15_000,
+    },
+  );
+});
+
+test("Perinimas counts dead chicks", async ({ page }) => {
+  await page.goto("/areas/incubation/losses");
+  await expect(
+    page.getByRole("region", { name: `Žuvę jaunikliai · ${farmToday().slice(0, 4)} m.` }),
+  ).toBeVisible();
 });

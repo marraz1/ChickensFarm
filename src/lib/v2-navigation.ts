@@ -234,11 +234,10 @@ export const AREA_LOSS_TARGETS: Record<
 };
 
 // Farm-wide V1 screen each not-yet-built area tab points to meanwhile
-// (Išlaidos has its own list since #194).
+// (Išlaidos has its own list since #194, Nuostoliai since #196).
 export const AREA_TAB_FALLBACK: Record<
-  Exclude<AreaTabSegment, null | "expenses">,
+  Exclude<AreaTabSegment, null | "expenses" | "losses">,
   { href: string; label: string }
 > = {
-  losses: { href: "/losses", label: "Visi ūkio nuostoliai" },
   finance: { href: "/finance/profit-loss", label: "Ūkio pelnas / nuostoliai" },
 };

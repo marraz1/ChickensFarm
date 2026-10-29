@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  birdGroupLabel,
   buildAreaExpenseSummary,
   type AreaExpenseInput,
   type AreaPurchaseInput,
 } from "./area-expenses";
+import { birdGroupLabel } from "./labels";
 import { currentYearLT, formatLongDateLT } from "./format";
 
 const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`); // as @db.Date comes back

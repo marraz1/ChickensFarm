@@ -8,6 +8,19 @@ import type {
   BirdTransactionType,
   FarmArea,
 } from "@/generated/prisma/client";
+import { formatDateLT } from "@/lib/format";
+
+/** A bird group as V2 lists name it: its own name, else its breed's. */
+export function birdGroupLabel(
+  group: { name: string | null; breed?: { name: string } | null } | null | undefined,
+): string | null {
+  return group?.name || group?.breed?.name || null;
+}
+
+/** An incubation cycle as lists name it: its own name, else when it started. */
+export function cycleLabel(cycle: { name: string | null; startDate: Date }): string {
+  return cycle.name || `Ciklas nuo ${formatDateLT(cycle.startDate)}`;
+}
 
 export const birdCategoryLabels: Record<BirdCategory, string> = {
   CHICK: "Viščiukai",

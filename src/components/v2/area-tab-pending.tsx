@@ -4,9 +4,8 @@ import { Card } from "@/components/ui/card";
 import { AREA_TAB_FALLBACK } from "@/lib/v2-navigation";
 
 /**
- * Body of an area tab whose V2 screen is not built yet (Nuostoliai #196,
- * Finansai #198): says so, and links to the farm-wide V1 screen that has the
- * data meanwhile.
+ * Body of an area tab whose V2 screen is not built yet (Finansai #198):
+ * says so, and links to the farm-wide V1 screen that has the data meanwhile.
  */
 export function AreaTabPending({ tab }: { tab: keyof typeof AREA_TAB_FALLBACK }) {
   const fallback = AREA_TAB_FALLBACK[tab];

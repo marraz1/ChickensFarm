@@ -53,13 +53,6 @@ export function areaCountsPurchases(area: FarmArea): boolean {
   return area === "EGGS";
 }
 
-/** A bird group as rows name it: its own name, else its breed's. */
-export function birdGroupLabel(
-  group: { name: string | null; breed?: { name: string } | null } | null | undefined,
-): string | null {
-  return group?.name || group?.breed?.name || null;
-}
-
 export function buildAreaExpenseSummary(input: {
   area: FarmArea;
   year: number;

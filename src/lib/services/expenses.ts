@@ -11,10 +11,10 @@ import type { ExpenseCategory, FarmArea } from "@/generated/prisma/client";
 import { listBirdTransactions } from "@/lib/services/bird-transactions";
 import {
   areaCountsPurchases,
-  birdGroupLabel,
   buildAreaExpenseSummary,
   type AreaExpenseSummary,
 } from "@/lib/area-expenses";
+import { birdGroupLabel } from "@/lib/labels";
 import { currentYearLT } from "@/lib/format";
 
 /**
