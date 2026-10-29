@@ -124,8 +124,11 @@ test.describe("Perekšlės (#188)", () => {
 
     await page.goto("/areas/hens");
     await expect(card).toContainText("Peri · 0 įrašų");
+    // Other hens may sit on the shared preview farm, so only "at least one" is
+    // certain here; the exact "8 kiaušiniai · 1-a diena" line is unit-tested
+    // (sittingDetail), and her card above already says "Peri".
     await expect(page.getByRole("region", { name: "Peri dabar" })).toContainText(
-      new RegExp(`${name}|8 kiaušiniai · 1-a diena`),
+      /^Peri dabar[1-9]/,
     );
     await card.click();
     await expect(page).toHaveURL(new RegExp(`/mother-hens/${henId}$`), { timeout: 15_000 });

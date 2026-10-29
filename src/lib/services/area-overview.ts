@@ -8,6 +8,7 @@ import {
   type HenStatus,
 } from "@/lib/area-overview";
 import { getAreaFinance, getAreaFinances } from "@/lib/services/area-finance";
+import { openBroodsWhere } from "@/lib/services/mother-hens";
 import type { AreaFinance } from "@/lib/area-finance";
 import type { EggsStatKey } from "@/lib/v2-navigation";
 
@@ -147,22 +148,22 @@ export async function getHensOverview(
       orderBy: { createdAt: "desc" },
     }),
     prisma.incubationCycle.findMany({
-      where: { farmId, hatchDate: null, motherHenId: { not: null } },
+      where: openBroodsWhere(farmId),
       select: { motherHenId: true, eggsTotal: true, startDate: true },
     }),
     getAreaFinance(farmId, "HENS", year),
   ]);
-  // Counted per hen through the farm's own hen ids: logs carry no farmId. A
-  // farm has a handful of hens with a diary each, so ids are enough to fetch.
-  const logs =
+  // Counted in the database, per hen, through the farm's own hen ids: diary
+  // entries carry no farmId, so the hens are read first.
+  const logCounts =
     hens.length === 0
       ? []
-      : await prisma.motherHenLog.findMany({
+      : await prisma.motherHenLog.groupBy({
+          by: ["motherHenId"],
           where: { motherHenId: { in: hens.map((h) => h.id) } },
-          select: { motherHenId: true },
+          _count: { _all: true },
         });
-  const logsOf = new Map<string, number>();
-  for (const log of logs) logsOf.set(log.motherHenId, (logsOf.get(log.motherHenId) ?? 0) + 1);
+  const logsOf = new Map(logCounts.map((row) => [row.motherHenId, row._count._all]));
   const cycleOf = new Map(activeCycles.map((c) => [c.motherHenId, c]));
 
   // Newest first; sorted here too because the test double ignores orderBy.

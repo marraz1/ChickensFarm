@@ -6,20 +6,11 @@ import { AreaNewSheet } from "@/components/v2/area-new-sheet";
 import { StatCard } from "@/components/v2/stat-card";
 import { countNounLT } from "@/lib/format";
 import { farmAreaLabels } from "@/lib/labels";
+import { sittingDetail } from "@/lib/area-overview";
 import { AREA_NEW_RECORDS } from "@/lib/v2-navigation";
 import type { HensOverview } from "@/lib/services/area-overview";
 
-const EGGS = ["kiaušinis", "kiaušiniai", "kiaušinių"] as const;
 const ENTRIES = ["įrašas", "įrašai", "įrašų"] as const;
-
-/** "8 kiaušiniai · 6-a diena" for one sitting hen, her names for several. */
-function sittingDetail(sitting: HensOverview["sitting"]): string {
-  if (sitting.length === 0) return "Šiuo metu niekas neperi";
-  if (sitting.length > 1) return sitting.map((s) => s.name).join(" · ");
-  const [{ eggs, day }] = sitting;
-  // Lithuanian ordinal with the feminine "-a" of "diena".
-  return [eggs != null && countNounLT(eggs, EGGS), `${day}-a diena`].filter(Boolean).join(" · ");
-}
 
 // The Perekšlės Apžvalga tab (#188, V2-Hens-Overview).
 export function HensAreaOverview({ data }: { data: HensOverview }) {

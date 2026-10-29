@@ -23,6 +23,9 @@ import { todayInputValue } from "@/lib/format";
 type BirdGroupOption = { id: string; label: string };
 type MotherHenOption = { id: string; label: string };
 
+/** No hen: the eggs go into the incubator. */
+const INCUBATOR = "";
+
 export function IncubationCycleForm({
   birdGroups,
   motherHens = [],
@@ -58,7 +61,10 @@ export function IncubationCycleForm({
   const eggSourceGroupId = watch("eggSourceGroupId");
   const motherHenId = watch("motherHenId");
   const groupItems = Object.fromEntries(birdGroups.map((g) => [g.id, g.label]));
-  const henItems = Object.fromEntries(motherHens.map((h) => [h.id, h.label]));
+  const henItems = {
+    [INCUBATOR]: "Inkubatorius",
+    ...Object.fromEntries(motherHens.map((h) => [h.id, h.label])),
+  };
 
   async function onSubmit(data: CreateIncubationCycleInput) {
     setServerError(null);
@@ -104,18 +110,26 @@ export function IncubationCycleForm({
         />
       </div>
 
-      {motherHens.length > 0 && (
+      {motherHens.length === 0 ? (
+        // Said out loud, so "Pradėti perėjimą su perekšle" never quietly ends
+        // up an incubator cycle.
+        <p className="text-sm text-muted-foreground">
+          Laisvų perekšlių nėra – ciklas bus inkubatoriuje.
+        </p>
+      ) : (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="motherHenId">Perekšlė (neprivaloma)</Label>
           <Select
             items={henItems}
-            value={motherHenId ?? ""}
-            onValueChange={(v) => setValue("motherHenId", v ?? "")}
+            value={motherHenId ?? INCUBATOR}
+            onValueChange={(v) => setValue("motherHenId", v ?? INCUBATOR)}
           >
             <SelectTrigger id="motherHenId" className="h-11 w-full">
               <SelectValue placeholder="Inkubatorius" />
             </SelectTrigger>
             <SelectContent>
+              {/* A way back after picking a hen, or one preset from her page. */}
+              <SelectItem value={INCUBATOR}>Inkubatorius</SelectItem>
               {motherHens.map((h) => (
                 <SelectItem key={h.id} value={h.id}>
                   {h.label}

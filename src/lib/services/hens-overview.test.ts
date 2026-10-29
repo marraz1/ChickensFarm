@@ -177,6 +177,17 @@ describe("a brood under a hen", () => {
     });
   });
 
+  it("turns a lost race for the same hen into the readable refusal", async () => {
+    // Postgres fails the later of two serializable transactions with P2034.
+    const race = Object.assign(new Error("could not serialize access"), { code: "P2034" });
+    const spy = vi.spyOn(fakePrisma, "$transaction").mockRejectedValueOnce(race);
+    await expect(createIncubationCycle(FARM_ID, cycleInput("rita"))).rejects.toThrow(
+      new ValidationError("Ši perekšlė jau peri"),
+    );
+    expect(spy).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
+    spy.mockRestore();
+  });
+
   it("offers only living hens that are not sitting, by name", async () => {
     await seedCycle("c1", "rude", "2026-10-20");
     await seedHen("auksa", "Auksė", "2026-07-01T10:00:00Z");

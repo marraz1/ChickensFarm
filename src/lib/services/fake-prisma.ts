@@ -26,7 +26,7 @@
 // throws) rather than silently returning a wrong answer, since nothing under
 // test needs it.
 //
-// aggregate/groupBy support `_sum` only, and match Prisma in returning `null`
+// aggregate/groupBy support `_sum` (groupBy also `_count: { _all }`), and match Prisma in returning `null`
 // for a summed field when no row matched — the services under test rely on
 // that (`_sum.quantity ?? 0`), so faking a 0 would leave the fallback
 // untested. They exist because the flock-reduction report (reports.ts) is
@@ -99,6 +99,8 @@ function rowsOf(model: ModelName): Row[] {
 function matchesWhere(model: ModelName, where: Where | undefined, row: Row): boolean {
   if (!where) return true;
   for (const [key, cond] of Object.entries(where)) {
+    // Prisma ignores a filter whose value is undefined — it matches every row.
+    if (cond === undefined) continue;
     if (isSomeFilter(cond)) {
       const relation = RELATIONS[model]?.[key];
       if (!relation) {
@@ -268,6 +270,7 @@ function createModelClient(model: ModelName) {
       by: string[];
       where?: Where;
       _sum?: Record<string, boolean>;
+      _count?: { _all: true };
     }): Promise<Row[]> {
       const matched = rowsOf(model).filter((r) => matchesWhere(model, args.where, r));
       const buckets = new Map<string, Row[]>();
@@ -285,6 +288,7 @@ function createModelClient(model: ModelName) {
         const group: Row = {};
         for (const field of args.by) group[field] = groupRows[0][field];
         group._sum = sumFields(groupRows, args._sum);
+        if (args._count) group._count = { _all: groupRows.length };
         return group;
       });
     },

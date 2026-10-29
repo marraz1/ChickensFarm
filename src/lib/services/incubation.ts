@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 import { adjustBirdGroupQuantityTx } from "@/lib/services/bird-groups";
+import { assertHenCanSit } from "@/lib/services/mother-hens";
 import type {
   CreateIncubationCycleInput,
   CandlingInput,
@@ -33,18 +34,6 @@ export function getIncubationCycle(farmId: string, cycleId: string) {
   });
 }
 
-// A brood under a hen (#188): she must be this farm's (tenant isolation, NF5),
-// alive, and not already sitting on eggs that have not hatched yet.
-async function assertHenCanSit(farmId: string, motherHenId: string) {
-  const [hen, sitting] = await Promise.all([
-    prisma.motherHen.findFirst({ where: { id: motherHenId, farmId } }),
-    prisma.incubationCycle.findFirst({ where: { farmId, motherHenId, hatchDate: null } }),
-  ]);
-  if (!hen) throw new ValidationError("Pasirinkta perekšlė nerasta");
-  if (hen.diedAt) throw new ValidationError("Nugaišusi perekšlė negali perėti");
-  if (sitting) throw new ValidationError("Ši perekšlė jau peri");
-}
-
 export async function createIncubationCycle(farmId: string, input: CreateIncubationCycleInput) {
   const eggSourceGroupId = input.eggSourceGroupId || null;
   if (eggSourceGroupId) {
@@ -52,20 +41,36 @@ export async function createIncubationCycle(farmId: string, input: CreateIncubat
     if (!group) throw new ValidationError("Pasirinkta kiaušinių šaltinio grupė nerasta");
   }
   const motherHenId = input.motherHenId || null;
-  if (motherHenId) await assertHenCanSit(farmId, motherHenId);
+  const data = {
+    farmId,
+    name: input.name,
+    startDate: new Date(input.startDate),
+    sourceDescription: input.sourceDescription || null,
+    eggSourceGroupId,
+    motherHenId,
+    eggsTotal: input.eggsTotal ?? null,
+    notes: input.notes || null,
+  };
+  if (!motherHenId) return prisma.incubationCycle.create({ data });
 
-  return prisma.incubationCycle.create({
-    data: {
-      farmId,
-      name: input.name,
-      startDate: new Date(input.startDate),
-      sourceDescription: input.sourceDescription || null,
-      eggSourceGroupId,
-      motherHenId,
-      eggsTotal: input.eggsTotal ?? null,
-      notes: input.notes || null,
-    },
-  });
+  // A brood under a hen (#188): the "not already sitting" check and the new
+  // cycle commit together. Serializable, so two saves racing for the same hen
+  // (two tabs) cannot both see her free — Postgres fails the later one.
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        await assertHenCanSit(tx, farmId, motherHenId);
+        return tx.incubationCycle.create({ data });
+      },
+      { isolationLevel: "Serializable" },
+    );
+  } catch (error) {
+    // P2034: Postgres rolled back the losing transaction of the race.
+    if ((error as { code?: unknown } | null)?.code === "P2034") {
+      throw new ValidationError("Ši perekšlė jau peri");
+    }
+    throw error;
+  }
 }
 
 // F10.2 — record candling results. Pure data update, no side effects, editable anytime.

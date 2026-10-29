@@ -2,6 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 import { getLocalNow } from "@/lib/notification-schedule";
 import type { CreateMotherHenInput, CreateMotherHenLogInput } from "@/lib/validation/mother-hens";
+import type { Prisma } from "@/generated/prisma/client";
+
+type DbClient = Prisma.TransactionClient | typeof prisma;
 
 export function listMotherHens(farmId: string) {
   return prisma.motherHen.findMany({
@@ -15,8 +18,42 @@ export function listMotherHens(farmId: string) {
 }
 
 /**
+ * The broods hens are sitting on (#188): cycles with a hen and no hatch date
+ * yet — one hen's, or every hen's. The single definition of "sitting" behind
+ * the Perekšlės overview, the cycle form's hen list and the save check.
+ */
+export function openBroodsWhere(farmId: string, motherHenId?: string) {
+  return {
+    farmId,
+    hatchDate: null,
+    motherHenId: motherHenId ?? { not: null as null },
+  } satisfies Prisma.IncubationCycleWhereInput;
+}
+
+/**
+ * Refuses setting a hen on eggs unless she is this farm's (tenant isolation,
+ * NF5), alive and not already sitting. Takes the transaction client, so the
+ * check and the new cycle commit together (createIncubationCycle).
+ */
+export async function assertHenCanSit(db: DbClient, farmId: string, motherHenId: string) {
+  const [hen, sitting] = await Promise.all([
+    db.motherHen.findFirst({ where: { id: motherHenId, farmId } }),
+    db.incubationCycle.findFirst({ where: openBroodsWhere(farmId, motherHenId) }),
+  ]);
+  if (!hen) throw new ValidationError("Pasirinkta perekšlė nerasta");
+  if (hen.diedAt) throw new ValidationError("Nugaišusi perekšlė negali perėti");
+  if (sitting) throw new ValidationError("Ši perekšlė jau peri");
+}
+
+/** Whether one hen can be set on eggs now: alive and not sitting. */
+export async function canHenSit(farmId: string, hen: { id: string; diedAt: Date | null }) {
+  if (hen.diedAt) return false;
+  return !(await prisma.incubationCycle.findFirst({ where: openBroodsWhere(farmId, hen.id) }));
+}
+
+/**
  * Hens that can be set on eggs (#188): alive, and not already sitting on a
- * cycle that has not hatched. The cycle form offers these; the service
+ * cycle that has not hatched. The cycle form offers these; assertHenCanSit
  * enforces the same rule on save.
  */
 export async function listHensFreeToSit(farmId: string) {
@@ -27,7 +64,7 @@ export async function listHensFreeToSit(farmId: string) {
       orderBy: { name: "asc" },
     }),
     prisma.incubationCycle.findMany({
-      where: { farmId, hatchDate: null, motherHenId: { not: null } },
+      where: openBroodsWhere(farmId),
       select: { motherHenId: true },
     }),
   ]);
