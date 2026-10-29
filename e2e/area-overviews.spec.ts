@@ -230,3 +230,40 @@ test.describe("Perinimas (#189)", () => {
     await expect(page).toHaveURL(/\/incubation\/new$/, { timeout: 15_000 });
   });
 });
+
+test.describe("Mėsa (#190)", () => {
+  test("shows the birds raised, meat use, the balance, the records and the latest use", async ({
+    page,
+  }) => {
+    await page.goto("/areas/meat");
+
+    await expect(page.getByRole("heading", { level: 1, name: "Mėsiniai paukščiai" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Auginama mėsai" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Suvartota mėsai" })).toContainText(
+      /Šį mėn\. \d+ · Metais \d+/,
+    );
+    await expect(page.getByRole("region", { name: `Balansas · ${farmYear()} m.` })).toBeVisible();
+
+    await expect(page.getByRole("link", { name: /^Mėsinių grupės\s*\d+/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Suvartota mėsai\s*\d+/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Mėsinių pardavimai\s*.+€/ })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Paskutiniai įrašai" })).toBeVisible();
+  });
+
+  test("Naujas opens the sheet, which leads to the meat-use form", async ({ page }) => {
+    await page.goto("/areas/meat");
+    await openSheet(page, "Naujas");
+
+    await expect(sheet(page)).toContainText("Mėsiniai paukščiai");
+    await expect(sheet(page).getByRole("link")).toHaveText([
+      "Suvartoti mėsai",
+      "Parduoti paukščių",
+      "Pirkti jauniklių auginti",
+      "Nauja mėsinių grupė",
+      "Nauja išlaida",
+      "Registruoti nuostolį",
+    ]);
+    await sheet(page).getByRole("link", { name: "Suvartoti mėsai" }).click();
+    await expect(page).toHaveURL(/\/birds\/consumptions\/new$/, { timeout: 15_000 });
+  });
+});

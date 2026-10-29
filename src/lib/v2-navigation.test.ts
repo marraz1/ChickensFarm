@@ -99,6 +99,14 @@ describe("navKeyForPath", () => {
 });
 
 describe("AREA_RECORD_LINKS", () => {
+  it("lists the Mėsa records in design order, each with its figure", () => {
+    expect(AREA_RECORD_LINKS.meat.map((l) => [l.label, l.stat])).toEqual([
+      ["Mėsinių grupės", "groups"],
+      ["Suvartota mėsai", "consumed"],
+      ["Mėsinių pardavimai", "sales"],
+    ]);
+  });
+
   it("links every area to at least one existing screen", () => {
     for (const links of Object.values(AREA_RECORD_LINKS)) {
       expect(links.length).toBeGreaterThan(0);
@@ -120,7 +128,7 @@ describe("AREA_RECORD_LINKS", () => {
 
 describe("AREA_NEW_RECORDS", () => {
   it("offers the Kiaušiniai sheet's eight actions in design order", () => {
-    expect(AREA_NEW_RECORDS.eggs?.map((a) => a.label)).toEqual([
+    expect(AREA_NEW_RECORDS.eggs.map((a) => a.label)).toEqual([
       "Surinkti kiaušinius",
       "Parduoti kiaušinius",
       "Suvartoti kiaušinius",
@@ -148,6 +156,17 @@ describe("AREA_NEW_RECORDS", () => {
       "Apšvietimas / patikra",
       "Registruoti išsiritimą",
       "Jauniklių sekimo įrašas",
+      "Nauja išlaida",
+      "Registruoti nuostolį",
+    ]);
+  });
+
+  it("offers the Mėsa sheet's six actions in design order", () => {
+    expect(AREA_NEW_RECORDS.meat.map((a) => a.label)).toEqual([
+      "Suvartoti mėsai",
+      "Parduoti paukščių",
+      "Pirkti jauniklių auginti",
+      "Nauja mėsinių grupė",
       "Nauja išlaida",
       "Registruoti nuostolį",
     ]);

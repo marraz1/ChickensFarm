@@ -158,3 +158,14 @@ export function flockByBreed(groups: { quantity: number; breedName: string }[]):
     .map(([name, quantity]) => ({ name, quantity }))
     .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name, "lt"));
 }
+
+/**
+ * Head count per group, largest first ("Pekino antis 12 · Brama gaidukai 8").
+ * Groups with no birds left are not listed.
+ */
+export function flockByGroup(groups: { quantity: number; label: string }[]): FlockPart[] {
+  return groups
+    .filter((g) => g.quantity > 0)
+    .map((g) => ({ name: g.label, quantity: g.quantity }))
+    .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name, "lt"));
+}

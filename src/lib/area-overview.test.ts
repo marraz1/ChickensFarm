@@ -3,6 +3,7 @@ import {
   cycleCardLines,
   cycleStatus,
   flockByBreed,
+  flockByGroup,
   hatchEfficiency,
   henStatus,
   incubationSheetItems,
@@ -200,6 +201,35 @@ describe("flockByBreed", () => {
     ).toEqual([
       { name: "Australorp", quantity: 3 },
       { name: "Sussex", quantity: 3 },
+    ]);
+  });
+});
+
+describe("flockByGroup", () => {
+  it("lists each group with birds, largest first, ties by name", () => {
+    expect(
+      flockByGroup([
+        { label: "Brama gaidukai", quantity: 8 },
+        { label: "Suvalgyti", quantity: 0 },
+        { label: "Pekino antis", quantity: 12 },
+        { label: "Ančiukai", quantity: 8 },
+      ]),
+    ).toEqual([
+      { name: "Pekino antis", quantity: 12 },
+      { name: "Ančiukai", quantity: 8 },
+      { name: "Brama gaidukai", quantity: 8 },
+    ]);
+  });
+
+  it("keeps two groups of one breed apart", () => {
+    expect(
+      flockByGroup([
+        { label: "Brama", quantity: 3 },
+        { label: "Brama", quantity: 5 },
+      ]),
+    ).toEqual([
+      { name: "Brama", quantity: 5 },
+      { name: "Brama", quantity: 3 },
     ]);
   });
 });
