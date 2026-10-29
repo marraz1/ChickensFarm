@@ -61,8 +61,8 @@ test("Finansai shows the year's result with the period switch", async ({ page })
   await expect(
     page.getByRole("region", { name: new RegExp(`^(Pelnas|Nuostolis) · ${year} m\\.$`) }),
   ).toBeVisible();
-  await expect(page.getByRole("region", { name: "Pajamos" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Išlaidos" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Pajamos", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Išlaidos", exact: true })).toBeVisible();
   // The placeholder is gone.
   await expect(page.getByText("Ši skiltis dar kuriama V2 beta versijoje.")).toHaveCount(0);
 
@@ -90,9 +90,14 @@ test("an area's expenses over a chosen period give its loss, by category", async
   });
 
   const result = page.getByRole("region", { name: `Nuostolis · ${date} – ${date}` });
-  await expect(result).toContainText("-12,00");
-  await expect(page.getByRole("region", { name: "Pajamos" })).toContainText("Pardavimų nebuvo");
-  await expect(page.getByRole("region", { name: "Išlaidos" })).toContainText("Vaistai, pašarai");
+  // lt-LT formats a negative amount with a true minus sign (U+2212).
+  await expect(result).toContainText("−12,00");
+  await expect(page.getByRole("region", { name: "Pajamos", exact: true })).toContainText(
+    "Pardavimų nebuvo",
+  );
+  await expect(page.getByRole("region", { name: "Išlaidos", exact: true })).toContainText(
+    "Vaistai, pašarai",
+  );
 
   const categories = page.getByRole("region", { name: "Išlaidos pagal kategoriją" });
   await expect(categories.getByRole("listitem")).toHaveCount(2);
