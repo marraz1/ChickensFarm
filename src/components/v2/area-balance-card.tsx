@@ -19,22 +19,24 @@ export function AreaBalanceCard({
   finance: Pick<AreaFinance, "income" | "expenses" | "result">;
 }) {
   const label = `Balansas · ${year} m.`;
+  // The region outside, the link inside: a landmark never sits within a link,
+  // and the link's name is its full text, Pajamos and Išlaidos included.
   return (
-    <Link href={`/areas/${area}/finance`} aria-label={`${label}: ${formatEUR(finance.result)}`}>
-      <Card className="gap-1 p-3" role="region" aria-label={label}>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p
+    <Card className="p-0" role="region" aria-label={label}>
+      <Link href={`/areas/${area}/finance`} className="flex flex-col gap-1 p-3">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <span
           className={cn(
             "text-xl font-medium tabular-nums",
             finance.result >= 0 ? "text-emerald-600" : "text-destructive",
           )}
         >
           {formatEUR(finance.result)}
-        </p>
-        <p className="text-[11px] leading-tight text-muted-foreground">
+        </span>
+        <span className="text-[11px] leading-tight text-muted-foreground">
           Pajamos {formatEUR(finance.income)} · Išlaidos {formatEUR(finance.expenses)}
-        </p>
-      </Card>
-    </Link>
+        </span>
+      </Link>
+    </Card>
   );
 }

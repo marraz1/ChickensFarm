@@ -98,6 +98,8 @@ describe("getEggsOverview", () => {
     await seedGroup("g3", "brama", "EGGS", 4);
     await seedGroup("g4", "brama", "MEAT", 50);
     await seedGroup("g5", "sussex", "INC", 12);
+    // Sold out: still listed, but holds no birds, so it is not counted.
+    await seedGroup("g6", "sussex", "EGGS", 0);
 
     const o = await getEggsOverview(FARM_ID, NOW);
     expect(o.flock).toEqual({

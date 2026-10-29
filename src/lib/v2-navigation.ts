@@ -158,7 +158,11 @@ export function navKeyForPath(pathname: string, areaParam?: string | null): NavK
 // the area. `stat` names the figure an area overview shows beside the link
 // (#187 Kiaušiniai); areas whose overview is not built yet (#188–#190) show
 // the bare list.
-export type AreaRecordLink = { href: string; label: string; stat?: string };
+export type EggsStatKey =
+  "collected" | "eggSales" | "eggsConsumed" | "purchases" | "birdSales" | "groups";
+// #188–#190 add their areas' keys to this union.
+export type AreaStatKey = EggsStatKey;
+export type AreaRecordLink = { href: string; label: string; stat?: AreaStatKey };
 
 export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
   eggs: [
@@ -183,9 +187,11 @@ export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
 
 // The "Naujas įrašas" sheet of each area (V2-<Area>-New): every record the
 // area can add, then its expense and loss. Areas whose overview is not built
-// yet (#188–#190) have none and keep the bare list.
-export const AREA_NEW_RECORDS: Partial<
-  Record<AreaSlug, readonly { href: string; label: string }[]>
+// yet (#188–#190) have none and keep the bare list. Each built area is a
+// required key, so its overview reads it without a non-null assertion.
+type NewRecordLinks = readonly { href: string; label: string }[];
+export const AREA_NEW_RECORDS: { eggs: NewRecordLinks } & Partial<
+  Record<AreaSlug, NewRecordLinks>
 > = {
   eggs: [
     { href: "/eggs/collections/new", label: "Surinkti kiaušinius" },

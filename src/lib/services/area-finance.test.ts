@@ -13,7 +13,7 @@ vi.mock("@/lib/prisma", async () => {
 });
 
 import { fakePrisma, resetFakePrisma } from "./fake-prisma";
-import { getAreaFinance, getFarmFinance } from "@/lib/services/area-finance";
+import { getAreaFinance, getAreaFinances, getFarmFinance } from "@/lib/services/area-finance";
 import {
   createBirdTransaction,
   transactionArea,
@@ -221,6 +221,36 @@ describe("getAreaFinance", () => {
     expect(cents("expenses")).toBe(Math.round(farm.expenses * 100));
     expect(cents("result")).toBe(Math.round(farm.profit * 100));
     expect(areas[4]).toMatchObject({ income: 0, expenses: 1.01 });
+  });
+});
+
+describe("getAreaFinances", () => {
+  it("builds each period from one fetch exactly as getAreaFinance does", async () => {
+    await seedMixedFarm();
+    for (const [date, quantity] of [
+      ["2026-04-03", 2],
+      ["2026-10-02", 5],
+    ] as const) {
+      await fakePrisma.birdConsumption.create({
+        data: {
+          farmId: FARM_ID,
+          birdGroupId: "g-meat",
+          consumptionDate: day(date),
+          quantity,
+          note: null,
+        },
+      });
+    }
+    const april = { from: day("2026-04-01"), to: day("2026-04-30"), today: PERIOD.today };
+
+    for (const area of AREAS) {
+      const [year, month] = await getAreaFinances(FARM_ID, area, [PERIOD, april]);
+      expect(year).toEqual(await getAreaFinance(FARM_ID, area, PERIOD));
+      expect(month).toEqual(await getAreaFinance(FARM_ID, area, april));
+    }
+    // Home use is dated too, so April counts only April's birds.
+    const [meatYear, meatApril] = await getAreaFinances(FARM_ID, "MEAT", [PERIOD, april]);
+    expect([meatYear.homeUse, meatApril.homeUse]).toEqual([7, 2]);
   });
 });
 

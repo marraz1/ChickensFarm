@@ -49,7 +49,7 @@ async function fetchFinanceRows(
       select: { id: true, area: true },
     }),
     prisma.birdConsumption.groupBy({
-      by: ["birdGroupId"],
+      by: ["birdGroupId", "consumptionDate"],
       where: { farmId, consumptionDate: dateRange },
       _sum: { quantity: true },
     }),
@@ -59,7 +59,7 @@ async function fetchFinanceRows(
   const rowsOf = (a: FarmArea) => {
     let rows = byArea.get(a);
     if (!rows)
-      byArea.set(a, (rows = { eggSales: [], birdTransactions: [], expenses: [], homeUse: 0 }));
+      byArea.set(a, (rows = { eggSales: [], birdTransactions: [], expenses: [], homeUse: [] }));
     return rows;
   };
 
@@ -84,12 +84,33 @@ async function fetchFinanceRows(
   const groupArea = new Map(groups.map((g) => [g.id, g.area]));
   for (const row of consumptions) {
     const a = groupArea.get(row.birdGroupId);
-    if (a) rowsOf(a).homeUse += row._sum.quantity ?? 0;
+    if (a) rowsOf(a).homeUse.push({ date: row.consumptionDate, quantity: row._sum.quantity ?? 0 });
   }
   return byArea;
 }
 
-const EMPTY: Rows = { eggSales: [], birdTransactions: [], expenses: [], homeUse: 0 };
+const EMPTY: Rows = { eggSales: [], birdTransactions: [], expenses: [], homeUse: [] };
+
+/**
+ * One area's money over several periods from a single fetch spanning them all
+ * (#187: the year's balance and this month's figures). Every row is dated, so
+ * each period is built from just its own days — the same result as calling
+ * getAreaFinance per period, with half the queries or fewer.
+ */
+export async function getAreaFinances(
+  farmId: string,
+  area: FarmArea,
+  periods: readonly Period[],
+): Promise<AreaFinance[]> {
+  if (periods.length === 0) return [];
+  const span: Period = {
+    from: new Date(Math.min(...periods.map((p) => p.from.getTime()))),
+    to: new Date(Math.max(...periods.map((p) => p.to.getTime()))),
+    today: periods[0].today,
+  };
+  const rows = (await fetchFinanceRows(farmId, span, area)).get(area) ?? EMPTY;
+  return periods.map((period) => buildAreaFinance({ ...rows, period }));
+}
 
 /**
  * One area's money over a period (#198). "SHARED" gives Bendra: its expenses

@@ -10,7 +10,7 @@ function build(partial: Partial<AreaFinanceInput>) {
     eggSales: [],
     birdTransactions: [],
     expenses: [],
-    homeUse: 0,
+    homeUse: [],
     period: YEAR,
     ...partial,
   });
@@ -104,7 +104,13 @@ describe("buildAreaFinance", () => {
   });
 
   it("passes home use through as a count only", () => {
-    const f = build({ homeUse: 9 });
+    const f = build({
+      homeUse: [
+        { date: day("2026-02-01"), quantity: 9 },
+        // Outside the period, so not counted.
+        { date: day("2025-12-31"), quantity: 5 },
+      ],
+    });
     expect(f).toMatchObject({ homeUse: 9, income: 0, hasRecords: false });
   });
 });

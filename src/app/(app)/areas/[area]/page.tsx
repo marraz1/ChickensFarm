@@ -15,6 +15,8 @@ import {
   AREA_SLUGS,
   isAreaSlug,
   type AreaRecordLink,
+  type AreaStatKey,
+  type EggsStatKey,
 } from "@/lib/v2-navigation";
 
 // An area's Apžvalga tab. Kiaušiniai has its overview (#187, V2-Eggs-Overview);
@@ -38,7 +40,8 @@ export default async function AreaOverviewPage({ params }: { params: Promise<{ a
 }
 
 function EggsAreaOverview({ data }: { data: EggsOverview }) {
-  const statValues: Record<string, string> = {
+  // Every Kiaušiniai key must be filled: a renamed or missing one is a type error.
+  const statValues: Record<EggsStatKey, string> = {
     collected: `${data.stats.collected} šį mėn.`,
     eggSales: formatEUR(data.stats.eggSales),
     eggsConsumed: String(data.stats.eggsConsumed),
@@ -50,7 +53,7 @@ function EggsAreaOverview({ data }: { data: EggsOverview }) {
   return (
     <div className="flex flex-col gap-3 px-4 pb-4">
       <div className="flex justify-end">
-        <AreaNewSheet areaLabel={farmAreaLabels[AREA_SLUGS.eggs]} items={AREA_NEW_RECORDS.eggs!} />
+        <AreaNewSheet areaLabel={farmAreaLabels[AREA_SLUGS.eggs]} items={AREA_NEW_RECORDS.eggs} />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
@@ -83,7 +86,7 @@ function RecordLinks({
   values = {},
 }: {
   links: readonly AreaRecordLink[];
-  values?: Record<string, string>;
+  values?: Partial<Record<AreaStatKey, string>>;
 }) {
   return (
     <ul className="flex flex-col gap-2">

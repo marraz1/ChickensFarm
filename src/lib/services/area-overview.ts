@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { resolveFinancePeriod } from "@/lib/finance-period";
 import { flockByBreed, type FlockPart } from "@/lib/area-overview";
-import { getAreaFinance } from "@/lib/services/area-finance";
+import { getAreaFinances } from "@/lib/services/area-finance";
 import type { AreaFinance } from "@/lib/area-finance";
+import type { EggsStatKey } from "@/lib/v2-navigation";
 
 export type EggsOverview = {
   year: number;
@@ -14,21 +15,15 @@ export type EggsOverview = {
   flock: { total: number; byBreed: FlockPart[]; groups: number };
   /** The year's Kiaušiniai result, as the Finansai tab shows it. */
   balance: AreaFinance;
-  /** The "Įrašai" figures, this month. */
-  stats: {
-    collected: number;
-    eggSales: number;
-    eggsConsumed: number;
-    purchases: number;
-    birdSales: number;
-    groups: number;
-  };
+  /** The "Įrašai" figures, this month, keyed as AREA_RECORD_LINKS.eggs names them. */
+  stats: Record<EggsStatKey, number>;
 };
 
 /**
  * The Kiaušiniai area home (#187, V2-Eggs-Overview). "This month" and "this
  * year" are the farm's (Europe/Vilnius), the same periods the Finansai tab
- * offers; money comes from getAreaFinance so the two screens always agree.
+ * offers; money comes from the same finance rows (one fetch for both periods),
+ * so the two screens always agree.
  * Farm-scoped throughout.
  */
 export async function getEggsOverview(
@@ -49,8 +44,7 @@ export async function getEggsOverview(
     consumedMonth,
     groups,
     breeds,
-    balance,
-    monthMoney,
+    [balance, monthMoney],
   ] = await Promise.all([
     prisma.eggCollection.aggregate({ where: { farmId }, _sum: { quantity: true } }),
     prisma.eggSale.aggregate({ where: { farmId }, _sum: { quantity: true } }),
@@ -72,8 +66,7 @@ export async function getEggsOverview(
       select: { quantity: true, breedId: true },
     }),
     prisma.breed.findMany({ where: { farmId }, select: { id: true, name: true } }),
-    getAreaFinance(farmId, "EGGS", year),
-    getAreaFinance(farmId, "EGGS", month),
+    getAreaFinances(farmId, "EGGS", [year, month]),
   ]);
 
   const breedName = new Map(breeds.map((b) => [b.id, b.name]));
@@ -81,6 +74,9 @@ export async function getEggsOverview(
     groups.map((g) => ({ quantity: g.quantity, breedName: breedName.get(g.breedId) ?? "—" })),
   );
   const collectedThisMonth = collectedMonth._sum.quantity ?? 0;
+  // Sold-out groups stay in the list but hold no birds: counting them would
+  // disagree with the flock card next to it.
+  const activeGroups = groups.filter((g) => g.quantity > 0).length;
 
   return {
     year: year.year,
@@ -93,7 +89,7 @@ export async function getEggsOverview(
     flock: {
       total: byBreed.reduce((sum, part) => sum + part.quantity, 0),
       byBreed,
-      groups: groups.length,
+      groups: activeGroups,
     },
     balance,
     stats: {
@@ -102,7 +98,7 @@ export async function getEggsOverview(
       eggsConsumed: consumedMonth._sum.quantity ?? 0,
       purchases: monthMoney.purchases,
       birdSales: monthMoney.birdIncome,
-      groups: groups.length,
+      groups: activeGroups,
     },
   };
 }
