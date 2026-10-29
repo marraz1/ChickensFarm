@@ -939,6 +939,28 @@ describe("area loss list", () => {
       total: 0,
     });
   });
+
+  it("counts only this year in the card but still lists last year's losses", async () => {
+    await fakePrisma.loss.create({
+      data: {
+        id: "loss-a-meat-2025",
+        farmId: FARM_A_ID,
+        area: "MEAT",
+        birdGroupId: null,
+        motherHenId: null,
+        incubationCycleId: null,
+        lossDate: new Date("2025-12-31"),
+        quantity: 5,
+        reasonType: "DISEASE",
+        comment: null,
+        createdAt: new Date("2025-12-31T10:00:00Z"),
+      },
+    });
+    const meatA = await getAreaLosses(FARM_A_ID, "MEAT", { now });
+    expect(meatA.total).toBe(2);
+    expect(meatA.byReason.map((r) => r.count)).toEqual([0, 2, 0]);
+    expect(meatA.rows.map((r) => r.key)).toEqual(["loss-a-meat", "loss-a-meat-2025"]);
+  });
 });
 
 describe("expense and loss targets (farm areas)", () => {

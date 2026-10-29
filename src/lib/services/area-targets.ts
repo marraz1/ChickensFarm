@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { birdGroupOptions } from "@/lib/bird-group-options";
-import { cycleLabel } from "@/lib/area-expenses";
+import { cycleLabel } from "@/lib/labels";
 import type { AreaSlug } from "@/lib/v2-navigation";
 
 export type TargetOption = { id: string; label: string };

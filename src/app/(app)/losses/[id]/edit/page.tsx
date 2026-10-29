@@ -4,7 +4,8 @@ import { getLoss } from "@/lib/services/losses";
 import { listBirdGroups } from "@/lib/services/bird-groups";
 import { PageHeader } from "@/components/layout/page-header";
 import { LossForm, type LossLockedTarget } from "@/components/forms/loss-form";
-import { cycleLabel } from "@/lib/area-expenses";
+import { birdGroupLabel, cycleLabel } from "@/lib/labels";
+import { birdGroupAreaEnum } from "@/lib/validation/farm-areas";
 import { DeleteRecordButton } from "@/components/forms/delete-record-button";
 import { isAreaSlug } from "@/lib/v2-navigation";
 
@@ -18,8 +19,12 @@ export default async function EditLossPage({
   const { id } = await params;
   const { area } = await searchParams;
   const { farm } = await requireActiveFarm();
-  const [loss, groups] = await Promise.all([getLoss(farm.id, id), listBirdGroups(farm.id)]);
+  const loss = await getLoss(farm.id, id);
   if (!loss) notFound();
+  // A group's loss can move only to another group of the same area (the
+  // server refuses others), so only those are offered.
+  const groupArea = birdGroupAreaEnum.safeParse(loss.birdGroupId ? loss.area : null);
+  const groups = await listBirdGroups(farm.id, groupArea.success ? groupArea.data : null);
 
   // Opened from an area's Nuostoliai tab: back, save and delete return there.
   const returnPath =
@@ -42,7 +47,7 @@ export default async function EditLossPage({
       <PageHeader title="Koreguoti nuostolį" backHref={returnPath} />
       <div className="flex flex-col gap-6 px-4">
         <LossForm
-          birdGroups={groups.map((g) => ({ id: g.id, label: g.breed.name }))}
+          birdGroups={groups.map((g) => ({ id: g.id, label: birdGroupLabel(g) ?? g.breed.name }))}
           lossId={loss.id}
           defaultValues={{
             lossDate: loss.lossDate.toISOString().slice(0, 10),

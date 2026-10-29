@@ -34,55 +34,60 @@ export type AreaLossSummary = {
   /** All three causes, in design order, even at 0. */
   byReason: { reason: LossReasonType; label: string; count: number }[];
   rows: AreaLossRow[];
+  /** More losses than the list shows; the farm-wide list has them all. */
+  hasMore: boolean;
 };
+
+/** How many records the tab lists; older ones are on the farm-wide list. */
+export const AREA_LOSS_LIST_LIMIT = 50;
 
 type Forms = readonly [string, string, string];
 
-/** What each area calls its losses (designs V2-<Area>-Losses). */
-export const AREA_LOSS_COPY: Record<AreaSlug, { heading: string; unit: Forms; empty: string }> =
-  (() => {
-    const birds = ["paukštis", "paukščiai", "paukščių"] as const;
-    const empty = "Šioje srityje dar nėra nuostolių.";
-    return {
-      eggs: { heading: "Nugaišo", unit: birds, empty },
-      hens: { heading: "Nugaišo", unit: birds, empty: "Šiais metais perekšlių nuostolių nebuvo." },
-      incubation: {
-        heading: "Žuvę jaunikliai",
-        unit: ["jauniklis", "jaunikliai", "jauniklių"],
-        empty,
-      },
-      meat: { heading: "Nugaišo", unit: birds, empty },
-    };
-  })();
+const BIRDS: Forms = ["paukštis", "paukščiai", "paukščių"];
+const NONE_THIS_YEAR = "Šiais metais nuostolių nebuvo.";
+
+/**
+ * What each area calls its losses (designs V2-<Area>-Losses). `empty` is
+ * shown when the year has none; older records are still listed below it.
+ */
+export const AREA_LOSS_COPY: Record<AreaSlug, { heading: string; unit: Forms; empty: string }> = {
+  eggs: { heading: "Nugaišo", unit: BIRDS, empty: NONE_THIS_YEAR },
+  hens: { heading: "Nugaišo", unit: BIRDS, empty: "Šiais metais perekšlių nuostolių nebuvo." },
+  incubation: {
+    heading: "Žuvę jaunikliai",
+    unit: ["jauniklis", "jaunikliai", "jauniklių"],
+    empty: NONE_THIS_YEAR,
+  },
+  meat: { heading: "Nugaišo", unit: BIRDS, empty: NONE_THIS_YEAR },
+};
 
 const REASON_ORDER: LossReasonType[] = ["DISEASE", "PREDATOR", "OTHER"];
 
 export function buildAreaLossSummary(input: {
   year: number;
+  /** The year's birds lost per cause (counted in the database). */
+  yearCounts: Partial<Record<LossReasonType, number>>;
+  /** The newest losses, up to the list limit (one more tells there are more). */
   losses: AreaLossInput[];
   /** Added to row links so the edit screen returns to this area (`?area=<slug>`). */
   linkQuery?: string;
 }): AreaLossSummary {
   const q = input.linkQuery ?? "";
 
-  // The card: this year only.
-  const counts: Record<LossReasonType, number> = { DISEASE: 0, PREDATOR: 0, OTHER: 0 };
-  for (const l of input.losses) {
-    if (l.lossDate.getUTCFullYear() === input.year) counts[l.reasonType] += l.quantity;
-  }
   const byReason = REASON_ORDER.map((reason) => ({
     reason,
     label: lossReasonLabels[reason],
-    count: counts[reason],
+    count: input.yearCounts[reason] ?? 0,
   }));
 
-  // The list: every loss, newest first; same day → the one entered last first.
+  // The list: newest first; same day → the one entered last first.
   const rows = [...input.losses]
     .sort(
       (a, b) =>
         b.lossDate.getTime() - a.lossDate.getTime() ||
         b.createdAt.getTime() - a.createdAt.getTime(),
     )
+    .slice(0, AREA_LOSS_LIST_LIMIT)
     .map((l) => ({
       key: l.id,
       title: `${lossReasonLabels[l.reasonType]} · ${formatLongDateLT(l.lossDate)}`,
@@ -96,5 +101,6 @@ export function buildAreaLossSummary(input: {
     total: byReason.reduce((sum, r) => sum + r.count, 0),
     byReason,
     rows,
+    hasMore: input.losses.length > AREA_LOSS_LIST_LIMIT,
   };
 }

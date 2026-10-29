@@ -8,9 +8,12 @@ import {
   targetFromInput,
   type Target,
 } from "@/lib/services/farm-areas";
-import { lossReasonLabels } from "@/lib/labels";
-import { birdGroupLabel, cycleLabel } from "@/lib/area-expenses";
-import { buildAreaLossSummary, type AreaLossSummary } from "@/lib/area-losses";
+import { birdGroupLabel, cycleLabel, lossReasonLabels } from "@/lib/labels";
+import {
+  AREA_LOSS_LIST_LIMIT,
+  buildAreaLossSummary,
+  type AreaLossSummary,
+} from "@/lib/area-losses";
 import { currentYearLT } from "@/lib/format";
 import type { FarmArea, Prisma } from "@/generated/prisma/client";
 import type { CreateLossInput } from "@/lib/validation/losses";
@@ -32,17 +35,34 @@ export async function getAreaLosses(
   area: Exclude<FarmArea, "SHARED">,
   options: { now?: Date; linkQuery?: string } = {},
 ): Promise<AreaLossSummary> {
-  const losses = await prisma.loss.findMany({
-    where: { farmId, area },
-    include: {
-      birdGroup: { select: { name: true, breed: { select: { name: true } } } },
-      motherHen: { select: { name: true } },
-      incubationCycle: { select: { name: true, startDate: true } },
-    },
-  });
+  const year = currentYearLT(options.now);
+  const [yearGroups, losses] = await Promise.all([
+    // The card: this year's birds per cause, counted in the database.
+    prisma.loss.groupBy({
+      by: ["reasonType"],
+      where: {
+        farmId,
+        area,
+        lossDate: { gte: new Date(Date.UTC(year, 0, 1)), lt: new Date(Date.UTC(year + 1, 0, 1)) },
+      },
+      _sum: { quantity: true },
+    }),
+    // The list: the newest records only, plus one to tell there are more.
+    prisma.loss.findMany({
+      where: { farmId, area },
+      include: {
+        birdGroup: { select: { name: true, breed: { select: { name: true } } } },
+        motherHen: { select: { name: true } },
+        incubationCycle: { select: { name: true, startDate: true } },
+      },
+      orderBy: [{ lossDate: "desc" }, { createdAt: "desc" }],
+      take: AREA_LOSS_LIST_LIMIT + 1,
+    }),
+  ]);
 
   return buildAreaLossSummary({
-    year: currentYearLT(options.now),
+    year,
+    yearCounts: Object.fromEntries(yearGroups.map((g) => [g.reasonType, g._sum.quantity ?? 0])),
     linkQuery: options.linkQuery,
     losses: losses.map((l) => ({
       id: l.id,

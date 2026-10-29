@@ -4,8 +4,8 @@ import { AUTH_FILE } from "./auth-file";
 // Recording a loss against what was lost (#195) and the area loss list
 // (#196). Needs the seeded user; skipped without it. Creates its own breed,
 // groups, hen and losses and deletes them again (losses first: they block
-// deleting a hen and restore what they changed). Incubation cycles have no delete endpoint, so cycle
-// losses are covered by the service tests instead.
+// deleting a hen and restore what they changed). Incubation cycles have no
+// delete endpoint, so cycle losses are covered by the service tests instead.
 const email = process.env.E2E_USER_EMAIL;
 const password = process.env.E2E_USER_PASSWORD; // read by auth.setup.ts; checked here to skip
 
@@ -175,13 +175,18 @@ test("a mother hen's loss marks her dead", async ({ page }) => {
   await expect(page.getByRole("option", { name: henName })).toHaveCount(0);
 });
 
-// #196: the area's Nuostoliai tab counts the year's losses by cause and lists them.
+// #196: the area's Nuostoliai tab counts the year's losses by cause and lists
+// them. The app counts years on the farm's clock, so the test does too.
+const farmToday = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vilnius" }).format(new Date());
+
 test("an area's Nuostoliai tab counts its losses by cause and lists them", async ({ page }) => {
   const group = await createGroup(page, "EGGS", 4);
-  const year = new Date().getFullYear();
+  const today = farmToday();
+  const year = today.slice(0, 4);
   const res = await page.request.post("/api/losses", {
     data: {
-      lossDate: new Date().toISOString().slice(0, 10),
+      lossDate: today,
       quantity: 2,
       reasonType: "PREDATOR",
       area: "EGGS",
@@ -217,6 +222,6 @@ test("an area's Nuostoliai tab counts its losses by cause and lists them", async
 test("Perinimas counts dead chicks", async ({ page }) => {
   await page.goto("/areas/incubation/losses");
   await expect(
-    page.getByRole("region", { name: `Žuvę jaunikliai · ${new Date().getFullYear()} m.` }),
+    page.getByRole("region", { name: `Žuvę jaunikliai · ${farmToday().slice(0, 4)} m.` }),
   ).toBeVisible();
 });

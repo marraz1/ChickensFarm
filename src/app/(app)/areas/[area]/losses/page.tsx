@@ -17,7 +17,7 @@ export default async function AreaLossesPage({ params }: { params: Promise<{ are
   if (!isAreaSlug(area)) notFound();
   const { farm } = await requireActiveFarm();
   // Rows carry ?area= so the edit screen returns here and keeps the area lit.
-  const { year, total, byReason, rows } = await getAreaLosses(farm.id, AREA_SLUGS[area], {
+  const { year, total, byReason, rows, hasMore } = await getAreaLosses(farm.id, AREA_SLUGS[area], {
     linkQuery: `?area=${area}`,
   });
   const copy = AREA_LOSS_COPY[area];
@@ -50,9 +50,12 @@ export default async function AreaLossesPage({ params }: { params: Promise<{ are
         </dl>
       </Card>
 
-      {rows.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">{copy.empty}</p>
-      ) : (
+      {/* None this year; earlier years' records are still listed below. */}
+      {total === 0 && (
+        <p className="py-6 text-center text-sm text-muted-foreground">{copy.empty}</p>
+      )}
+
+      {rows.length > 0 && (
         <>
           <h2 className="pt-2 text-sm font-medium text-muted-foreground">Įrašai</h2>
           <ul className="flex flex-col gap-2">
@@ -79,6 +82,14 @@ export default async function AreaLossesPage({ params }: { params: Promise<{ are
               </li>
             ))}
           </ul>
+          {hasMore && (
+            <Link
+              href="/losses"
+              className="flex min-h-11 items-center justify-center text-sm font-medium text-primary"
+            >
+              Visi ūkio nuostoliai
+            </Link>
+          )}
         </>
       )}
     </div>

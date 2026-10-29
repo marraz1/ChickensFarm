@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { AREA_LOSS_COPY, buildAreaLossSummary, type AreaLossInput } from "./area-losses";
+import {
+  AREA_LOSS_COPY,
+  AREA_LOSS_LIST_LIMIT,
+  buildAreaLossSummary,
+  type AreaLossInput,
+} from "./area-losses";
 import { countNounLT } from "./format";
 
 const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`); // as @db.Date comes back
@@ -45,14 +50,11 @@ describe("countNounLT", () => {
 });
 
 describe("buildAreaLossSummary — the year card", () => {
-  it("counts the year's birds by cause, all three always shown", () => {
+  it("shows the year's birds by cause, in design order, all three always shown", () => {
     const s = buildAreaLossSummary({
       year: 2026,
-      losses: [
-        loss({ reasonType: "PREDATOR", quantity: 2 }),
-        loss({ reasonType: "DISEASE", quantity: 1 }),
-        loss({ reasonType: "PREDATOR", quantity: 1 }),
-      ],
+      yearCounts: { PREDATOR: 3, DISEASE: 1 },
+      losses: [],
     });
     expect(s.byReason).toEqual([
       { reason: "DISEASE", label: "Liga", count: 1 },
@@ -62,20 +64,30 @@ describe("buildAreaLossSummary — the year card", () => {
     expect(s.total).toBe(4);
   });
 
-  it("leaves last year's losses out of the card but keeps them in the list", () => {
-    const s = buildAreaLossSummary({
-      year: 2026,
-      losses: [loss({ lossDate: day("2025-12-31"), quantity: 5 }), loss({ quantity: 1 })],
-    });
-    expect(s.total).toBe(1);
-    expect(s.rows).toHaveLength(2);
-  });
-
   it("is zero with no losses", () => {
-    const s = buildAreaLossSummary({ year: 2026, losses: [] });
+    const s = buildAreaLossSummary({ year: 2026, yearCounts: {}, losses: [] });
     expect(s.total).toBe(0);
     expect(s.byReason.map((r) => r.count)).toEqual([0, 0, 0]);
     expect(s.rows).toEqual([]);
+    expect(s.hasMore).toBe(false);
+  });
+});
+
+describe("buildAreaLossSummary — the list limit", () => {
+  it("lists the newest records up to the limit and says there are more", () => {
+    const losses = Array.from({ length: AREA_LOSS_LIST_LIMIT + 1 }, (_, i) =>
+      loss({ id: `n${i}`, lossDate: new Date(Date.UTC(2026, 0, 1 + i)) }),
+    );
+    const s = buildAreaLossSummary({ year: 2026, yearCounts: {}, losses });
+    expect(s.rows).toHaveLength(AREA_LOSS_LIST_LIMIT);
+    expect(s.rows[0].key).toBe(`n${AREA_LOSS_LIST_LIMIT}`); // the newest
+    expect(s.rows.map((r) => r.key)).not.toContain("n0"); // the oldest is left out
+    expect(s.hasMore).toBe(true);
+  });
+
+  it("says nothing more when all fit", () => {
+    const s = buildAreaLossSummary({ year: 2026, yearCounts: {}, losses: [loss()] });
+    expect(s.hasMore).toBe(false);
   });
 });
 
@@ -84,13 +96,14 @@ describe("buildAreaLossSummary — the records", () => {
     const older = loss({ id: "older", lossDate: day("2026-09-02") });
     const first = loss({ id: "first", lossDate: day("2026-10-26") });
     const second = loss({ id: "second", lossDate: day("2026-10-26") });
-    const s = buildAreaLossSummary({ year: 2026, losses: [older, first, second] });
+    const s = buildAreaLossSummary({ year: 2026, yearCounts: {}, losses: [older, first, second] });
     expect(s.rows.map((r) => r.key)).toEqual(["second", "first", "older"]);
   });
 
   it("titles a row with its cause and date, and names what was lost and why", () => {
     const s = buildAreaLossSummary({
       year: 2026,
+      yearCounts: {},
       linkQuery: "?area=eggs",
       losses: [
         loss({
@@ -119,7 +132,11 @@ describe("buildAreaLossSummary — the records", () => {
     [null, "lapė", "lapė"],
     [null, null, null],
   ])("detail of target %s and comment %s → %s", (targetName, comment, detail) => {
-    const s = buildAreaLossSummary({ year: 2026, losses: [loss({ targetName, comment })] });
+    const s = buildAreaLossSummary({
+      year: 2026,
+      yearCounts: {},
+      losses: [loss({ targetName, comment })],
+    });
     expect(s.rows[0].detail).toBe(detail);
   });
 });
@@ -134,6 +151,6 @@ describe("AREA_LOSS_COPY", () => {
 
   it("says Perekšlės had no losses this year, as designed", () => {
     expect(AREA_LOSS_COPY.hens.empty).toBe("Šiais metais perekšlių nuostolių nebuvo.");
-    expect(AREA_LOSS_COPY.eggs.empty).toBe("Šioje srityje dar nėra nuostolių.");
+    expect(AREA_LOSS_COPY.eggs.empty).toBe("Šiais metais nuostolių nebuvo.");
   });
 });
