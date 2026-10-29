@@ -40,7 +40,9 @@ export function AreaNewSheet({
         <nav aria-label="Naujas įrašas" className="flex flex-col px-4">
           {items.map((item) => (
             <Link
-              key={item.href}
+              // Labels are unique; hrefs are not (Perinimas' per-cycle actions
+              // can all fall back to the cycle list).
+              key={item.label}
               href={item.href}
               className="flex min-h-11 items-center justify-between gap-3 border-t py-2.5 text-sm font-medium first:border-t-0"
             >

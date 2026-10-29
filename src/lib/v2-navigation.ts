@@ -154,17 +154,17 @@ export function navKeyForPath(pathname: string, areaParam?: string | null): NavK
   return best?.key ?? null;
 }
 
-// The "Įrašai" list of each area's Apžvalga tab: the V1 screens that belong to
-// the area. `stat` names the figure an area overview shows beside the link
-// (#187 Kiaušiniai); areas whose overview is not built yet (#188–#190) show
-// the bare list.
+// The "Įrašai" list on the Apžvalga tabs that have one: the V1 screens that
+// belong to the area. `stat` names the figure the overview shows beside the
+// link (#187 Kiaušiniai); Mėsa shows the bare list until #190. Perekšlės and
+// Perinimas list their hens and cycles instead (#188, #189).
 export type EggsStatKey =
   "collected" | "eggSales" | "eggsConsumed" | "purchases" | "birdSales" | "groups";
 // #188–#190 add their areas' keys to this union.
 export type AreaStatKey = EggsStatKey;
 export type AreaRecordLink = { href: string; label: string; stat?: AreaStatKey };
 
-export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
+export const AREA_RECORD_LINKS: Record<"eggs" | "meat", readonly AreaRecordLink[]> = {
   eggs: [
     { href: "/eggs/collections", label: "Kiaušinių surinkimas", stat: "collected" },
     { href: "/eggs/sales", label: "Kiaušinių pardavimai", stat: "eggSales" },
@@ -175,8 +175,6 @@ export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
     // Not in the design; kept so the report stays reachable in V2.
     { href: "/eggs/reports", label: "Kiaušinių ataskaita" },
   ],
-  hens: [{ href: "/mother-hens", label: "Perekšlės" }],
-  incubation: [{ href: "/incubation", label: "Perinimo ciklai" }],
   meat: [
     { href: "/birds/consumptions", label: "Suvartota mėsai" },
     { href: "/bird-groups?area=meat", label: "Mėsinių grupės" },
@@ -187,12 +185,19 @@ export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
 
 // The "Naujas įrašas" sheet of each area (V2-<Area>-New): every record the
 // area can add, then its expense and loss. Areas whose overview is not built
-// yet (#188–#190) have none and keep the bare list. Each built area is a
-// required key, so its overview reads it without a non-null assertion.
-type NewRecordLinks = readonly { href: string; label: string }[];
-export const AREA_NEW_RECORDS: { eggs: NewRecordLinks; hens: NewRecordLinks } & Partial<
-  Record<AreaSlug, NewRecordLinks>
-> = {
+// yet (#190) have none and keep the bare list. Each built area is a required
+// key, so its overview reads it without a non-null assertion.
+//
+// `cycle` marks an action done on one incubation cycle: the Perinimas overview
+// points it at that cycle when exactly one fits (incubationSheetItems), else
+// it opens the cycle list to pick from.
+export type NewRecordLink = { href: string; label: string; cycle?: "active" | "growing" };
+type NewRecordLinks = readonly NewRecordLink[];
+export const AREA_NEW_RECORDS: {
+  eggs: NewRecordLinks;
+  hens: NewRecordLinks;
+  incubation: NewRecordLinks;
+} & Partial<Record<AreaSlug, NewRecordLinks>> = {
   eggs: [
     { href: "/eggs/collections/new", label: "Surinkti kiaušinius" },
     { href: "/eggs/sales/new", label: "Parduoti kiaušinius" },
@@ -211,6 +216,16 @@ export const AREA_NEW_RECORDS: { eggs: NewRecordLinks; hens: NewRecordLinks } & 
     { href: "/incubation/new", label: "Pradėti perėjimą su perekšle" },
     { href: "/expenses/new?area=hens", label: "Nauja išlaida" },
     { href: "/losses/new?area=hens", label: "Registruoti nuostolį" },
+  ],
+  incubation: [
+    { href: "/incubation/new", label: "Naujas perinimo ciklas" },
+    // Candling and the hatch are recorded on a running cycle's page.
+    { href: "/incubation", label: "Apšvietimas / patikra", cycle: "active" },
+    { href: "/incubation", label: "Registruoti išsiritimą", cycle: "active" },
+    // A growth entry belongs to a hatched cycle still being raised.
+    { href: "/incubation", label: "Jauniklių sekimo įrašas", cycle: "growing" },
+    { href: "/expenses/new?area=incubation", label: "Nauja išlaida" },
+    { href: "/losses/new?area=incubation", label: "Registruoti nuostolį" },
   ],
 };
 

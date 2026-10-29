@@ -123,7 +123,11 @@ import {
 } from "@/lib/services/incubation";
 import { listAreaTargetOptions } from "@/lib/services/area-targets";
 import { getAreaFinance, getFarmFinance } from "@/lib/services/area-finance";
-import { getEggsOverview, getHensOverview } from "@/lib/services/area-overview";
+import {
+  getEggsOverview,
+  getHensOverview,
+  getIncubationAreaOverview,
+} from "@/lib/services/area-overview";
 
 const FARM_A_ID = "farm-a";
 const FARM_B_ID = "farm-b";
@@ -1136,6 +1140,16 @@ describe("Perekšlės overview and broods under a hen", () => {
       }),
     ).rejects.toThrow(ValidationError);
     expect((await listHensFreeToSit(FARM_A_ID)).map((h) => h.id)).toEqual(["hen-a"]);
+  });
+
+  it("never shows another farm's cycles on the Perinimas overview", async () => {
+    const now = new Date("2026-10-28T12:00:00Z");
+    const incA = await getIncubationAreaOverview(FARM_A_ID, now);
+    expect(incA).toMatchObject({ active: { count: 0, eggs: 0 }, cards: [] });
+    expect(incA.sheet).toEqual({ active: [], growing: [] });
+
+    const incB = await getIncubationAreaOverview(FARM_B_ID, now);
+    expect(incB.active).toEqual({ count: 1, eggs: 9 });
   });
 });
 

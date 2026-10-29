@@ -1,5 +1,134 @@
 import { describe, expect, it } from "vitest";
-import { flockByBreed, henStatus, sittingDay, sittingDetail } from "@/lib/area-overview";
+import {
+  cycleCardLines,
+  cycleStatus,
+  flockByBreed,
+  hatchEfficiency,
+  henStatus,
+  incubationSheetItems,
+  sittingDay,
+  sittingDetail,
+} from "@/lib/area-overview";
+import { formatShareLT } from "@/lib/format";
+import { AREA_NEW_RECORDS } from "@/lib/v2-navigation";
+
+const d = (s: string) => new Date(`${s}T00:00:00Z`);
+const running = { hatchDate: null, eggsFertile: null, hatchedCount: null };
+
+describe("cycleStatus", () => {
+  it("is Pradėta, then Apšviesta once candled, then Išsiritę", () => {
+    expect(cycleStatus(running)).toBe("Pradėta");
+    expect(cycleStatus({ ...running, eggsFertile: 20 })).toBe("Apšviesta");
+    expect(cycleStatus({ hatchDate: d("2026-10-01"), eggsFertile: 20, hatchedCount: 16 })).toBe(
+      "Išsiritę",
+    );
+  });
+});
+
+describe("hatchEfficiency", () => {
+  it("divides hatched by fertile eggs over hatched cycles only", () => {
+    const e = hatchEfficiency([
+      { hatchDate: d("2026-09-23"), eggsFertile: 20, hatchedCount: 16 },
+      { hatchDate: d("2026-08-01"), eggsFertile: 18, hatchedCount: 15 },
+      // Candled, not hatched yet: its fertile eggs have no result to count.
+      { hatchDate: null, eggsFertile: 22, hatchedCount: null },
+    ]);
+    expect(e).toMatchObject({ hatched: 31, fertile: 38 });
+    expect(formatShareLT(e.rate!)).toMatch(/^81,6\s?%$/);
+  });
+
+  it("has no rate before any fertile eggs have hatched", () => {
+    expect(hatchEfficiency([running, { ...running, eggsFertile: 10 }])).toMatchObject({
+      rate: null,
+      anyHatched: false,
+    });
+  });
+
+  it("tells a hatch recorded without candling apart from no hatch at all", () => {
+    // No fertile count to divide by, but something did hatch.
+    expect(
+      hatchEfficiency([{ hatchDate: d("2026-09-01"), eggsFertile: null, hatchedCount: 9 }]),
+    ).toMatchObject({ rate: null, anyHatched: true });
+  });
+});
+
+describe("cycleCardLines", () => {
+  const base = {
+    ...running,
+    startDate: d("2026-10-12"),
+    eggsTotal: 24,
+    henName: null,
+    sourceBreed: null,
+    sourceDescription: null,
+    latestAlive: null,
+    growthCompletedAt: null,
+  };
+  const today = d("2026-10-26");
+
+  it("shows a running cycle's start, day and source", () => {
+    expect(cycleCardLines({ ...base, sourceBreed: "Brama" }, today)).toEqual({
+      started: "Pradėta 2026 m. spalio 12 d. · 15-a diena",
+      source: "Šaltinis: Brama · 24 kiaušiniai",
+      result: null,
+    });
+  });
+
+  it("names the hen first, then the breed, the description or nothing", () => {
+    const line = (o: object) => cycleCardLines({ ...base, ...o }, today).source;
+    expect(line({ henName: "Rita", sourceBreed: "Brama", eggsTotal: 18 })).toBe(
+      "Perekšlė Rita · 18 kiaušinių",
+    );
+    expect(line({ sourceDescription: "iš kaimyno", eggsTotal: null })).toBe("iš kaimyno");
+    expect(line({ eggsTotal: 1 })).toBe("Šaltinis nenurodytas · 1 kiaušinis");
+  });
+
+  it("drops the day once hatched and shows the chicks", () => {
+    const hatched = { ...base, hatchDate: d("2026-11-02"), eggsFertile: 20, hatchedCount: 16 };
+    expect(cycleCardLines({ ...hatched, latestAlive: 15 }, today)).toMatchObject({
+      started: "Pradėta 2026 m. spalio 12 d.",
+      result: "Išsirito 16 · dabar gyvų 15",
+    });
+    expect(cycleCardLines(hatched, today).result).toBe("Išsirito 16");
+  });
+
+  it("says when the chicks' raising is finished", () => {
+    const done = {
+      ...base,
+      hatchDate: d("2026-09-02"),
+      eggsFertile: 20,
+      hatchedCount: 16,
+      latestAlive: 15,
+      growthCompletedAt: d("2026-10-20"),
+    };
+    expect(cycleCardLines(done, today).result).toBe(
+      "Išsirito 16 · dabar gyvų 15 · auginimas baigtas",
+    );
+  });
+});
+
+describe("incubationSheetItems", () => {
+  const hrefs = (cycles: { active: string[]; growing: string[] }) =>
+    Object.fromEntries(
+      incubationSheetItems(AREA_NEW_RECORDS.incubation, cycles).map((i) => [i.label, i.href]),
+    );
+
+  it("points the per-cycle actions at the only cycle that fits", () => {
+    expect(hrefs({ active: ["c1"], growing: ["c9"] })).toMatchObject({
+      "Apšvietimas / patikra": "/incubation/c1",
+      "Registruoti išsiritimą": "/incubation/c1",
+      "Jauniklių sekimo įrašas": "/incubation/c9/growth-logs/new",
+      "Naujas perinimo ciklas": "/incubation/new",
+    });
+  });
+
+  it("opens the cycle list to pick from with none or several", () => {
+    expect(hrefs({ active: [], growing: ["c8", "c9"] })).toMatchObject({
+      "Apšvietimas / patikra": "/incubation",
+      "Registruoti išsiritimą": "/incubation",
+      "Jauniklių sekimo įrašas": "/incubation",
+    });
+  });
+});
 
 describe("sittingDetail", () => {
   it("shows one sitting hen's eggs and day", () => {
