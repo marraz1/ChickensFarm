@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 import { adjustBirdGroupQuantityTx } from "@/lib/services/bird-groups";
+import { assertHenCanSit } from "@/lib/services/mother-hens";
 import type {
   CreateIncubationCycleInput,
   CandlingInput,
@@ -39,19 +40,43 @@ export async function createIncubationCycle(farmId: string, input: CreateIncubat
     const group = await prisma.birdGroup.findFirst({ where: { id: eggSourceGroupId, farmId } });
     if (!group) throw new ValidationError("Pasirinkta kiaušinių šaltinio grupė nerasta");
   }
+  const motherHenId = input.motherHenId || null;
+  const data = {
+    farmId,
+    name: input.name,
+    startDate: new Date(input.startDate),
+    sourceDescription: input.sourceDescription || null,
+    eggSourceGroupId,
+    motherHenId,
+    eggsTotal: input.eggsTotal ?? null,
+    notes: input.notes || null,
+  };
+  if (!motherHenId) return prisma.incubationCycle.create({ data });
 
-  return prisma.incubationCycle.create({
-    data: {
-      farmId,
-      name: input.name,
-      startDate: new Date(input.startDate),
-      sourceDescription: input.sourceDescription || null,
-      eggSourceGroupId,
-      eggsTotal: input.eggsTotal ?? null,
-      notes: input.notes || null,
-    },
-  });
+  // A brood under a hen (#188): the "not already sitting" check and the new
+  // cycle commit together. Serializable, so two saves racing for the same hen
+  // (two tabs) cannot both see her free — Postgres fails the later one.
+  //
+  // Postgres can also fail it over an unrelated save that touched the same
+  // index pages (P2034), so it is retried: on a real race the next attempt's
+  // check sees the winner's brood and refuses with its own message.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          await assertHenCanSit(tx, farmId, motherHenId);
+          return tx.incubationCycle.create({ data });
+        },
+        { isolationLevel: "Serializable" },
+      );
+    } catch (error) {
+      const serializationFailure = (error as { code?: unknown } | null)?.code === "P2034";
+      if (!serializationFailure || attempt >= SERIALIZABLE_ATTEMPTS) throw error;
+    }
+  }
 }
+
+const SERIALIZABLE_ATTEMPTS = 3;
 
 // F10.2 — record candling results. Pure data update, no side effects, editable anytime.
 export async function recordCandling(farmId: string, cycleId: string, input: CandlingInput) {

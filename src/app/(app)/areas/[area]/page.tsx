@@ -6,7 +6,8 @@ import { AreaBalanceCard } from "@/components/v2/area-balance-card";
 import { AreaNewSheet } from "@/components/v2/area-new-sheet";
 import { StatCard } from "@/components/v2/stat-card";
 import { requireActiveFarm } from "@/lib/session";
-import { getEggsOverview, type EggsOverview } from "@/lib/services/area-overview";
+import { HensAreaOverview } from "@/components/v2/hens-area-overview";
+import { getEggsOverview, getHensOverview, type EggsOverview } from "@/lib/services/area-overview";
 import { farmAreaLabels } from "@/lib/labels";
 import { formatEUR } from "@/lib/format";
 import {
@@ -19,9 +20,9 @@ import {
   type EggsStatKey,
 } from "@/lib/v2-navigation";
 
-// An area's Apžvalga tab. Kiaušiniai has its overview (#187, V2-Eggs-Overview);
-// the other areas list their V1 screens until #188–#190 build theirs — each
-// screen has its own add button, so records stay reachable meanwhile.
+// An area's Apžvalga tab. Kiaušiniai (#187) and Perekšlės (#188) have their
+// overviews; the other areas list their V1 screens until #189–#190 build
+// theirs — each screen has its own add button, so records stay reachable.
 export default async function AreaOverviewPage({ params }: { params: Promise<{ area: string }> }) {
   const { area } = await params;
   if (!isAreaSlug(area)) notFound();
@@ -29,6 +30,10 @@ export default async function AreaOverviewPage({ params }: { params: Promise<{ a
   if (area === "eggs") {
     const { farm } = await requireActiveFarm();
     return <EggsAreaOverview data={await getEggsOverview(farm.id)} />;
+  }
+  if (area === "hens") {
+    const { farm } = await requireActiveFarm();
+    return <HensAreaOverview data={await getHensOverview(farm.id)} />;
   }
 
   return (

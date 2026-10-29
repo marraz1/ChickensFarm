@@ -1,7 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { resolveFinancePeriod } from "@/lib/finance-period";
-import { flockByBreed, type FlockPart } from "@/lib/area-overview";
-import { getAreaFinances } from "@/lib/services/area-finance";
+import {
+  flockByBreed,
+  henStatus,
+  sittingDay,
+  type FlockPart,
+  type HenStatus,
+} from "@/lib/area-overview";
+import { getAreaFinance, getAreaFinances } from "@/lib/services/area-finance";
+import { openBroodsWhere } from "@/lib/services/mother-hens";
 import type { AreaFinance } from "@/lib/area-finance";
 import type { EggsStatKey } from "@/lib/v2-navigation";
 
@@ -100,5 +107,98 @@ export async function getEggsOverview(
       birdSales: monthMoney.birdIncome,
       groups: activeGroups,
     },
+  };
+}
+
+export type HenCard = {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  status: HenStatus;
+  /** Diary entries. */
+  logs: number;
+};
+
+export type HensOverview = {
+  year: number;
+  /** Living hens, newest first (as the V1 list orders them). */
+  hens: { id: string; name: string }[];
+  /** Hens sitting now, each on her unhatched cycle. */
+  sitting: { name: string; eggs: number | null; day: number }[];
+  /** Every hen; living first (newest first), then the dead with "Nugaišusi", latest death first. */
+  cards: HenCard[];
+  balance: AreaFinance;
+};
+
+/**
+ * The Perekšlės area home (#188, V2-Hens-Overview). A hen sits while she has
+ * an incubation cycle with no hatch date yet; the day count uses the farm's
+ * today (Europe/Vilnius). Farm-scoped throughout.
+ */
+export async function getHensOverview(
+  farmId: string,
+  now: Date = new Date(),
+): Promise<HensOverview> {
+  const year = resolveFinancePeriod({}, now);
+
+  const [hens, activeCycles, balance] = await Promise.all([
+    prisma.motherHen.findMany({
+      where: { farmId },
+      select: { id: true, name: true, photoUrl: true, diedAt: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.incubationCycle.findMany({
+      where: openBroodsWhere(farmId),
+      select: { motherHenId: true, eggsTotal: true, startDate: true },
+    }),
+    getAreaFinance(farmId, "HENS", year),
+  ]);
+  // Counted in the database, per hen, through the farm's own hen ids: diary
+  // entries carry no farmId, so the hens are read first.
+  const logCounts =
+    hens.length === 0
+      ? []
+      : await prisma.motherHenLog.groupBy({
+          by: ["motherHenId"],
+          where: { motherHenId: { in: hens.map((h) => h.id) } },
+          _count: { _all: true },
+        });
+  const logsOf = new Map(logCounts.map((row) => [row.motherHenId, row._count._all]));
+  // One open brood per hen is the rule (createIncubationCycle); should the data
+  // ever hold more, her latest one is shown, never an arbitrary one.
+  const cycleOf = new Map<string | null, (typeof activeCycles)[number]>();
+  for (const c of [...activeCycles].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())) {
+    cycleOf.set(c.motherHenId, c);
+  }
+
+  // Newest first; sorted here too because the test double ignores orderBy.
+  const ordered = [...hens].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const living = ordered.filter((h) => !h.diedAt);
+  // The most recently died first.
+  const dead = hens
+    .filter((h) => h.diedAt)
+    .sort((a, b) => b.diedAt!.getTime() - a.diedAt!.getTime());
+
+  return {
+    year: year.year,
+    hens: living.map(({ id, name }) => ({ id, name })),
+    sitting: living
+      .filter((h) => cycleOf.has(h.id))
+      .map((h) => {
+        const cycle = cycleOf.get(h.id)!;
+        return {
+          name: h.name,
+          eggs: cycle.eggsTotal,
+          day: sittingDay(cycle.startDate, year.today),
+        };
+      }),
+    cards: [...living, ...dead].map((h) => ({
+      id: h.id,
+      name: h.name,
+      photoUrl: h.photoUrl,
+      status: henStatus(h, cycleOf.has(h.id)),
+      logs: logsOf.get(h.id) ?? 0,
+    })),
+    balance,
   };
 }

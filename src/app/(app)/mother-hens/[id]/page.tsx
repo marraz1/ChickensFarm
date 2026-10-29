@@ -1,21 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActiveFarm } from "@/lib/session";
-import { getMotherHenWithLogs } from "@/lib/services/mother-hens";
+import { getMotherHenWithLogs, isHenSitting } from "@/lib/services/mother-hens";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { formatDateLT } from "@/lib/format";
-import { Plus, Pencil } from "lucide-react";
+import { Egg, Plus, Pencil } from "lucide-react";
 
-export default async function MotherHenDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function MotherHenDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { farm } = await requireActiveFarm();
-  const hen = await getMotherHenWithLogs(farm.id, id);
+  const [hen, sitting] = await Promise.all([
+    getMotherHenWithLogs(farm.id, id),
+    isHenSitting(farm.id, id),
+  ]);
   if (!hen) notFound();
+  // Alive and not sitting already: she can be set on eggs (#188).
+  const canSit = !hen.diedAt && !sitting;
 
   return (
     <div>
@@ -43,7 +44,19 @@ export default async function MotherHenDetailPage({
       <div className="flex flex-col gap-4 px-4">
         {hen.photoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={hen.photoUrl} alt={hen.name} className="h-56 w-full rounded-lg border object-cover" />
+          <img
+            src={hen.photoUrl}
+            alt={hen.name}
+            className="h-56 w-full rounded-lg border object-cover"
+          />
+        )}
+        {canSit && (
+          <Link
+            href={`/incubation/new?motherHenId=${hen.id}`}
+            className="flex h-11 items-center justify-center gap-1 rounded-lg border text-sm font-medium"
+          >
+            <Egg size={16} aria-hidden /> Pradėti perėjimą
+          </Link>
         )}
         {(hen.description || hen.birdGroup) && (
           <Card className="p-4">

@@ -26,7 +26,7 @@
 // throws) rather than silently returning a wrong answer, since nothing under
 // test needs it.
 //
-// aggregate/groupBy support `_sum` only, and match Prisma in returning `null`
+// aggregate/groupBy support `_sum` (groupBy also `_count: { _all }`), and match Prisma in returning `null`
 // for a summed field when no row matched — the services under test rely on
 // that (`_sum.quantity ?? 0`), so faking a 0 would leave the fallback
 // untested. They exist because the flock-reduction report (reports.ts) is
@@ -99,6 +99,8 @@ function rowsOf(model: ModelName): Row[] {
 function matchesWhere(model: ModelName, where: Where | undefined, row: Row): boolean {
   if (!where) return true;
   for (const [key, cond] of Object.entries(where)) {
+    // Prisma ignores a filter whose value is undefined — it matches every row.
+    if (cond === undefined) continue;
     if (isSomeFilter(cond)) {
       const relation = RELATIONS[model]?.[key];
       if (!relation) {
@@ -134,6 +136,9 @@ function isOperatorFilter(value: unknown): value is Record<string, unknown> {
 /** Dates compare by instant, not by reference — `new Date(x) !== new Date(x)`. */
 function valuesEqual(a: unknown, b: unknown): boolean {
   if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  // A column a create never wrote is NULL in the database, so it matches a
+  // `null` filter there; the fake stores it as undefined.
+  if (a == null && b == null) return true;
   return a === b;
 }
 
@@ -265,6 +270,7 @@ function createModelClient(model: ModelName) {
       by: string[];
       where?: Where;
       _sum?: Record<string, boolean>;
+      _count?: { _all: true };
     }): Promise<Row[]> {
       const matched = rowsOf(model).filter((r) => matchesWhere(model, args.where, r));
       const buckets = new Map<string, Row[]>();
@@ -282,6 +288,7 @@ function createModelClient(model: ModelName) {
         const group: Row = {};
         for (const field of args.by) group[field] = groupRows[0][field];
         group._sum = sumFields(groupRows, args._sum);
+        if (args._count) group._count = { _all: groupRows.length };
         return group;
       });
     },

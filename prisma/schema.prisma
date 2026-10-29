@@ -319,9 +319,10 @@ model MotherHen {
   diedAt      DateTime?  @db.Date
   createdAt   DateTime   @default(now())
 
-  logs     MotherHenLog[]
-  losses   Loss[]
-  expenses Expense[]
+  logs             MotherHenLog[]
+  losses           Loss[]
+  expenses         Expense[]
+  incubationCycles IncubationCycle[]
 
   @@index([farmId])
   @@map("mother_hens")
@@ -519,6 +520,10 @@ model IncubationCycle {
   hatchedCount      Int?
   resultingGroupId  String?
   resultingGroup    BirdGroup? @relation("ResultingGroup", fields: [resultingGroupId], references: [id], onDelete: SetNull)
+  // The hen sitting on these eggs, when they are hatched under one (#188). A
+  // hen is "Peri" while she has a cycle with no hatchDate yet.
+  motherHenId       String?
+  motherHen         MotherHen? @relation(fields: [motherHenId], references: [id], onDelete: SetNull)
   notes             String?
   growthCompletedAt DateTime? // set when jauniklių auginimas/sekimas is finished
   createdAt         DateTime   @default(now())
@@ -529,6 +534,7 @@ model IncubationCycle {
   expenses   Expense[]
 
   @@index([farmId, startDate])
+  @@index([motherHenId])
   @@map("incubation_cycles")
 }
 

@@ -20,14 +20,17 @@ import {
 export function AreaNewSheet({
   areaLabel,
   items,
+  triggerLabel = "Naujas",
 }: {
   areaLabel: string;
   items: readonly { href: string; label: string }[];
+  /** The button's word as the design spells it: "Naujas", or "Nauja" on Perekšlės. */
+  triggerLabel?: string;
 }) {
   return (
     <Sheet>
       <SheetTrigger className="flex h-11 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground">
-        <Plus size={16} aria-hidden /> Naujas
+        <Plus size={16} aria-hidden /> {triggerLabel}
       </SheetTrigger>
       <SheetContent side="bottom" showCloseButton={false} className="rounded-t-2xl pb-4">
         <SheetHeader className="pb-0">

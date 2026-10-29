@@ -132,13 +132,28 @@ describe("AREA_NEW_RECORDS", () => {
     ]);
   });
 
+  it("offers the Perekšlės sheet's five actions in design order", () => {
+    expect(AREA_NEW_RECORDS.hens.map((a) => a.label)).toEqual([
+      "Nauja perekšlė",
+      "Dienoraščio įrašas",
+      "Pradėti perėjimą su perekšle",
+      "Nauja išlaida",
+      "Registruoti nuostolį",
+    ]);
+  });
+
   it("keeps every action inside its area, so the bar stays on it", () => {
+    // A brood under a hen is created as a Perinimas cycle, so that one action
+    // lights Perinimas — where the farmer then follows the cycle.
+    const crossArea = new Set(["hens /incubation/new"]);
     for (const [area, actions] of Object.entries(AREA_NEW_RECORDS)) {
       for (const { href } of actions ?? []) {
+        if (crossArea.has(`${area} ${href}`)) continue;
         const url = new URL(href, "http://x");
         expect(navKeyForPath(url.pathname, url.searchParams.get("area"))).toBe(area);
       }
     }
+    expect(navKeyForPath("/incubation/new")).toBe("incubation");
   });
 });
 

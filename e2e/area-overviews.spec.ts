@@ -72,3 +72,81 @@ test.describe("Kiaušiniai (#187)", () => {
     await expect(page).toHaveURL(/\/eggs\/collections\/new$/, { timeout: 15_000 });
   });
 });
+
+test.describe("Perekšlės (#188)", () => {
+  let henId: string | undefined;
+  let cycleId: string | undefined;
+
+  test.afterEach(async ({ page }) => {
+    // A cycle has no delete endpoint: hatch it with no chicks, so it never
+    // counts as active again on the shared preview farm, then remove the hen
+    // (the cycle keeps no link to her: SetNull).
+    if (cycleId) {
+      const hatched = await page.request.patch(`/api/incubation-cycles/${cycleId}`, {
+        data: {
+          action: "hatch",
+          hatchDate: farmToday(),
+          hatchedCount: 0,
+          target: { mode: "none" },
+        },
+      });
+      expect(hatched.ok()).toBe(true);
+    }
+    if (henId) expect((await page.request.delete(`/api/mother-hens/${henId}`)).ok()).toBe(true);
+    henId = cycleId = undefined;
+  });
+
+  const farmToday = () =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vilnius" }).format(new Date());
+
+  test("shows the hens, who is sitting, the balance and a card per hen", async ({ page }) => {
+    const name = `E2E perekšlė ${Date.now()}`;
+    const hen = await page.request.post("/api/mother-hens", { data: { name } });
+    expect(hen.ok()).toBe(true);
+    henId = (await hen.json()).id as string;
+
+    await page.goto("/areas/hens");
+    await expect(page.getByRole("region", { name: "Perekšlės" })).toContainText(name);
+    await expect(page.getByRole("region", { name: "Peri dabar" })).toBeVisible();
+    await expect(page.getByRole("region", { name: `Balansas · ${farmYear()} m.` })).toBeVisible();
+    const card = page.getByRole("link").filter({ hasText: name });
+    await expect(card).toContainText("Ilsisi · 0 įrašų");
+
+    // The cycle form offers her, then a brood under her makes her sit.
+    await page.goto(`/incubation/new?motherHenId=${henId}`);
+    await expect(page.getByLabel("Perekšlė (neprivaloma)")).toContainText(name);
+
+    const cycle = await page.request.post("/api/incubation-cycles", {
+      data: { name: `E2E ${name}`, startDate: farmToday(), eggsTotal: 8, motherHenId: henId },
+    });
+    expect(cycle.ok()).toBe(true);
+    cycleId = (await cycle.json()).id as string;
+
+    await page.goto("/areas/hens");
+    await expect(card).toContainText("Peri · 0 įrašų");
+    // Other hens may sit on the shared preview farm, so only "at least one" is
+    // certain here; the exact "8 kiaušiniai · 1-a diena" line is unit-tested
+    // (sittingDetail), and her card above already says "Peri".
+    await expect(page.getByRole("region", { name: "Peri dabar" })).toContainText(
+      /^Peri dabar[1-9]/,
+    );
+    await card.click();
+    await expect(page).toHaveURL(new RegExp(`/mother-hens/${henId}$`), { timeout: 15_000 });
+  });
+
+  test("Nauja opens the sheet with the hen actions", async ({ page }) => {
+    await page.goto("/areas/hens");
+    await page.getByRole("button", { name: "Nauja" }).click();
+
+    await expect(sheet(page)).toContainText("Perekšlės");
+    await expect(sheet(page).getByRole("link")).toHaveText([
+      "Nauja perekšlė",
+      "Dienoraščio įrašas",
+      "Pradėti perėjimą su perekšle",
+      "Nauja išlaida",
+      "Registruoti nuostolį",
+    ]);
+    await sheet(page).getByRole("button", { name: "Uždaryti" }).click();
+    await expect(sheet(page)).toBeHidden();
+  });
+});
