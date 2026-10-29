@@ -112,12 +112,18 @@ import {
   createMotherHen,
   deleteMotherHen,
   getMotherHenWithLogs,
+  listHensFreeToSit,
   updateMotherHen,
 } from "@/lib/services/mother-hens";
-import { finalizeHatch, getIncubationCycle, recordCandling } from "@/lib/services/incubation";
+import {
+  createIncubationCycle,
+  finalizeHatch,
+  getIncubationCycle,
+  recordCandling,
+} from "@/lib/services/incubation";
 import { listAreaTargetOptions } from "@/lib/services/area-targets";
 import { getAreaFinance, getFarmFinance } from "@/lib/services/area-finance";
-import { getEggsOverview } from "@/lib/services/area-overview";
+import { getEggsOverview, getHensOverview } from "@/lib/services/area-overview";
 
 const FARM_A_ID = "farm-a";
 const FARM_B_ID = "farm-b";
@@ -1080,6 +1086,56 @@ describe("area finance", () => {
       });
     }
     expect((await getAreaFinance(FARM_A_ID, "MEAT", period)).eggIncome).toBe(0);
+  });
+});
+
+describe("Perekšlės overview and broods under a hen", () => {
+  beforeEach(async () => {
+    await seedTwoFarms();
+    for (const [id, farmId, name] of [
+      ["hen-a", FARM_A_ID, "Rita"],
+      ["hen-b", FARM_B_ID, "Svetima"],
+    ] as const) {
+      await fakePrisma.motherHen.create({
+        data: { id, farmId, birdGroupId: null, name, photoUrl: null, diedAt: null },
+      });
+    }
+    // Farm B's hen sits and keeps a diary.
+    await fakePrisma.incubationCycle.create({
+      data: {
+        id: "cycle-b",
+        farmId: FARM_B_ID,
+        name: "B",
+        motherHenId: "hen-b",
+        eggSourceGroupId: null,
+        startDate: new Date("2026-10-20"),
+        eggsTotal: 9,
+        hatchDate: null,
+      },
+    });
+    await fakePrisma.motherHenLog.create({
+      data: { motherHenId: "hen-b", entryDate: new Date("2026-10-21"), note: null, photoUrl: null },
+    });
+  });
+
+  it("never shows another farm's hens, broods or diary entries", async () => {
+    const hensA = await getHensOverview(FARM_A_ID, new Date("2026-10-28T12:00:00Z"));
+    expect(hensA.hens.map((h) => h.name)).toEqual(["Rita"]);
+    expect(hensA.sitting).toEqual([]);
+    expect(hensA.cards).toEqual([
+      expect.objectContaining({ name: "Rita", status: "Ilsisi", logs: 0 }),
+    ]);
+  });
+
+  it("never starts a brood under another farm's hen", async () => {
+    await expect(
+      createIncubationCycle(FARM_A_ID, {
+        name: "Svetimas",
+        startDate: "2026-10-28",
+        motherHenId: "hen-b",
+      }),
+    ).rejects.toThrow(ValidationError);
+    expect((await listHensFreeToSit(FARM_A_ID)).map((h) => h.id)).toEqual(["hen-a"]);
   });
 });
 

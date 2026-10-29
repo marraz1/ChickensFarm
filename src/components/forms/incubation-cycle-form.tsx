@@ -21,8 +21,19 @@ import {
 import { todayInputValue } from "@/lib/format";
 
 type BirdGroupOption = { id: string; label: string };
+type MotherHenOption = { id: string; label: string };
 
-export function IncubationCycleForm({ birdGroups }: { birdGroups: BirdGroupOption[] }) {
+export function IncubationCycleForm({
+  birdGroups,
+  motherHens = [],
+  defaultMotherHenId = "",
+}: {
+  birdGroups: BirdGroupOption[];
+  /** Hens free to sit (alive, not sitting already) — #188. */
+  motherHens?: MotherHenOption[];
+  /** Preselected when started from a hen ("Pradėti perėjimą"). */
+  defaultMotherHenId?: string;
+}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -34,11 +45,20 @@ export function IncubationCycleForm({ birdGroups }: { birdGroups: BirdGroupOptio
     formState: { errors, isSubmitting },
   } = useForm<CreateIncubationCycleInput>({
     resolver: zodResolver(createIncubationCycleSchema),
-    defaultValues: { name: "", startDate: todayInputValue(), sourceDescription: "", eggSourceGroupId: "", notes: "" },
+    defaultValues: {
+      name: "",
+      startDate: todayInputValue(),
+      sourceDescription: "",
+      eggSourceGroupId: "",
+      motherHenId: defaultMotherHenId,
+      notes: "",
+    },
   });
 
   const eggSourceGroupId = watch("eggSourceGroupId");
+  const motherHenId = watch("motherHenId");
   const groupItems = Object.fromEntries(birdGroups.map((g) => [g.id, g.label]));
+  const henItems = Object.fromEntries(motherHens.map((h) => [h.id, h.label]));
 
   async function onSubmit(data: CreateIncubationCycleInput) {
     setServerError(null);
@@ -84,10 +104,39 @@ export function IncubationCycleForm({ birdGroups }: { birdGroups: BirdGroupOptio
         />
       </div>
 
+      {motherHens.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="motherHenId">Perekšlė (neprivaloma)</Label>
+          <Select
+            items={henItems}
+            value={motherHenId ?? ""}
+            onValueChange={(v) => setValue("motherHenId", v ?? "")}
+          >
+            <SelectTrigger id="motherHenId" className="h-11 w-full">
+              <SelectValue placeholder="Inkubatorius" />
+            </SelectTrigger>
+            <SelectContent>
+              {motherHens.map((h) => (
+                <SelectItem key={h.id} value={h.id}>
+                  {h.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.motherHenId && (
+            <p className="text-sm text-destructive">{errors.motherHenId.message}</p>
+          )}
+        </div>
+      )}
+
       {birdGroups.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="eggSourceGroupId">Kiaušinių šaltinis (grupė, neprivaloma)</Label>
-          <Select items={groupItems} value={eggSourceGroupId ?? ""} onValueChange={(v) => setValue("eggSourceGroupId", v ?? "")}>
+          <Select
+            items={groupItems}
+            value={eggSourceGroupId ?? ""}
+            onValueChange={(v) => setValue("eggSourceGroupId", v ?? "")}
+          >
             <SelectTrigger id="eggSourceGroupId" className="h-11 w-full">
               <SelectValue placeholder="Nenurodyta" />
             </SelectTrigger>

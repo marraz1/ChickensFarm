@@ -14,6 +14,28 @@ export function listMotherHens(farmId: string) {
   });
 }
 
+/**
+ * Hens that can be set on eggs (#188): alive, and not already sitting on a
+ * cycle that has not hatched. The cycle form offers these; the service
+ * enforces the same rule on save.
+ */
+export async function listHensFreeToSit(farmId: string) {
+  const [hens, active] = await Promise.all([
+    prisma.motherHen.findMany({
+      where: { farmId, diedAt: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.incubationCycle.findMany({
+      where: { farmId, hatchDate: null, motherHenId: { not: null } },
+      select: { motherHenId: true },
+    }),
+  ]);
+  const sitting = new Set(active.map((c) => c.motherHenId));
+  // Sorted here too: the test double ignores orderBy.
+  return hens.filter((h) => !sitting.has(h.id)).sort((a, b) => a.name.localeCompare(b.name, "lt"));
+}
+
 export function getMotherHenWithLogs(farmId: string, motherHenId: string) {
   return prisma.motherHen.findFirst({
     where: { id: motherHenId, farmId },

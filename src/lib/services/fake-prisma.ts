@@ -134,6 +134,9 @@ function isOperatorFilter(value: unknown): value is Record<string, unknown> {
 /** Dates compare by instant, not by reference — `new Date(x) !== new Date(x)`. */
 function valuesEqual(a: unknown, b: unknown): boolean {
   if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+  // A column a create never wrote is NULL in the database, so it matches a
+  // `null` filter there; the fake stores it as undefined.
+  if (a == null && b == null) return true;
   return a === b;
 }
 

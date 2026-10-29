@@ -190,7 +190,7 @@ export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
 // yet (#188–#190) have none and keep the bare list. Each built area is a
 // required key, so its overview reads it without a non-null assertion.
 type NewRecordLinks = readonly { href: string; label: string }[];
-export const AREA_NEW_RECORDS: { eggs: NewRecordLinks } & Partial<
+export const AREA_NEW_RECORDS: { eggs: NewRecordLinks; hens: NewRecordLinks } & Partial<
   Record<AreaSlug, NewRecordLinks>
 > = {
   eggs: [
@@ -202,6 +202,15 @@ export const AREA_NEW_RECORDS: { eggs: NewRecordLinks } & Partial<
     { href: "/bird-groups/new?area=eggs", label: "Nauja dedeklių grupė" },
     { href: "/expenses/new?area=eggs", label: "Nauja išlaida" },
     { href: "/losses/new?area=eggs", label: "Registruoti nuostolį" },
+  ],
+  hens: [
+    { href: "/mother-hens/new", label: "Nauja perekšlė" },
+    // A diary entry belongs to one hen, so this opens the hens to pick from.
+    { href: "/mother-hens", label: "Dienoraščio įrašas" },
+    // The brood is a Perinimas cycle with the hen chosen on it (#188).
+    { href: "/incubation/new", label: "Pradėti perėjimą su perekšle" },
+    { href: "/expenses/new?area=hens", label: "Nauja išlaida" },
+    { href: "/losses/new?area=hens", label: "Registruoti nuostolį" },
   ],
 };
 

@@ -33,12 +33,26 @@ export function getIncubationCycle(farmId: string, cycleId: string) {
   });
 }
 
+// A brood under a hen (#188): she must be this farm's (tenant isolation, NF5),
+// alive, and not already sitting on eggs that have not hatched yet.
+async function assertHenCanSit(farmId: string, motherHenId: string) {
+  const [hen, sitting] = await Promise.all([
+    prisma.motherHen.findFirst({ where: { id: motherHenId, farmId } }),
+    prisma.incubationCycle.findFirst({ where: { farmId, motherHenId, hatchDate: null } }),
+  ]);
+  if (!hen) throw new ValidationError("Pasirinkta perekšlė nerasta");
+  if (hen.diedAt) throw new ValidationError("Nugaišusi perekšlė negali perėti");
+  if (sitting) throw new ValidationError("Ši perekšlė jau peri");
+}
+
 export async function createIncubationCycle(farmId: string, input: CreateIncubationCycleInput) {
   const eggSourceGroupId = input.eggSourceGroupId || null;
   if (eggSourceGroupId) {
     const group = await prisma.birdGroup.findFirst({ where: { id: eggSourceGroupId, farmId } });
     if (!group) throw new ValidationError("Pasirinkta kiaušinių šaltinio grupė nerasta");
   }
+  const motherHenId = input.motherHenId || null;
+  if (motherHenId) await assertHenCanSit(farmId, motherHenId);
 
   return prisma.incubationCycle.create({
     data: {
@@ -47,6 +61,7 @@ export async function createIncubationCycle(farmId: string, input: CreateIncubat
       startDate: new Date(input.startDate),
       sourceDescription: input.sourceDescription || null,
       eggSourceGroupId,
+      motherHenId,
       eggsTotal: input.eggsTotal ?? null,
       notes: input.notes || null,
     },

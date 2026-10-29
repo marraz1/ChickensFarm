@@ -7,6 +7,8 @@ export const createIncubationCycleSchema = z.object({
   startDate: z.string().min(1, "Įveskite pradžios datą"),
   sourceDescription: z.string().trim().max(300).optional().or(z.literal("")),
   eggSourceGroupId: z.string().optional().or(z.literal("")),
+  // The hen sitting on the eggs, when they are hatched under one (#188).
+  motherHenId: z.string().optional().or(z.literal("")),
   eggsTotal: z.number().int().min(0).optional(),
   notes: z.string().trim().max(1000).optional().or(z.literal("")),
 });

@@ -1,6 +1,23 @@
 // Small pure helpers behind the V2 area overviews (#187–#190), kept free of
 // Prisma so they are unit-tested directly.
 
+export type HenStatus = "Peri" | "Ilsisi" | "Nugaišusi";
+
+/**
+ * A mother hen's badge on the Perekšlės overview (#188): a dead hen is
+ * "Nugaišusi" whatever else is recorded; otherwise she sits ("Peri") while she
+ * has a cycle that has not hatched, and rests ("Ilsisi") between broods.
+ */
+export function henStatus(hen: { diedAt: Date | null }, sitting: boolean): HenStatus {
+  if (hen.diedAt) return "Nugaišusi";
+  return sitting ? "Peri" : "Ilsisi";
+}
+
+/** Which day of sitting today is: the start day is day 1. Dates are UTC midnights. */
+export function sittingDay(startDate: Date, today: Date): number {
+  return Math.max(1, Math.round((today.getTime() - startDate.getTime()) / 86_400_000) + 1);
+}
+
 export type FlockPart = { name: string; quantity: number };
 
 /**
