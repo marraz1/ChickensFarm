@@ -4,10 +4,10 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { formatEUR, formatShareLT } from "@/lib/format";
 import {
-  areaSplit,
   donutSegments,
   splitTextAlternative,
   splitWord,
+  type AreaSplits,
   type SplitMode,
 } from "@/lib/area-split";
 import { cn } from "@/lib/utils";
@@ -23,17 +23,16 @@ const MODES: { mode: SplitMode; label: string }[] = [
 // The overview's "Pagal sritį" card (#202, V2-Overview): the period's spending
 // or income split by area. Tapping a legend row focuses its slice and shows its
 // amount in the centre; tapping it again clears the focus.
-export function AreaSplitCard({
-  areas,
-}: {
-  areas: Record<FarmArea, { income: number; expenses: number }>;
-}) {
+export function AreaSplitCard({ splits }: { splits: AreaSplits }) {
   const [mode, setMode] = useState<SplitMode>("expenses");
   const [focus, setFocus] = useState<FarmArea | null>(null);
 
-  const split = areaSplit(areas, mode);
+  const split = splits[mode];
   const segments = donutSegments(split.parts, RADIUS);
   const focused = split.parts.find((p) => p.area === focus);
+  // A focused area with no money has no slice: the centre still answers with
+  // its 0, but the other slices are not faded around nothing.
+  const fade = (area: FarmArea) => focused != null && focused.amount > 0 && focus !== area;
   const centre = SIZE / 2;
 
   return (
@@ -46,7 +45,11 @@ export function AreaSplitCard({
               key={m.mode}
               type="button"
               aria-pressed={mode === m.mode}
-              onClick={() => setMode(m.mode)}
+              onClick={() => {
+                // A focus from the other view may have no money in this one.
+                setMode(m.mode);
+                setFocus(null);
+              }}
               className={cn(
                 "min-h-9 rounded-md px-3 text-sm font-medium",
                 mode === m.mode ? "bg-background shadow-sm" : "text-muted-foreground",
@@ -86,7 +89,7 @@ export function AreaSplitCard({
                 strokeWidth={focus === s.area ? 24 : 20}
                 strokeDasharray={s.dash}
                 strokeDashoffset={s.offset}
-                opacity={focus && focus !== s.area ? 0.3 : 1}
+                opacity={fade(s.area) ? 0.3 : 1}
                 transform={`rotate(-90 ${centre} ${centre})`}
               />
             ))}

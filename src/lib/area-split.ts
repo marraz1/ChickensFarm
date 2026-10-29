@@ -4,19 +4,30 @@
 import type { FarmArea } from "@/generated/prisma/client";
 import { formatEUR, formatShareLT } from "@/lib/format";
 import { farmAreaOrder } from "@/lib/labels";
+import { NAV_ITEMS, areaSlugFor } from "@/lib/v2-navigation";
 
 /**
- * Each area's short name and colour, the same in both views. Colours are fixed
- * per area, never by rank (README § Area colours); three sit below 3:1 on
- * white, so every slice also has its percentage as text in the legend.
+ * Each area's colour, the same in both views. Colours are fixed per area,
+ * never by rank (README § Area colours); three sit below 3:1 on white, so
+ * every slice also has its percentage as text in the legend.
  */
-export const AREA_CHART: Record<FarmArea, { short: string; color: string }> = {
-  EGGS: { short: "Kiaušiniai", color: "#2a78d6" },
-  HENS: { short: "Perekšlės", color: "#eb6834" },
-  INC: { short: "Perinimas", color: "#1baf7a" },
-  MEAT: { short: "Mėsa", color: "#eda100" },
-  SHARED: { short: "Bendros", color: "#e87ba4" },
+const AREA_COLORS: Record<FarmArea, string> = {
+  EGGS: "#2a78d6",
+  HENS: "#eb6834",
+  INC: "#1baf7a",
+  MEAT: "#eda100",
+  SHARED: "#e87ba4",
 };
+
+/** The bottom bar's short name for an area; Bendra has no bar item. */
+function shortName(area: FarmArea): string {
+  const slug = areaSlugFor(area);
+  return NAV_ITEMS.find((item) => item.key === slug)?.label ?? "Bendros";
+}
+
+export const AREA_CHART = Object.fromEntries(
+  farmAreaOrder.map((area) => [area, { short: shortName(area), color: AREA_COLORS[area] }]),
+) as Record<FarmArea, { short: string; color: string }>;
 
 export type SplitMode = "expenses" | "income";
 
@@ -30,6 +41,14 @@ export type AreaSplitPart = {
 };
 
 export type AreaSplit = { total: number; parts: AreaSplitPart[] };
+/** Both views, worked out on the server so the card only picks one. */
+export type AreaSplits = Record<SplitMode, AreaSplit>;
+
+export function areaSplits(
+  areas: Record<FarmArea, { income: number; expenses: number }>,
+): AreaSplits {
+  return { expenses: areaSplit(areas, "expenses"), income: areaSplit(areas, "income") };
+}
 
 /** Every area, in display order, with its share of the farm's spending or income. */
 export function areaSplit(
@@ -56,20 +75,22 @@ const SLICE_GAP = 2;
 
 /**
  * One ring stroke per area with money, laid end to end from the top. Each
- * dash is its arc less a small gap (never below half a unit, so a sliver still
- * shows), followed by the whole circumference so it is drawn once.
+ * dash is its arc less a small gap between slices (never below half a unit,
+ * so a sliver still shows), followed by the whole circumference so it is
+ * drawn once. A lone slice is the whole ring, with no gap.
  */
 export function donutSegments(parts: readonly AreaSplitPart[], radius: number): DonutSegment[] {
   const circumference = 2 * Math.PI * radius;
+  const withMoney = parts.filter((p) => p.share > 0);
+  const gap = withMoney.length > 1 ? SLICE_GAP : 0;
   const segments: DonutSegment[] = [];
   let start = 0;
-  for (const part of parts) {
-    if (part.share <= 0) continue;
+  for (const part of withMoney) {
     const length = part.share * circumference;
     segments.push({
       area: part.area,
       color: part.color,
-      dash: `${Math.max(length - SLICE_GAP, 0.5)} ${circumference}`,
+      dash: `${Math.max(length - gap, 0.5)} ${circumference}`,
       offset: String(-start),
     });
     start += length;

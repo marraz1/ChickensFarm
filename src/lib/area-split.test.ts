@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { AREA_CHART, areaSplit, donutSegments, splitTextAlternative } from "@/lib/area-split";
+import {
+  AREA_CHART,
+  areaSplit,
+  areaSplits,
+  donutSegments,
+  splitTextAlternative,
+} from "@/lib/area-split";
+import { NAV_ITEMS } from "@/lib/v2-navigation";
 import { formatShareLT } from "@/lib/format";
 import type { FarmArea } from "@/generated/prisma/client";
 
@@ -115,5 +122,30 @@ describe("splitTextAlternative", () => {
     expect(splitTextAlternative(areaSplit(areas({}), "income"), "income")).toMatch(
       /^Pajamos pagal sritį: /,
     );
+  });
+});
+
+describe("review fixes (#202)", () => {
+  it("draws a lone area as the whole ring, with no gap", () => {
+    const parts = areaSplit(areas({ MEAT: { expenses: 5 } }), "expenses").parts;
+    const circumference = 2 * Math.PI * 52;
+    expect(donutSegments(parts, 52)).toEqual([
+      { area: "MEAT", color: "#eda100", dash: `${circumference} ${circumference}`, offset: "0" },
+    ]);
+  });
+
+  it("takes the short names from the bottom bar, Bendros for the shared costs", () => {
+    const bar = Object.fromEntries(NAV_ITEMS.map((item) => [item.key, item.label]));
+    expect(AREA_CHART.EGGS.short).toBe(bar.eggs);
+    expect(AREA_CHART.HENS.short).toBe(bar.hens);
+    expect(AREA_CHART.INC.short).toBe(bar.incubation);
+    expect(AREA_CHART.MEAT.short).toBe(bar.meat);
+    expect(AREA_CHART.SHARED.short).toBe("Bendros");
+  });
+
+  it("works out both views at once", () => {
+    const splits = areaSplits(SAMPLE);
+    expect(splits.expenses).toEqual(areaSplit(SAMPLE, "expenses"));
+    expect(splits.income).toEqual(areaSplit(SAMPLE, "income"));
   });
 });

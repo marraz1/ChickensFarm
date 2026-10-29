@@ -138,7 +138,11 @@ test("Pagal sritį splits the period's spending or income by area", async ({ pag
   await expect(legendRow("Mėsa")).toHaveAttribute("aria-pressed", "false");
   await expect(card).toContainText("Išlaidos iš viso");
 
+  // Switching the view clears a focus: Bendros has no income to show.
+  await legendRow("Bendros").click();
+  await expect(legendRow("Bendros")).toHaveAttribute("aria-pressed", "true");
   await card.getByRole("button", { name: "Pajamos", exact: true }).click();
+  await expect(legendRow("Bendros")).toHaveAttribute("aria-pressed", "false");
   await expect(card).toContainText("Pajamos iš viso");
   await expect(card.getByRole("img")).toHaveAccessibleName(/^Pajamos pagal sritį: /);
 });

@@ -6,9 +6,9 @@ import { resolveFinancePeriod, type SearchParam } from "@/lib/finance-period";
 import { Card } from "@/components/ui/card";
 import { PeriodSwitch } from "@/components/v2/period-switch";
 import { formatEUR, formatRelativeLT } from "@/lib/format";
-import { birdTypeLabels, farmAreaOrder } from "@/lib/labels";
+import { birdTypeLabels } from "@/lib/labels";
 import { AreaSplitCard } from "@/components/v2/area-split-card";
-import type { FarmArea } from "@/generated/prisma/client";
+import { areaSplits } from "@/lib/area-split";
 import { cn } from "@/lib/utils";
 import { Egg, AlertTriangle, Heart, Drumstick, Plus } from "lucide-react";
 
@@ -81,17 +81,8 @@ export default async function OverviewPage({
       </div>
 
       <div className="px-4">
-        {/* Only the two figures the card draws, not each area's whole finance. */}
-        <AreaSplitCard
-          areas={
-            Object.fromEntries(
-              farmAreaOrder.map((a) => [
-                a,
-                { income: finance.areas[a].income, expenses: finance.areas[a].expenses },
-              ]),
-            ) as Record<FarmArea, { income: number; expenses: number }>
-          }
-        />
+        {/* Both views worked out here; the card only picks one and draws it. */}
+        <AreaSplitCard splits={areaSplits(finance.areas)} />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 px-4">

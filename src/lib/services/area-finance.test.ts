@@ -20,6 +20,7 @@ import {
   updateBirdTransaction,
 } from "@/lib/services/bird-transactions";
 import { getProfitLossReport } from "@/lib/services/reports";
+import { areaSplits } from "@/lib/area-split";
 import type { FarmArea } from "@/generated/prisma/client";
 
 const FARM_ID = "farm-1";
@@ -271,6 +272,16 @@ describe("getFarmFinance", () => {
 
     const pl = await getProfitLossReport(FARM_ID, { from: PERIOD.from, to: PERIOD.to });
     expect(farm.total).toEqual({ income: pl.income, expenses: pl.expenses, result: pl.profit });
+  });
+
+  // #202: the overview's "Pagal sritį" donut sums the same areas; its totals
+  // must never drift from the farm result next to it.
+  it("gives the donut the farm total in both views", async () => {
+    await seedMixedFarm();
+    const farm = await getFarmFinance(FARM_ID, PERIOD);
+    const splits = areaSplits(farm.areas);
+    expect(splits.expenses.total).toBe(farm.total.expenses);
+    expect(splits.income.total).toBe(farm.total.income);
   });
 
   it("files home use under each group's area", async () => {
