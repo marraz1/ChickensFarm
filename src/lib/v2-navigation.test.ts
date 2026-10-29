@@ -99,6 +99,14 @@ describe("navKeyForPath", () => {
 });
 
 describe("AREA_RECORD_LINKS", () => {
+  it("lists the Mėsa records in design order, each with its figure", () => {
+    expect(AREA_RECORD_LINKS.meat.map((l) => [l.label, l.stat])).toEqual([
+      ["Mėsinių grupės", "groups"],
+      ["Suvartota mėsai", "consumed"],
+      ["Mėsinių pardavimai", "sales"],
+    ]);
+  });
+
   it("links every area to at least one existing screen", () => {
     for (const links of Object.values(AREA_RECORD_LINKS)) {
       expect(links.length).toBeGreaterThan(0);
@@ -109,8 +117,6 @@ describe("AREA_RECORD_LINKS", () => {
   it("keeps each link inside the area it is listed under", () => {
     for (const [area, links] of Object.entries(AREA_RECORD_LINKS)) {
       for (const { href } of links) {
-        // Meat-bird sales use the same V1 sales list as laying birds for now.
-        if (area === "meat" && href === "/birds/sales") continue;
         const url = new URL(href, "http://x");
         expect(navKeyForPath(url.pathname, url.searchParams.get("area"))).toBe(area);
       }
@@ -120,7 +126,7 @@ describe("AREA_RECORD_LINKS", () => {
 
 describe("AREA_NEW_RECORDS", () => {
   it("offers the Kiaušiniai sheet's eight actions in design order", () => {
-    expect(AREA_NEW_RECORDS.eggs?.map((a) => a.label)).toEqual([
+    expect(AREA_NEW_RECORDS.eggs.map((a) => a.label)).toEqual([
       "Surinkti kiaušinius",
       "Parduoti kiaušinius",
       "Suvartoti kiaušinius",
@@ -148,6 +154,17 @@ describe("AREA_NEW_RECORDS", () => {
       "Apšvietimas / patikra",
       "Registruoti išsiritimą",
       "Jauniklių sekimo įrašas",
+      "Nauja išlaida",
+      "Registruoti nuostolį",
+    ]);
+  });
+
+  it("offers the Mėsa sheet's six actions in design order", () => {
+    expect(AREA_NEW_RECORDS.meat.map((a) => a.label)).toEqual([
+      "Suvartoti mėsai",
+      "Parduoti paukščių",
+      "Pirkti jauniklių auginti",
+      "Nauja mėsinių grupė",
       "Nauja išlaida",
       "Registruoti nuostolį",
     ]);
@@ -192,6 +209,10 @@ describe("navKeyForPath with an area", () => {
     ["/bird-groups/new", "incubation", "incubation"],
     ["/birds/purchases/new", "meat", "meat"],
     ["/birds/sales/new", "eggs", "eggs"],
+    // #190: the sales and meat-use lists opened from Mėsa keep it lit.
+    ["/birds/sales", "meat", "meat"],
+    ["/birds/consumptions", "meat", "meat"],
+    ["/birds/consumptions/new", "meat", "meat"],
     ["/bird-groups", null, "eggs"],
     ["/bird-groups", "hens", "eggs"],
     // The area only steers the shared group and trade screens.

@@ -122,6 +122,7 @@ const AREA_PARAM_SCREENS: readonly { match: RegExp; accepts: "group" | "any" }[]
   { match: /^\/bird-groups(\/|$)/, accepts: "group" },
   { match: /^\/birds\/purchases(\/|$)/, accepts: "group" },
   { match: /^\/birds\/sales(\/|$)/, accepts: "group" },
+  { match: /^\/birds\/consumptions(\/|$)/, accepts: "group" },
   { match: /^\/expenses\/new$/, accepts: "any" },
   { match: /^\/expenses\/[^/]+\/edit$/, accepts: "any" },
   { match: /^\/losses\/new$/, accepts: "any" },
@@ -156,12 +157,12 @@ export function navKeyForPath(pathname: string, areaParam?: string | null): NavK
 
 // The "Įrašai" list on the Apžvalga tabs that have one: the V1 screens that
 // belong to the area. `stat` names the figure the overview shows beside the
-// link (#187 Kiaušiniai); Mėsa shows the bare list until #190. Perekšlės and
-// Perinimas list their hens and cycles instead (#188, #189).
+// link (#187 Kiaušiniai, #190 Mėsa). Perekšlės and Perinimas list their hens
+// and cycles instead (#188, #189).
 export type EggsStatKey =
   "collected" | "eggSales" | "eggsConsumed" | "purchases" | "birdSales" | "groups";
-// #188–#190 add their areas' keys to this union.
-export type AreaStatKey = EggsStatKey;
+export type MeatStatKey = "groups" | "consumed" | "sales";
+export type AreaStatKey = EggsStatKey | MeatStatKey;
 export type AreaRecordLink = { href: string; label: string; stat?: AreaStatKey };
 
 export const AREA_RECORD_LINKS: Record<"eggs" | "meat", readonly AreaRecordLink[]> = {
@@ -170,34 +171,29 @@ export const AREA_RECORD_LINKS: Record<"eggs" | "meat", readonly AreaRecordLink[
     { href: "/eggs/sales", label: "Kiaušinių pardavimai", stat: "eggSales" },
     { href: "/eggs/consumptions", label: "Suvartoti kiaušiniai", stat: "eggsConsumed" },
     { href: "/birds/purchases", label: "Paukščių pirkimai", stat: "purchases" },
-    { href: "/birds/sales", label: "Paukščių pardavimai", stat: "birdSales" },
+    { href: "/birds/sales?area=eggs", label: "Paukščių pardavimai", stat: "birdSales" },
     { href: "/bird-groups?area=eggs", label: "Dedeklių grupės", stat: "groups" },
     // Not in the design; kept so the report stays reachable in V2.
     { href: "/eggs/reports", label: "Kiaušinių ataskaita" },
   ],
+  // The Mėsa use and sales figures are the year's, as the design shows them
+  // (#190); each list is kept to the area, so it holds what its figure counts.
   meat: [
-    { href: "/birds/consumptions", label: "Suvartota mėsai" },
-    { href: "/bird-groups?area=meat", label: "Mėsinių grupės" },
-    { href: "/birds/purchases/new?area=meat", label: "Pirkti jauniklių auginti" },
-    { href: "/birds/sales", label: "Paukščių pardavimai" },
+    { href: "/bird-groups?area=meat", label: "Mėsinių grupės", stat: "groups" },
+    { href: "/birds/consumptions?area=meat", label: "Suvartota mėsai", stat: "consumed" },
+    { href: "/birds/sales?area=meat", label: "Mėsinių pardavimai", stat: "sales" },
   ],
 };
 
 // The "Naujas įrašas" sheet of each area (V2-<Area>-New): every record the
-// area can add, then its expense and loss. Areas whose overview is not built
-// yet (#190) have none and keep the bare list. Each built area is a required
-// key, so its overview reads it without a non-null assertion.
+// area can add, then its expense and loss.
 //
 // `cycle` marks an action done on one incubation cycle: the Perinimas overview
 // points it at that cycle when exactly one fits (incubationSheetItems), else
 // it opens the cycle list to pick from.
 export type NewRecordLink = { href: string; label: string; cycle?: "active" | "growing" };
 type NewRecordLinks = readonly NewRecordLink[];
-export const AREA_NEW_RECORDS: {
-  eggs: NewRecordLinks;
-  hens: NewRecordLinks;
-  incubation: NewRecordLinks;
-} & Partial<Record<AreaSlug, NewRecordLinks>> = {
+export const AREA_NEW_RECORDS: Record<AreaSlug, NewRecordLinks> = {
   eggs: [
     { href: "/eggs/collections/new", label: "Surinkti kiaušinius" },
     { href: "/eggs/sales/new", label: "Parduoti kiaušinius" },
@@ -226,6 +222,14 @@ export const AREA_NEW_RECORDS: {
     { href: "/incubation", label: "Jauniklių sekimo įrašas", cycle: "growing" },
     { href: "/expenses/new?area=incubation", label: "Nauja išlaida" },
     { href: "/losses/new?area=incubation", label: "Registruoti nuostolį" },
+  ],
+  meat: [
+    { href: "/birds/consumptions/new?area=meat", label: "Suvartoti mėsai" },
+    { href: "/birds/sales/new?area=meat", label: "Parduoti paukščių" },
+    { href: "/birds/purchases/new?area=meat", label: "Pirkti jauniklių auginti" },
+    { href: "/bird-groups/new?area=meat", label: "Nauja mėsinių grupė" },
+    { href: "/expenses/new?area=meat", label: "Nauja išlaida" },
+    { href: "/losses/new?area=meat", label: "Registruoti nuostolį" },
   ],
 };
 

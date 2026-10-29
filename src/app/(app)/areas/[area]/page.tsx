@@ -1,17 +1,17 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { AreaBalanceCard } from "@/components/v2/area-balance-card";
 import { AreaNewSheet } from "@/components/v2/area-new-sheet";
+import { RecordLinks } from "@/components/v2/record-links";
 import { StatCard } from "@/components/v2/stat-card";
 import { requireActiveFarm } from "@/lib/session";
 import { HensAreaOverview } from "@/components/v2/hens-area-overview";
 import { IncubationAreaOverview } from "@/components/v2/incubation-area-overview";
+import { MeatAreaOverview } from "@/components/v2/meat-area-overview";
 import {
   getEggsOverview,
   getHensOverview,
   getIncubationAreaOverview,
+  getMeatOverview,
   type EggsOverview,
 } from "@/lib/services/area-overview";
 import { farmAreaLabels } from "@/lib/labels";
@@ -21,37 +21,26 @@ import {
   AREA_RECORD_LINKS,
   AREA_SLUGS,
   isAreaSlug,
-  type AreaRecordLink,
-  type AreaStatKey,
   type EggsStatKey,
 } from "@/lib/v2-navigation";
 
-// An area's Apžvalga tab. Kiaušiniai (#187), Perekšlės (#188) and Perinimas
-// (#189) have their overviews; Mėsa lists its V1 screens until #190 builds its
-// own — each screen has its own add button, so records stay reachable.
+// An area's Apžvalga tab: Kiaušiniai (#187), Perekšlės (#188), Perinimas
+// (#189) and Mėsa (#190).
 export default async function AreaOverviewPage({ params }: { params: Promise<{ area: string }> }) {
   const { area } = await params;
   if (!isAreaSlug(area)) notFound();
 
-  if (area === "eggs") {
-    const { farm } = await requireActiveFarm();
-    return <EggsAreaOverview data={await getEggsOverview(farm.id)} />;
+  const { farm } = await requireActiveFarm();
+  switch (area) {
+    case "eggs":
+      return <EggsAreaOverview data={await getEggsOverview(farm.id)} />;
+    case "hens":
+      return <HensAreaOverview data={await getHensOverview(farm.id)} />;
+    case "incubation":
+      return <IncubationAreaOverview data={await getIncubationAreaOverview(farm.id)} />;
+    case "meat":
+      return <MeatAreaOverview data={await getMeatOverview(farm.id)} />;
   }
-  if (area === "hens") {
-    const { farm } = await requireActiveFarm();
-    return <HensAreaOverview data={await getHensOverview(farm.id)} />;
-  }
-  if (area === "incubation") {
-    const { farm } = await requireActiveFarm();
-    return <IncubationAreaOverview data={await getIncubationAreaOverview(farm.id)} />;
-  }
-
-  return (
-    <div className="flex flex-col gap-3 px-4">
-      <h2 className="text-sm font-medium text-muted-foreground">Įrašai</h2>
-      <RecordLinks links={AREA_RECORD_LINKS[area]} />
-    </div>
-  );
 }
 
 function EggsAreaOverview({ data }: { data: EggsOverview }) {
@@ -93,33 +82,5 @@ function EggsAreaOverview({ data }: { data: EggsOverview }) {
       <h2 className="pt-2 text-sm font-medium text-muted-foreground">Įrašai</h2>
       <RecordLinks links={AREA_RECORD_LINKS.eggs} values={statValues} />
     </div>
-  );
-}
-
-function RecordLinks({
-  links,
-  values = {},
-}: {
-  links: readonly AreaRecordLink[];
-  values?: Partial<Record<AreaStatKey, string>>;
-}) {
-  return (
-    <ul className="flex flex-col gap-2">
-      {links.map((link) => (
-        <li key={link.href}>
-          <Link href={link.href}>
-            <Card className="flex min-h-11 flex-row items-center gap-3 p-4">
-              <span className="flex-1 font-medium">{link.label}</span>
-              {link.stat && values[link.stat] != null && (
-                <span className="text-sm text-muted-foreground tabular-nums">
-                  {values[link.stat]}
-                </span>
-              )}
-              <ChevronRight size={18} className="text-muted-foreground" aria-hidden />
-            </Card>
-          </Link>
-        </li>
-      ))}
-    </ul>
   );
 }

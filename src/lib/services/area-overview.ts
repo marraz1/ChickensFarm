@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { resolveFinancePeriod } from "@/lib/finance-period";
-import { cycleLabel } from "@/lib/labels";
+import { birdGroupLabel, cycleLabel } from "@/lib/labels";
 import {
   cycleCardLines,
   cycleStatus,
   flockByBreed,
+  flockByGroup,
   hatchEfficiency,
   henStatus,
   sittingDay,
@@ -15,7 +16,7 @@ import {
 import { getAreaFinance, getAreaFinances } from "@/lib/services/area-finance";
 import { openBroodsWhere } from "@/lib/services/mother-hens";
 import type { AreaFinance } from "@/lib/area-finance";
-import type { EggsStatKey } from "@/lib/v2-navigation";
+import type { EggsStatKey, MeatStatKey } from "@/lib/v2-navigation";
 
 export type EggsOverview = {
   year: number;
@@ -298,5 +299,104 @@ export async function getIncubationAreaOverview(
         .map((c) => c.id),
     },
     balance,
+  };
+}
+
+/** How many meat-use records "Paskutiniai įrašai" lists. */
+const RECENT_MEAT_USE = 5;
+
+export type MeatOverview = {
+  year: number;
+  /** Birds in Mėsa groups, and the same split by group. */
+  raising: { total: number; byGroup: FlockPart[] };
+  /** Mėsa birds used at home, this month and this year. */
+  homeUse: { month: number; year: number };
+  /** The year's Mėsa result, as the Finansai tab shows it. */
+  balance: AreaFinance;
+  /**
+   * The "Įrašai" figures, keyed as AREA_RECORD_LINKS.meat names them: the
+   * groups holding birds now, and this year's meat use and sales.
+   */
+  stats: Record<MeatStatKey, number>;
+  /** The latest meat-use records, newest first. */
+  recent: { id: string; date: Date; groupLabel: string; quantity: number }[];
+};
+
+/**
+ * The Mėsa area home (#190, V2-Meat-Overview). Meat use counts the Mėsa
+ * groups' consumptions, as the Finansai tab's home use does (a consumption
+ * goes by its group's current area), so the two screens always agree.
+ * Farm-scoped throughout.
+ */
+export async function getMeatOverview(
+  farmId: string,
+  now: Date = new Date(),
+): Promise<MeatOverview> {
+  const year = resolveFinancePeriod({}, now);
+  const month = resolveFinancePeriod({ period: "month" }, now);
+
+  const [groups, breeds, [balance, monthMoney]] = await Promise.all([
+    prisma.birdGroup.findMany({
+      where: { farmId, area: "MEAT" },
+      select: { id: true, name: true, quantity: true, breedId: true },
+    }),
+    prisma.breed.findMany({ where: { farmId }, select: { id: true, name: true } }),
+    getAreaFinances(farmId, "MEAT", [year, month]),
+  ]);
+
+  const breedName = new Map(breeds.map((b) => [b.id, b.name]));
+  const labelOf = new Map(
+    groups.map((g) => [
+      g.id,
+      birdGroupLabel({ name: g.name, breed: { name: breedName.get(g.breedId) ?? "" } }) ?? "—",
+    ]),
+  );
+  // Read after the groups: a consumption carries the group, not its area.
+  const consumptions =
+    groups.length === 0
+      ? []
+      : await prisma.birdConsumption.findMany({
+          where: { farmId, birdGroupId: { in: groups.map((g) => g.id) } },
+          select: {
+            id: true,
+            birdGroupId: true,
+            consumptionDate: true,
+            quantity: true,
+            createdAt: true,
+          },
+          orderBy: [{ consumptionDate: "desc" }, { createdAt: "desc" }],
+          take: RECENT_MEAT_USE,
+        });
+
+  const byGroup = flockByGroup(
+    groups.map((g) => ({ quantity: g.quantity, label: labelOf.get(g.id)! })),
+  );
+
+  return {
+    year: year.year,
+    raising: { total: byGroup.reduce((sum, part) => sum + part.quantity, 0), byGroup },
+    homeUse: { month: monthMoney.homeUse, year: balance.homeUse },
+    balance,
+    stats: {
+      // Sold-out groups hold no birds: counted, they would disagree with the card.
+      groups: groups.filter((g) => g.quantity > 0).length,
+      consumed: balance.homeUse,
+      sales: balance.birdIncome,
+    },
+    // Newest first, sorted and cut here too because the test double ignores
+    // orderBy and take.
+    recent: [...consumptions]
+      .sort(
+        (a, b) =>
+          b.consumptionDate.getTime() - a.consumptionDate.getTime() ||
+          b.createdAt.getTime() - a.createdAt.getTime(),
+      )
+      .slice(0, RECENT_MEAT_USE)
+      .map((c) => ({
+        id: c.id,
+        date: c.consumptionDate,
+        groupLabel: labelOf.get(c.birdGroupId) ?? "—",
+        quantity: c.quantity,
+      })),
   };
 }

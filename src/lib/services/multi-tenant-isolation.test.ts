@@ -127,6 +127,7 @@ import {
   getEggsOverview,
   getHensOverview,
   getIncubationAreaOverview,
+  getMeatOverview,
 } from "@/lib/services/area-overview";
 
 const FARM_A_ID = "farm-a";
@@ -1079,6 +1080,21 @@ describe("area finance", () => {
 
     const eggsB = await getEggsOverview(FARM_B_ID, now);
     expect(eggsB.balance).toMatchObject({ income: 50 });
+  });
+
+  it("keeps the Mėsa overview to the farm's own groups, meat use and sales", async () => {
+    const now = new Date("2026-10-28T12:00:00Z");
+    const meatA = await getMeatOverview(FARM_A_ID, now);
+    expect(meatA).toMatchObject({
+      raising: { total: 50, byGroup: [{ name: "Antys", quantity: 50 }] },
+      homeUse: { month: 0, year: 3 },
+      stats: { groups: 1, consumed: 3, sales: 20 },
+    });
+    expect(meatA.recent).toEqual([expect.objectContaining({ groupLabel: "Antys", quantity: 3 })]);
+    expect(meatA.balance).toMatchObject({ income: 20, expenses: 7 });
+
+    const meatB = await getMeatOverview(FARM_B_ID, now);
+    expect(meatB.stats).toEqual({ groups: 1, consumed: 30, sales: 200 });
   });
 
   it("keeps each area to its own money, egg sales in Kiaušiniai only", async () => {
