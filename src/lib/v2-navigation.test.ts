@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  areaSlugFor,
   AREA_TABS,
   NAV_ITEMS,
   areaTabHref,
@@ -276,5 +277,15 @@ describe("AREA_LOSS_TARGETS", () => {
     expect(AREA_LOSS_TARGETS.meat.hint).toBe(AREA_LOSS_TARGETS.eggs.hint);
     expect(AREA_LOSS_TARGETS.hens.hint).toBe("Perekšlė bus pažymėta kaip nugaišusi.");
     expect(AREA_LOSS_TARGETS.incubation.hint).toBe("Gyvų jauniklių skaičius cikle bus sumažintas.");
+  });
+});
+
+describe("areaSlugFor", () => {
+  it("gives each area's URL slug, and none for Bendra", () => {
+    expect(areaSlugFor("EGGS")).toBe("eggs");
+    expect(areaSlugFor("HENS")).toBe("hens");
+    expect(areaSlugFor("INC")).toBe("incubation");
+    expect(areaSlugFor("MEAT")).toBe("meat");
+    expect(areaSlugFor("SHARED")).toBeNull();
   });
 });

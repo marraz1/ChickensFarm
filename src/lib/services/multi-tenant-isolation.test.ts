@@ -121,7 +121,7 @@ import {
   getIncubationCycle,
   recordCandling,
 } from "@/lib/services/incubation";
-import { listAreaTargetOptions } from "@/lib/services/area-targets";
+import { expenseTargetLabel, listAreaTargetOptions } from "@/lib/services/area-targets";
 import { getAreaFinance, getFarmFinance } from "@/lib/services/area-finance";
 import {
   getEggsOverview,
@@ -1210,6 +1210,21 @@ describe("expense and loss targets (farm areas)", () => {
 
   const expense = { expenseDate: "2025-02-01", category: "FEED" as const, amount: 5 };
   const loss = { lossDate: "2025-02-01", quantity: 1, reasonType: "DISEASE" as const };
+
+  it("never names another farm's group, hen or cycle in the move warning (#193)", async () => {
+    const none = { birdGroupId: null, motherHenId: null, incubationCycleId: null };
+    await expect(expenseTargetLabel(FARM_A_ID, { ...none, motherHenId: "hen-a" })).resolves.toBe(
+      "Cluck",
+    );
+    for (const target of [
+      { birdGroupId: "group-a" },
+      { motherHenId: "hen-a" },
+      { incubationCycleId: "cycle-a" },
+    ]) {
+      await expect(expenseTargetLabel(FARM_B_ID, { ...none, ...target })).resolves.toBeNull();
+    }
+  });
+
   const foreignTargets = [
     { birdGroupId: "group-a" },
     { motherHenId: "hen-a" },

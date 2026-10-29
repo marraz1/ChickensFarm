@@ -13,12 +13,27 @@ test.skip(!email || !password, "E2E_USER_EMAIL / E2E_USER_PASSWORD not set");
 test.use({ storageState: AUTH_FILE });
 
 let expenseIds: string[] = [];
+// Expenses saved through the form, found by their unique description.
+let savedDescriptions: string[] = [];
 
 test.beforeEach(() => {
   expenseIds = [];
+  savedDescriptions = [];
 });
 
+async function expensesByDescription(page: Page, description: string) {
+  const all = (await (await page.request.get("/api/expenses")).json()) as {
+    id: string;
+    area: string;
+    description: string | null;
+  }[];
+  return all.filter((e) => e.description === description);
+}
+
 test.afterEach(async ({ page }) => {
+  for (const description of savedDescriptions) {
+    for (const e of await expensesByDescription(page, description)) expenseIds.push(e.id);
+  }
   // A failed delete would leave money on the shared preview farm.
   for (const id of expenseIds) {
     expect((await page.request.delete(`/api/expenses/${id}`)).ok()).toBe(true);
@@ -103,9 +118,9 @@ test("the general expense form asks for the area and files a shared cost under B
   page,
 }) => {
   const description = `E2E bendra ${Date.now()}`;
+  // Registered before saving, so a failure after the save still removes it.
+  savedDescriptions.push(description);
   await page.goto("/expenses/new");
-  // The form submits through its script; a click before hydration would not.
-  await page.waitForLoadState("networkidle");
 
   const areas = page.getByRole("group", { name: "Sritis" });
   await expect(areas.getByRole("radio")).toHaveCount(5);
@@ -119,23 +134,23 @@ test("the general expense form asks for the area and files a shared cost under B
     await expect(areas.getByRole("radio", { name })).not.toBeChecked();
   }
 
-  await page.getByLabel("Data").fill(quietDay());
-  await page.getByLabel("Suma (€)").fill("4,50");
-  await page.getByLabel("Aprašymas").fill(description);
-  await page.getByRole("button", { name: "Išsaugoti" }).click();
-  await expect(page.getByText("Pasirinkite sritį")).toBeVisible();
+  // The form submits through its script: a click that lands before hydration
+  // reloads the page empty, so fill and click again until the form answers.
+  await expect(async () => {
+    // A day in 2003: the exact-amount checks above use 2002.
+    await page.getByLabel("Data").fill(quietDay().replace(/^2002/, "2003"));
+    await page.getByLabel("Suma (€)").fill("4,50");
+    await page.getByLabel("Aprašymas").fill(description);
+    await page.getByRole("button", { name: "Išsaugoti" }).click();
+    await expect(page.getByText("Pasirinkite sritį")).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
   await expect(page).toHaveURL((url) => url.pathname === "/expenses/new");
 
   await areas.getByRole("radio", { name: "Bendra (visam ūkiui)" }).check();
+  await expect(page.getByText("Išlaida bus įskaičiuota į viso ūkio finansus.")).toBeVisible();
   await page.getByRole("button", { name: "Išsaugoti" }).click();
   await expect(page).toHaveURL((url) => url.pathname === "/expenses", { timeout: 15_000 });
 
-  const all = (await (await page.request.get("/api/expenses")).json()) as {
-    id: string;
-    area: string;
-    description: string | null;
-  }[];
-  const saved = all.find((e) => e.description === description);
+  const saved = (await expensesByDescription(page, description))[0];
   expect(saved?.area).toBe("SHARED");
-  if (saved) expenseIds.push(saved.id);
 });

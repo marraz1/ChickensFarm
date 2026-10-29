@@ -36,8 +36,9 @@ const expenseFields = z.object({
 const oneTarget = (v: TargetFields) => countTargets(v) <= 1;
 const ONE_TARGET = { message: SINGLE_TARGET_MESSAGE, path: ["birdGroupId"] };
 
-// For an update and the service: left out, `area` is the stored one on update,
-// and on create it is taken from the target, else "Bendra".
+// For an update (PATCH) and direct service calls: left out, `area` is the
+// stored one on update; createExpense still derives it from the target, else
+// "Bendra", but the API's create requires it (newExpenseSchema, #193).
 export const createExpenseSchema = expenseFields.refine(oneTarget, ONE_TARGET);
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 

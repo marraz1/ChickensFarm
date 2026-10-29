@@ -19,7 +19,7 @@ import type { z } from "zod";
 import { newExpenseSchema, type CreateExpenseInput } from "@/lib/validation/expenses";
 import { expenseAreaChoices, expenseCategoryLabels } from "@/lib/labels";
 import { todayInputValue } from "@/lib/format";
-import type { ExpenseTargetField } from "@/lib/v2-navigation";
+import { areaSlugFor, type ExpenseTargetField } from "@/lib/v2-navigation";
 import type { FarmArea } from "@/generated/prisma/client";
 
 /**
@@ -40,17 +40,25 @@ export type ExpenseAreaContext = {
 
 const NO_TARGET = "";
 const AREA_HINT = "Išlaida bus įskaičiuota į šios srities ir viso ūkio finansus.";
+// A "Bendra" cost belongs to no area (finance rule 1).
+const SHARED_HINT = "Išlaida bus įskaičiuota į viso ūkio finansus.";
 
 export function ExpenseForm({
   expenseId,
   defaultValues,
   onSuccessPath = "/expenses",
   areaContext,
+  followMovedArea = false,
+  targetLabel = null,
 }: {
   expenseId?: string;
   defaultValues?: Partial<CreateExpenseInput>;
   onSuccessPath?: string;
   areaContext?: ExpenseAreaContext;
+  /** Edit opened from an area's tab: after a move, open the new area's tab. */
+  followMovedArea?: boolean;
+  /** What the stored expense points at, named in the warning before a move. */
+  targetLabel?: string | null;
 } = {}) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -76,13 +84,15 @@ export function ExpenseForm({
   const category = watch("category");
   const targetField = areaContext?.target.field;
   const targetId = targetField ? (watch(targetField) ?? NO_TARGET) : NO_TARGET;
+  const chosenArea = watch("area");
+  // The general form has no target picker: moving an expense to another area
+  // drops the target, which belongs to the old one and would be refused there.
+  const isMove = (area: unknown) =>
+    !areaContext && expenseId != null && area != null && area !== defaultValues?.area;
 
   async function onSubmit(data: CreateExpenseInput) {
     setServerError(null);
-    // The general form has no target picker: moving an expense to another area
-    // drops the target, which belongs to the old one and would be refused there.
-    const movedWithoutPicker =
-      !areaContext && expenseId != null && data.area !== defaultValues?.area;
+    const movedWithoutPicker = isMove(data.area);
     const body = movedWithoutPicker
       ? { ...data, birdGroupId: null, motherHenId: null, incubationCycleId: null }
       : data;
@@ -98,7 +108,12 @@ export function ExpenseForm({
       return;
     }
 
-    router.push(onSuccessPath);
+    let nextPath = onSuccessPath;
+    if (movedWithoutPicker && followMovedArea && data.area) {
+      const slug = areaSlugFor(data.area);
+      nextPath = slug ? `/areas/${slug}/expenses` : "/expenses";
+    }
+    router.push(nextPath);
     router.refresh();
   }
 
@@ -141,7 +156,14 @@ export function ExpenseForm({
             ))}
           </div>
           {errors.area && <p className="text-sm text-destructive">{errors.area.message}</p>}
-          <p className="text-xs text-muted-foreground">{AREA_HINT}</p>
+          <p className="text-xs text-muted-foreground">
+            {chosenArea === "SHARED" ? SHARED_HINT : AREA_HINT}
+          </p>
+          {targetLabel && isMove(chosenArea) && (
+            <p role="status" className="text-sm text-amber-700">
+              Išlaida nebebus susieta su „{targetLabel}“.
+            </p>
+          )}
         </fieldset>
       )}
 

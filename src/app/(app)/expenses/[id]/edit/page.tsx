@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireActiveFarm } from "@/lib/session";
 import { getExpense } from "@/lib/services/expenses";
+import { expenseTargetLabel } from "@/lib/services/area-targets";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExpenseForm } from "@/components/forms/expense-form";
 import { DeleteRecordButton } from "@/components/forms/delete-record-button";
@@ -21,8 +22,8 @@ export default async function EditExpensePage({
 
   // Opened from an area's Išlaidos tab (#194): back, save and delete return
   // there. Otherwise the farm-wide list, as before.
-  const returnPath =
-    typeof area === "string" && isAreaSlug(area) ? `/areas/${area}/expenses` : "/expenses";
+  const fromArea = typeof area === "string" && isAreaSlug(area);
+  const returnPath = fromArea ? `/areas/${area}/expenses` : "/expenses";
 
   return (
     <div>
@@ -39,6 +40,10 @@ export default async function EditExpensePage({
             area: expense.area,
           }}
           onSuccessPath={returnPath}
+          // Moved to another area, it is no longer on this area's tab: saving
+          // opens the new area's tab instead.
+          followMovedArea={fromArea}
+          targetLabel={await expenseTargetLabel(farm.id, expense)}
         />
         <DeleteRecordButton
           endpoint={`/api/expenses/${expense.id}`}
