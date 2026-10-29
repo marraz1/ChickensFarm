@@ -232,12 +232,3 @@ export const AREA_LOSS_TARGETS: Record<
     requiredMessage: "Pasirinkite mėsinių grupę",
   },
 };
-
-// Farm-wide V1 screen each not-yet-built area tab points to meanwhile
-// (Išlaidos has its own list since #194, Nuostoliai since #196).
-export const AREA_TAB_FALLBACK: Record<
-  Exclude<AreaTabSegment, null | "expenses" | "losses">,
-  { href: string; label: string }
-> = {
-  finance: { href: "/finance/profit-loss", label: "Ūkio pelnas / nuostoliai" },
-};

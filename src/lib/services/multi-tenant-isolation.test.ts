@@ -116,6 +116,7 @@ import {
 } from "@/lib/services/mother-hens";
 import { finalizeHatch, getIncubationCycle, recordCandling } from "@/lib/services/incubation";
 import { listAreaTargetOptions } from "@/lib/services/area-targets";
+import { getAreaFinance } from "@/lib/services/area-finance";
 
 const FARM_A_ID = "farm-a";
 const FARM_B_ID = "farm-b";
@@ -960,6 +961,104 @@ describe("area loss list", () => {
     expect(meatA.total).toBe(2);
     expect(meatA.byReason.map((r) => r.count)).toEqual([0, 2, 0]);
     expect(meatA.rows.map((r) => r.key)).toEqual(["loss-a-meat", "loss-a-meat-2025"]);
+  });
+});
+
+describe("area finance", () => {
+  const period = {
+    from: new Date("2026-01-01"),
+    to: new Date("2026-12-31"),
+    today: new Date("2026-10-28"),
+  };
+
+  beforeEach(async () => {
+    await seedTwoFarms();
+    for (const farmId of [FARM_A_ID, FARM_B_ID]) {
+      const tag = farmId === FARM_A_ID ? "a" : "b";
+      // Farm B's money is ten times farm A's, so a leak shows in every total.
+      const k = farmId === FARM_A_ID ? 1 : 10;
+      await fakePrisma.breed.create({
+        data: { id: `breed-${tag}`, farmId, name: "Antys", birdType: "DUCK" },
+      });
+      await fakePrisma.birdGroup.create({
+        data: {
+          id: `meat-${tag}`,
+          farmId,
+          breedId: `breed-${tag}`,
+          name: null,
+          sex: "UNKNOWN",
+          category: "OTHER",
+          area: "MEAT",
+          quantity: 50,
+          birthOrAcquiredDate: new Date("2026-01-01"),
+        },
+      });
+      await fakePrisma.eggSale.create({
+        data: {
+          farmId,
+          saleDate: new Date("2026-03-01"),
+          quantity: 10,
+          unitPrice: 0.5,
+          totalAmount: 5 * k,
+          buyer: null,
+        },
+      });
+      await fakePrisma.birdTransaction.create({
+        data: {
+          farmId,
+          birdGroupId: `meat-${tag}`,
+          area: "MEAT",
+          type: "SALE",
+          transactionDate: new Date("2026-04-01"),
+          quantity: k,
+          unitPrice: 20,
+          totalAmount: 20 * k,
+        },
+      });
+      await fakePrisma.expense.create({
+        data: {
+          farmId,
+          area: "MEAT",
+          birdGroupId: null,
+          motherHenId: null,
+          incubationCycleId: null,
+          expenseDate: new Date("2026-04-02"),
+          category: "FEED",
+          amount: 7 * k,
+          description: null,
+        },
+      });
+      await fakePrisma.birdConsumption.create({
+        data: {
+          farmId,
+          birdGroupId: `meat-${tag}`,
+          consumptionDate: new Date("2026-05-01"),
+          quantity: 3 * k,
+          note: null,
+        },
+      });
+    }
+  });
+
+  it("never counts another farm's sales, expenses or home use", async () => {
+    const meatA = await getAreaFinance(FARM_A_ID, "MEAT", period);
+    expect(meatA).toMatchObject({ income: 20, birdsSold: 1, expenses: 7, homeUse: 3 });
+    const eggsA = await getAreaFinance(FARM_A_ID, "EGGS", period);
+    expect(eggsA).toMatchObject({ income: 5, eggIncome: 5, expenses: 0, homeUse: 0 });
+
+    const meatB = await getAreaFinance(FARM_B_ID, "MEAT", period);
+    expect(meatB).toMatchObject({ income: 200, expenses: 70, homeUse: 30 });
+  });
+
+  it("keeps each area to its own money, egg sales in Kiaušiniai only", async () => {
+    for (const area of ["HENS", "INC", "SHARED"] as const) {
+      await expect(getAreaFinance(FARM_A_ID, area, period)).resolves.toMatchObject({
+        income: 0,
+        expenses: 0,
+        hasRecords: false,
+      });
+    }
+    expect((await getAreaFinance(FARM_A_ID, "MEAT", period)).eggIncome).toBe(0);
   });
 });
 
