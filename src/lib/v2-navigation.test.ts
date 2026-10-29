@@ -142,6 +142,17 @@ describe("AREA_NEW_RECORDS", () => {
     ]);
   });
 
+  it("offers the Perinimas sheet's six actions in design order", () => {
+    expect(AREA_NEW_RECORDS.incubation.map((a) => a.label)).toEqual([
+      "Naujas perinimo ciklas",
+      "Apšvietimas / patikra",
+      "Registruoti išsiritimą",
+      "Jauniklių sekimo įrašas",
+      "Nauja išlaida",
+      "Registruoti nuostolį",
+    ]);
+  });
+
   it("keeps every action inside its area, so the bar stays on it", () => {
     // A brood under a hen is created as a Perinimas cycle, so that one action
     // lights Perinimas — where the farmer then follows the cycle.

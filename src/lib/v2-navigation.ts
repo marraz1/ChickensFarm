@@ -187,12 +187,19 @@ export const AREA_RECORD_LINKS: Record<AreaSlug, readonly AreaRecordLink[]> = {
 
 // The "Naujas įrašas" sheet of each area (V2-<Area>-New): every record the
 // area can add, then its expense and loss. Areas whose overview is not built
-// yet (#188–#190) have none and keep the bare list. Each built area is a
-// required key, so its overview reads it without a non-null assertion.
-type NewRecordLinks = readonly { href: string; label: string }[];
-export const AREA_NEW_RECORDS: { eggs: NewRecordLinks; hens: NewRecordLinks } & Partial<
-  Record<AreaSlug, NewRecordLinks>
-> = {
+// yet (#190) have none and keep the bare list. Each built area is a required
+// key, so its overview reads it without a non-null assertion.
+//
+// `cycle` marks an action done on one incubation cycle: the Perinimas overview
+// points it at that cycle when exactly one fits (incubationSheetItems), else
+// it opens the cycle list to pick from.
+export type NewRecordLink = { href: string; label: string; cycle?: "active" | "growing" };
+type NewRecordLinks = readonly NewRecordLink[];
+export const AREA_NEW_RECORDS: {
+  eggs: NewRecordLinks;
+  hens: NewRecordLinks;
+  incubation: NewRecordLinks;
+} & Partial<Record<AreaSlug, NewRecordLinks>> = {
   eggs: [
     { href: "/eggs/collections/new", label: "Surinkti kiaušinius" },
     { href: "/eggs/sales/new", label: "Parduoti kiaušinius" },
@@ -211,6 +218,16 @@ export const AREA_NEW_RECORDS: { eggs: NewRecordLinks; hens: NewRecordLinks } & 
     { href: "/incubation/new", label: "Pradėti perėjimą su perekšle" },
     { href: "/expenses/new?area=hens", label: "Nauja išlaida" },
     { href: "/losses/new?area=hens", label: "Registruoti nuostolį" },
+  ],
+  incubation: [
+    { href: "/incubation/new", label: "Naujas perinimo ciklas" },
+    // Candling and the hatch are recorded on a running cycle's page.
+    { href: "/incubation", label: "Apšvietimas / patikra", cycle: "active" },
+    { href: "/incubation", label: "Registruoti išsiritimą", cycle: "active" },
+    // A growth entry belongs to a hatched cycle still being raised.
+    { href: "/incubation", label: "Jauniklių sekimo įrašas", cycle: "growing" },
+    { href: "/expenses/new?area=incubation", label: "Nauja išlaida" },
+    { href: "/losses/new?area=incubation", label: "Registruoti nuostolį" },
   ],
 };
 

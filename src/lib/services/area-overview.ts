@@ -1,9 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { resolveFinancePeriod } from "@/lib/finance-period";
+import { formatDateLT } from "@/lib/format";
 import {
+  cycleCardLines,
+  cycleStatus,
   flockByBreed,
+  hatchEfficiency,
   henStatus,
   sittingDay,
+  type CycleStatus,
   type FlockPart,
   type HenStatus,
 } from "@/lib/area-overview";
@@ -199,6 +204,93 @@ export async function getHensOverview(
       status: henStatus(h, cycleOf.has(h.id)),
       logs: logsOf.get(h.id) ?? 0,
     })),
+    balance,
+  };
+}
+
+export type CycleCard = {
+  id: string;
+  name: string;
+  status: CycleStatus;
+  lines: ReturnType<typeof cycleCardLines>;
+};
+
+export type IncubationOverview = {
+  year: number;
+  /** Cycles not hatched yet, and the eggs in them (under a hen included). */
+  active: { count: number; eggs: number };
+  efficiency: ReturnType<typeof hatchEfficiency>;
+  /** Running cycles first, then the newest start. */
+  cards: CycleCard[];
+  /** For the sheet's per-cycle actions (incubationSheetItems). */
+  sheet: { active: string[]; growing: string[] };
+  balance: AreaFinance;
+};
+
+/**
+ * The Perinimas area home (#189, V2-Inc-Overview). Day counts use the farm's
+ * today (Europe/Vilnius). Farm-scoped throughout.
+ */
+export async function getIncubationAreaOverview(
+  farmId: string,
+  now: Date = new Date(),
+): Promise<IncubationOverview> {
+  const year = resolveFinancePeriod({}, now);
+
+  const [cycles, balance] = await Promise.all([
+    prisma.incubationCycle.findMany({
+      where: { farmId },
+      include: {
+        eggSourceGroup: { select: { breed: { select: { name: true } } } },
+        motherHen: { select: { name: true } },
+        // Latest first; two entries on one day → the one written last.
+        growthLogs: {
+          select: { aliveCount: true },
+          orderBy: [{ logDate: "desc" }, { createdAt: "desc" }],
+          take: 1,
+        },
+      },
+    }),
+    getAreaFinance(farmId, "INC", year),
+  ]);
+
+  // Running first, then the newest start; sorted here because the test
+  // double ignores orderBy.
+  const ordered = [...cycles].sort(
+    (a, b) =>
+      Number(!!a.hatchDate) - Number(!!b.hatchDate) ||
+      b.startDate.getTime() - a.startDate.getTime(),
+  );
+  const running = ordered.filter((c) => !c.hatchDate);
+
+  return {
+    year: year.year,
+    active: {
+      count: running.length,
+      eggs: running.reduce((sum, c) => sum + (c.eggsTotal ?? 0), 0),
+    },
+    efficiency: hatchEfficiency(cycles),
+    cards: ordered.map((c) => ({
+      id: c.id,
+      // Cycles from before names were required, labelled as the V1 list does.
+      name: c.name ?? `Pradėta ${formatDateLT(c.startDate)}`,
+      status: cycleStatus(c),
+      lines: cycleCardLines(
+        {
+          ...c,
+          // Optional chaining: a link can be gone (SetNull) and tests use a
+          // fake that returns rows without their relations.
+          henName: c.motherHen?.name ?? null,
+          sourceBreed: c.eggSourceGroup?.breed.name ?? null,
+          latestAlive: c.growthLogs?.[0]?.aliveCount ?? null,
+        },
+        year.today,
+      ),
+    })),
+    sheet: {
+      active: running.map((c) => c.id),
+      growing: ordered.filter((c) => c.hatchDate && !c.growthCompletedAt).map((c) => c.id),
+    },
     balance,
   };
 }

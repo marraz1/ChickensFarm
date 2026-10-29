@@ -150,3 +150,67 @@ test.describe("Perekšlės (#188)", () => {
     await expect(sheet(page)).toBeHidden();
   });
 });
+
+test.describe("Perinimas (#189)", () => {
+  let cycleId: string | undefined;
+
+  const farmToday = () =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vilnius" }).format(new Date());
+
+  test.afterEach(async ({ page }) => {
+    // A cycle has no delete endpoint: hatch it with no chicks, so it never
+    // counts as active again on the shared preview farm.
+    if (cycleId) {
+      const hatched = await page.request.patch(`/api/incubation-cycles/${cycleId}`, {
+        data: {
+          action: "hatch",
+          hatchDate: farmToday(),
+          hatchedCount: 0,
+          target: { mode: "none" },
+        },
+      });
+      expect(hatched.ok()).toBe(true);
+    }
+    cycleId = undefined;
+  });
+
+  test("shows running cycles, efficiency, the balance and a card per cycle", async ({ page }) => {
+    const name = `E2E ciklas ${Date.now()}`;
+    const cycle = await page.request.post("/api/incubation-cycles", {
+      data: { name, startDate: farmToday(), eggsTotal: 12 },
+    });
+    expect(cycle.ok()).toBe(true);
+    cycleId = (await cycle.json()).id as string;
+
+    await page.goto("/areas/incubation");
+    await expect(page.getByRole("region", { name: "Aktyvūs ciklai" })).toContainText(
+      /^Aktyvūs ciklai[1-9]/,
+    );
+    await expect(page.getByRole("region", { name: "Efektyvumas" })).toBeVisible();
+    await expect(page.getByRole("region", { name: `Balansas · ${farmYear()} m.` })).toBeVisible();
+
+    const card = page.getByRole("link").filter({ hasText: name });
+    await expect(card).toContainText("Pradėta");
+    await expect(card).toContainText("1-a diena");
+    await expect(card).toContainText("12 kiaušinių");
+    await card.click();
+    await expect(page).toHaveURL(new RegExp(`/incubation/${cycleId}$`), { timeout: 15_000 });
+  });
+
+  test("Naujas ciklas opens the sheet, which leads to the new-cycle form", async ({ page }) => {
+    await page.goto("/areas/incubation");
+    await page.getByRole("button", { name: "Naujas ciklas" }).click();
+
+    await expect(sheet(page)).toContainText("Perinimas");
+    await expect(sheet(page).getByRole("link")).toHaveText([
+      "Naujas perinimo ciklas",
+      "Apšvietimas / patikra",
+      "Registruoti išsiritimą",
+      "Jauniklių sekimo įrašas",
+      "Nauja išlaida",
+      "Registruoti nuostolį",
+    ]);
+    await sheet(page).getByRole("link", { name: "Naujas perinimo ciklas" }).click();
+    await expect(page).toHaveURL(/\/incubation\/new$/, { timeout: 15_000 });
+  });
+});

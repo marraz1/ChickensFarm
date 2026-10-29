@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// --- Story #188: the Perekšlės overview and broods under a hen ----------------
+// --- Stories #188 and #189: the Perekšlės and Perinimas overviews -------------
 //
 // Runs the real services against the in-memory fake Prisma client
 // (fake-prisma.ts) — CI has no reachable database, see the note at the top of
@@ -14,7 +14,7 @@ vi.mock("@/lib/prisma", async () => {
 
 import { fakePrisma, resetFakePrisma } from "./fake-prisma";
 import { ValidationError } from "@/lib/errors";
-import { getHensOverview } from "@/lib/services/area-overview";
+import { getHensOverview, getIncubationAreaOverview } from "@/lib/services/area-overview";
 import { getAreaFinance } from "@/lib/services/area-finance";
 import { createIncubationCycle } from "@/lib/services/incubation";
 import { deleteMotherHen, listHensFreeToSit } from "@/lib/services/mother-hens";
@@ -242,5 +242,80 @@ describe("a brood under a hen", () => {
     await seedCycle("c1", "rude", "2026-10-20");
     await seedHen("auksa", "Auksė", "2026-07-01T10:00:00Z");
     expect((await listHensFreeToSit(FARM_ID)).map((h) => h.name)).toEqual(["Auksė", "Rita"]);
+  });
+});
+
+// --- Story #189: the Perinimas overview ---------------------------------------
+
+describe("getIncubationAreaOverview", () => {
+  async function hatch(id: string, fertile: number, hatched: number, completed = false) {
+    await fakePrisma.incubationCycle.update({
+      where: { id },
+      data: {
+        eggsFertile: fertile,
+        hatchedCount: hatched,
+        hatchDate: day("2026-09-20"),
+        growthCompletedAt: completed ? new Date("2026-10-15T10:00:00Z") : null,
+      },
+    });
+  }
+
+  it("counts running cycles and their eggs, a hen's brood included", async () => {
+    await seedCycle("incubator", null, "2026-10-12", null, 24);
+    await seedCycle("under-rita", "rita", "2026-10-21", null, 18);
+    await seedCycle("old", null, "2026-08-30", null, 30);
+    await hatch("old", 20, 16);
+
+    const o = await getIncubationAreaOverview(FARM_ID, NOW);
+    expect(o.active).toEqual({ count: 2, eggs: 42 });
+  });
+
+  it("measures efficiency over hatched cycles only", async () => {
+    await seedCycle("a", null, "2026-08-01");
+    await seedCycle("b", null, "2026-08-10");
+    await seedCycle("candled", null, "2026-10-20");
+    await hatch("a", 20, 16);
+    await hatch("b", 18, 15);
+    await fakePrisma.incubationCycle.update({
+      where: { id: "candled" },
+      data: { eggsFertile: 22 },
+    });
+
+    const o = await getIncubationAreaOverview(FARM_ID, NOW);
+    expect(o.efficiency).toMatchObject({ hatched: 31, fertile: 38 });
+    expect(o.efficiency.rate).toBeCloseTo(31 / 38, 10);
+  });
+
+  it("lists running cycles first, newest start first, with their status and day", async () => {
+    await seedCycle("summer", null, "2026-06-01");
+    await seedCycle("autumn", null, "2026-10-12");
+    await seedCycle("brood", "rita", "2026-10-21");
+    await hatch("summer", 10, 9);
+
+    const o = await getIncubationAreaOverview(FARM_ID, NOW);
+    expect(o.cards.map((c) => [c.id, c.status])).toEqual([
+      ["brood", "Pradėta"],
+      ["autumn", "Pradėta"],
+      ["summer", "Išsiritę"],
+    ]);
+    expect(o.cards[0].lines.started).toBe("Pradėta 2026 m. spalio 21 d. · 9-a diena");
+  });
+
+  it("knows which cycles the sheet's per-cycle actions can go to", async () => {
+    await seedCycle("running", null, "2026-10-12");
+    await seedCycle("raising", null, "2026-08-01");
+    await seedCycle("done", null, "2026-06-01");
+    await hatch("raising", 10, 9);
+    await hatch("done", 10, 8, true);
+
+    const o = await getIncubationAreaOverview(FARM_ID, NOW);
+    expect(o.sheet).toEqual({ active: ["running"], growing: ["raising"] });
+  });
+
+  it("takes the balance from the Perinimas finances", async () => {
+    const o = await getIncubationAreaOverview(FARM_ID, NOW);
+    expect(o.balance).toEqual(await getAreaFinance(FARM_ID, "INC", resolveFinancePeriod({}, NOW)));
+    expect(o.cards).toEqual([]);
+    expect(o.efficiency.rate).toBeNull();
   });
 });
