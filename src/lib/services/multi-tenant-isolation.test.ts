@@ -116,7 +116,7 @@ import {
 } from "@/lib/services/mother-hens";
 import { finalizeHatch, getIncubationCycle, recordCandling } from "@/lib/services/incubation";
 import { listAreaTargetOptions } from "@/lib/services/area-targets";
-import { getAreaFinance } from "@/lib/services/area-finance";
+import { getAreaFinance, getFarmFinance } from "@/lib/services/area-finance";
 
 const FARM_A_ID = "farm-a";
 const FARM_B_ID = "farm-b";
@@ -1048,6 +1048,15 @@ describe("area finance", () => {
 
     const meatB = await getAreaFinance(FARM_B_ID, "MEAT", period);
     expect(meatB).toMatchObject({ income: 200, expenses: 70, homeUse: 30 });
+  });
+
+  it("keeps the farm overview's result to the farm's own money", async () => {
+    const farmA = await getFarmFinance(FARM_A_ID, period);
+    expect(farmA.total).toEqual({ income: 25, expenses: 7, result: 18 });
+    expect(farmA.areas.MEAT.homeUse).toBe(3);
+
+    const farmB = await getFarmFinance(FARM_B_ID, period);
+    expect(farmB.total).toEqual({ income: 250, expenses: 70, result: 180 });
   });
 
   it("keeps each area to its own money, egg sales in Kiaušiniai only", async () => {

@@ -13,7 +13,7 @@ vi.mock("@/lib/prisma", async () => {
 });
 
 import { fakePrisma, resetFakePrisma } from "./fake-prisma";
-import { getAreaFinance } from "@/lib/services/area-finance";
+import { getAreaFinance, getFarmFinance } from "@/lib/services/area-finance";
 import {
   createBirdTransaction,
   transactionArea,
@@ -73,6 +73,31 @@ async function seedExpense(id: string, area: FarmArea, amount: string, category 
       description: null,
     },
   });
+}
+
+const AREAS = ["EGGS", "HENS", "INC", "MEAT", "SHARED"] as const;
+
+/** Money in every area, with amounts that drift if summed as floats. */
+async function seedMixedFarm() {
+  await fakePrisma.eggSale.create({
+    data: {
+      farmId: FARM_ID,
+      saleDate: day("2026-02-01"),
+      quantity: 10,
+      unitPrice: 0.33,
+      totalAmount: "3.33",
+      buyer: null,
+    },
+  });
+  await createBirdTransaction(FARM_ID, USER_ID, sale("g-inc", 3, 3.33));
+  await createBirdTransaction(FARM_ID, USER_ID, sale("g-meat", 1, 0.1));
+  await createBirdTransaction(FARM_ID, USER_ID, sale(null, 1, 0.2));
+  await createBirdTransaction(FARM_ID, USER_ID, { ...sale("g-inc", 2, 1.11), type: "PURCHASE" });
+  await seedExpense("e1", "EGGS", "10.10");
+  await seedExpense("e2", "HENS", "0.10", "MEDICINE");
+  await seedExpense("e3", "INC", "0.20", "OTHER");
+  await seedExpense("e4", "MEAT", "7.77");
+  await seedExpense("e5", "SHARED", "1.01", "OTHER");
 }
 
 beforeEach(async () => {
@@ -181,25 +206,7 @@ describe("getAreaFinance", () => {
   });
 
   it("adds up, four areas plus Bendra, to the farm P&L to the cent", async () => {
-    await fakePrisma.eggSale.create({
-      data: {
-        farmId: FARM_ID,
-        saleDate: day("2026-02-01"),
-        quantity: 10,
-        unitPrice: 0.33,
-        totalAmount: "3.33",
-        buyer: null,
-      },
-    });
-    await createBirdTransaction(FARM_ID, USER_ID, sale("g-inc", 3, 3.33));
-    await createBirdTransaction(FARM_ID, USER_ID, sale("g-meat", 1, 0.1));
-    await createBirdTransaction(FARM_ID, USER_ID, sale(null, 1, 0.2));
-    await createBirdTransaction(FARM_ID, USER_ID, { ...sale("g-inc", 2, 1.11), type: "PURCHASE" });
-    await seedExpense("e1", "EGGS", "10.10");
-    await seedExpense("e2", "HENS", "0.10", "MEDICINE");
-    await seedExpense("e3", "INC", "0.20", "OTHER");
-    await seedExpense("e4", "MEAT", "7.77");
-    await seedExpense("e5", "SHARED", "1.01", "OTHER");
+    await seedMixedFarm();
 
     const areas = await Promise.all(
       (["EGGS", "HENS", "INC", "MEAT", "SHARED"] as const).map((a) =>
@@ -214,5 +221,46 @@ describe("getAreaFinance", () => {
     expect(cents("expenses")).toBe(Math.round(farm.expenses * 100));
     expect(cents("result")).toBe(Math.round(farm.profit * 100));
     expect(areas[4]).toMatchObject({ income: 0, expenses: 1.01 });
+  });
+});
+
+describe("getFarmFinance", () => {
+  it("builds every area exactly as its own tab does", async () => {
+    await seedMixedFarm();
+    const farm = await getFarmFinance(FARM_ID, PERIOD);
+    for (const area of AREAS) {
+      expect(farm.areas[area]).toEqual(await getAreaFinance(FARM_ID, area, PERIOD));
+    }
+  });
+
+  it("totals the four areas plus Bendros išlaidos, equal to the farm P&L to the cent", async () => {
+    await seedMixedFarm();
+    const farm = await getFarmFinance(FARM_ID, PERIOD);
+    const sumCents = AREAS.reduce((sum, a) => sum + Math.round(farm.areas[a].result * 100), 0);
+    expect(Math.round(farm.total.result * 100)).toBe(sumCents);
+
+    const pl = await getProfitLossReport(FARM_ID, { from: PERIOD.from, to: PERIOD.to });
+    expect(farm.total).toEqual({ income: pl.income, expenses: pl.expenses, result: pl.profit });
+  });
+
+  it("files home use under each group's area", async () => {
+    await fakePrisma.birdConsumption.create({
+      data: {
+        farmId: FARM_ID,
+        birdGroupId: "g-meat",
+        consumptionDate: day("2026-06-01"),
+        quantity: 4,
+        note: null,
+      },
+    });
+    const farm = await getFarmFinance(FARM_ID, PERIOD);
+    expect(farm.areas.MEAT.homeUse).toBe(4);
+    expect(farm.areas.EGGS.homeUse).toBe(0);
+    expect(farm.total.income).toBe(0);
+  });
+
+  it("is all zero for a farm with no records", async () => {
+    const farm = await getFarmFinance(FARM_ID, PERIOD);
+    expect(farm.total).toEqual({ income: 0, expenses: 0, result: 0 });
   });
 });

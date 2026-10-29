@@ -19,7 +19,10 @@ test.beforeEach(() => {
 });
 
 test.afterEach(async ({ page }) => {
-  for (const id of expenseIds) await page.request.delete(`/api/expenses/${id}`);
+  // A failed delete would leave money on the shared preview farm.
+  for (const id of expenseIds) {
+    expect((await page.request.delete(`/api/expenses/${id}`)).ok()).toBe(true);
+  }
 });
 
 async function createExpense(

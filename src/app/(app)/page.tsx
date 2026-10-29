@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { requireActiveFarm } from "@/lib/session";
 import { getDashboardData } from "@/lib/services/dashboard";
+import { getFarmFinance } from "@/lib/services/area-finance";
+import { resolveFinancePeriod, type SearchParam } from "@/lib/finance-period";
 import { Card } from "@/components/ui/card";
-import { formatEUR, formatMonthLT, formatRelativeLT } from "@/lib/format";
+import { PeriodSwitch } from "@/components/v2/period-switch";
+import { formatEUR, formatRelativeLT } from "@/lib/format";
 import { birdTypeLabels } from "@/lib/labels";
-import { Egg, AlertTriangle, Heart, Drumstick } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Egg, AlertTriangle, Heart, Drumstick, Plus } from "lucide-react";
 
 const ACTIVITY_ICONS = {
   EGG_COLLECTION: Egg,
@@ -13,49 +17,68 @@ const ACTIVITY_ICONS = {
   MOTHER_HEN_LOG: Heart,
 } as const;
 
-// Income minus expenses for one period, with its own Pajamos/Išlaidos breakdown.
-// Rendered twice on the dashboard: current month and current year.
-function BalanceCard({
-  label,
-  income,
-  expenses,
-  href,
+// The V2 farm overview (V2-Overview). #201 adds its top: the title with
+// "Išlaida", the period switch and the farm result. The donut (#202), area
+// tiles (#203) and "Ūkis dabar"/"Daugiau statistikos" (#204) come later; until
+// then the V1 dashboard's counts and recent activity stay below the result.
+export default async function OverviewPage({
+  searchParams,
 }: {
-  label: string;
-  income: number;
-  expenses: number;
-  href: string;
+  searchParams: Promise<{ period?: SearchParam; from?: SearchParam; to?: SearchParam }>;
 }) {
-  const balance = income - expenses;
+  const [query, { farm }] = await Promise.all([searchParams, requireActiveFarm()]);
+  const period = resolveFinancePeriod(query);
+  const [data, finance] = await Promise.all([
+    getDashboardData(farm.id),
+    getFarmFinance(farm.id, period),
+  ]);
+  const { income, expenses, result } = finance.total;
+  const heading = `${result >= 0 ? "Pelnas" : "Nuostolis"} · ${period.label}`;
+
   return (
-    <Link href={href}>
-      {/* h-full so both balance cards stay level when one label wraps. */}
-      <Card className="h-full p-3">
-        <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-        <p
-          className={`text-xl font-medium ${balance >= 0 ? "text-emerald-600" : "text-destructive"}`}
+    <div className="flex flex-col gap-3 pt-2">
+      <div className="flex items-center justify-between gap-3 px-4">
+        <h1 className="text-lg font-semibold">Ūkio apžvalga</h1>
+        {/* The general form: it files the expense under Bendra until #193 adds
+            the area chooser. */}
+        <Link
+          href="/expenses/new"
+          className="flex h-11 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
         >
-          {formatEUR(balance)}
-        </p>
-        {/* Stacked, not joined by "·": two of these sit side by side at 11px,
-            and formatEUR emits "1 234,00 €", which wraps unpredictably. */}
-        <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
-          Pajamos {formatEUR(income)}
-        </p>
-        <p className="text-[11px] leading-tight text-muted-foreground">
-          Išlaidos {formatEUR(expenses)}
-        </p>
-      </Card>
-    </Link>
-  );
-}
+          <Plus size={16} aria-hidden /> Išlaida
+        </Link>
+      </div>
 
-export default async function DashboardPage() {
-  const { farm } = await requireActiveFarm();
-  const data = await getDashboardData(farm.id);
+      <div className="px-4">
+        <PeriodSwitch basePath="/" period={period} />
+      </div>
 
-  return (
-    <div className="pt-2">
+      <div className="px-4">
+        <Card className="gap-1 p-4" role="region" aria-label={heading}>
+          <p className="text-sm text-muted-foreground">{heading}</p>
+          <p
+            className={cn(
+              "text-3xl font-semibold tabular-nums",
+              result >= 0 ? "text-emerald-600" : "text-destructive",
+            )}
+          >
+            {formatEUR(result)}
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-3 border-t pt-3">
+            <div role="region" aria-label="Pajamos">
+              <p className="text-xs text-muted-foreground">Pajamos</p>
+              <p className="text-base font-semibold tabular-nums text-emerald-600">
+                {formatEUR(income)}
+              </p>
+            </div>
+            <div role="region" aria-label="Išlaidos">
+              <p className="text-xs text-muted-foreground">Išlaidos</p>
+              <p className="text-base font-semibold tabular-nums">{formatEUR(expenses)}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-2 gap-2.5 px-4">
         <Card className="p-3">
           <p className="mb-1 text-xs text-muted-foreground">Paukščių iš viso</p>
@@ -75,18 +98,6 @@ export default async function DashboardPage() {
             Šį mėn. {data.eggsThisMonth} · Metais {data.eggsThisYear}
           </p>
         </Card>
-        <BalanceCard
-          label={`Balansas · ${formatMonthLT(data.currentMonth)}`}
-          income={data.incomeThisMonth}
-          expenses={data.expensesThisMonth}
-          href={`/finance/profit-loss?year=${data.currentYear}&month=${data.currentMonth + 1}`}
-        />
-        <BalanceCard
-          label={`Balansas · ${data.currentYear} m.`}
-          income={data.incomeThisYear}
-          expenses={data.expensesThisYear}
-          href={`/finance/profit-loss?year=${data.currentYear}`}
-        />
         {/* Odd card out in a 2-column grid — span both so no empty cell is left. */}
         <Card className="col-span-2 p-3">
           <p className="mb-1 text-xs text-muted-foreground">Aktyvus perinimas</p>
@@ -94,7 +105,7 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-1">
         <p className="mb-2 text-sm text-muted-foreground">Paskutiniai įrašai</p>
         <div className="flex flex-col">
           {data.activity.length === 0 && (
