@@ -101,6 +101,15 @@ export function formatPercent(ratio: number | null | undefined): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
+/** A share with one decimal, the way the V2 finance screens show it: "83,5 %". */
+export function formatShareLT(ratio: number): string {
+  return new Intl.NumberFormat("lt-LT", {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(ratio);
+}
+
 // Hardcoded rather than derived from Intl: `Intl.DateTimeFormat("lt-LT", { month:
 // "long" })` yields a lowercase name and depends on the runtime's ICU data, while
 // these labels are used as headings. Same approach as src/lib/labels.ts.

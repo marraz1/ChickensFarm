@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { adjustBirdGroupQuantityTx } from "@/lib/services/bird-groups";
 import { ValidationError } from "@/lib/errors";
-import type { Prisma, BirdTransactionType } from "@/generated/prisma/client";
+import type { Prisma, BirdTransactionType, FarmArea } from "@/generated/prisma/client";
 import type { CreateBirdTransactionInput } from "@/lib/validation/bird-transactions";
 
 type TxClient = Prisma.TransactionClient;
@@ -13,6 +13,15 @@ type TxClient = Prisma.TransactionClient;
  */
 export function signedQuantityDelta(type: BirdTransactionType, quantity: number): number {
   return type === "PURCHASE" ? quantity : -quantity;
+}
+
+/**
+ * The area a transaction's money counts in (#198): a sale takes its group's
+ * area (chick sales → Perinimas, meat birds → Mėsa), an unlinked sale and every
+ * purchase count in Kiaušiniai, where all bird trade lives (#194).
+ */
+export function transactionArea(type: BirdTransactionType, groupArea: FarmArea | null): FarmArea {
+  return type === "SALE" && groupArea ? groupArea : "EGGS";
 }
 
 /** quantity × unitPrice unless the user pinned a hand-agreed total. */
@@ -38,6 +47,7 @@ export function getBirdTransaction(farmId: string, id: string) {
 async function assertGroupBelongsToFarm(tx: TxClient, farmId: string, birdGroupId: string) {
   const group = await tx.birdGroup.findFirst({ where: { id: birdGroupId, farmId } });
   if (!group) throw new ValidationError("Pasirinkta paukščių grupė nerasta");
+  return group;
 }
 
 export async function createBirdTransaction(
@@ -47,12 +57,13 @@ export async function createBirdTransaction(
 ) {
   return prisma.$transaction(async (tx) => {
     const birdGroupId = input.birdGroupId || null;
-    if (birdGroupId) await assertGroupBelongsToFarm(tx, farmId, birdGroupId);
+    const group = birdGroupId ? await assertGroupBelongsToFarm(tx, farmId, birdGroupId) : null;
 
     const transaction = await tx.birdTransaction.create({
       data: {
         farmId,
         birdGroupId,
+        area: transactionArea(input.type, group?.area ?? null),
         type: input.type,
         transactionDate: new Date(input.transactionDate),
         quantity: input.quantity,
@@ -118,7 +129,13 @@ export async function updateBirdTransaction(
     if (!existing) throw new ValidationError("Sandorio įrašas nerastas");
 
     const newGroupId = input.birdGroupId || null;
-    if (newGroupId) await assertGroupBelongsToFarm(tx, farmId, newGroupId);
+    const newGroup = newGroupId ? await assertGroupBelongsToFarm(tx, farmId, newGroupId) : null;
+    // The area is fixed when the record is saved: an edit that keeps the type
+    // and group keeps it, so a group moved since then does not re-file the sale.
+    const area =
+      existing.birdGroupId === newGroupId && existing.type === input.type
+        ? existing.area
+        : transactionArea(input.type, newGroup?.area ?? null);
 
     // Reconcile the head-count effect. Same group → apply only the net change,
     // recorded as a correction because that is what editing a saved record is;
@@ -160,6 +177,7 @@ export async function updateBirdTransaction(
       where: { id },
       data: {
         birdGroupId: newGroupId,
+        area,
         type: input.type,
         transactionDate: new Date(input.transactionDate),
         quantity: input.quantity,

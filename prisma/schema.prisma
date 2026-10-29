@@ -449,12 +449,18 @@ model Expense {
 // quantity → totalAmount, with the total stored so a hand-agreed price survives
 // a later unit-price edit), and Loss's optional birdGroupId link: naming a group
 // moves its head count too, leaving it null records money only.
+//
+// `area` is the area the money counts in (#198), fixed when the record is saved
+// so moving a group later never re-files its past sales: a sale takes its
+// group's area (chick sales → Perinimas, meat birds → Mėsa), an unlinked sale
+// and every purchase count in Kiaušiniai (#194).
 model BirdTransaction {
   id              String              @id @default(cuid())
   farmId          String
   farm            Farm                @relation(fields: [farmId], references: [id], onDelete: Cascade)
   birdGroupId     String?
   birdGroup       BirdGroup?          @relation(fields: [birdGroupId], references: [id], onDelete: SetNull)
+  area            FarmArea            @default(EGGS)
   type            BirdTransactionType
   transactionDate DateTime            @db.Date
   quantity        Int
@@ -466,6 +472,7 @@ model BirdTransaction {
 
   @@index([farmId, transactionDate])
   @@index([farmId, type])
+  @@index([farmId, area])
   @@map("bird_transactions")
 }
 

@@ -13,28 +13,13 @@ import {
   ltMonthNames,
 } from "@/lib/format";
 
-type SearchParam = string | string[] | undefined;
-
-/** Repeated query keys arrive as arrays in Next 16 — keep the first value. */
-function first(value: SearchParam): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
+import { firstParam as first, parseUtcDateInput, type SearchParam } from "@/lib/finance-period";
 
 function parseIntOrNull(value: SearchParam): number | null {
   const raw = first(value);
   if (!raw) return null;
   const parsed = Number(raw);
   return Number.isInteger(parsed) ? parsed : null;
-}
-
-/** Strict "YYYY-MM-DD" → UTC midnight. Rejects near-misses and rolled-over dates. */
-function parseUtcDateInput(value: SearchParam): Date | null {
-  const raw = first(value);
-  if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
-  const [year, month, day] = raw.split("-").map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  // Guards against 2026-02-31 silently becoming March 3rd.
-  return parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day ? parsed : null;
 }
 
 export default async function ProfitLossPage({
