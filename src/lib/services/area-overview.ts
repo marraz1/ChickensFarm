@@ -313,7 +313,10 @@ export type MeatOverview = {
   homeUse: { month: number; year: number };
   /** The year's Mėsa result, as the Finansai tab shows it. */
   balance: AreaFinance;
-  /** The "Įrašai" figures, this year, keyed as AREA_RECORD_LINKS.meat names them. */
+  /**
+   * The "Įrašai" figures, keyed as AREA_RECORD_LINKS.meat names them: the
+   * groups holding birds now, and this year's meat use and sales.
+   */
   stats: Record<MeatStatKey, number>;
   /** The latest meat-use records, newest first. */
   recent: { id: string; date: Date; groupLabel: string; quantity: number }[];
@@ -345,7 +348,7 @@ export async function getMeatOverview(
   const labelOf = new Map(
     groups.map((g) => [
       g.id,
-      birdGroupLabel({ name: g.name, breed: { name: breedName.get(g.breedId) ?? "—" } })!,
+      birdGroupLabel({ name: g.name, breed: { name: breedName.get(g.breedId) ?? "" } }) ?? "—",
     ]),
   );
   // Read after the groups: a consumption carries the group, not its area.

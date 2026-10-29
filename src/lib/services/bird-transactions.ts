@@ -29,9 +29,14 @@ function resolveTotal(input: CreateBirdTransactionInput): number {
   return input.totalAmount ?? input.quantity * input.unitPrice;
 }
 
-export function listBirdTransactions(farmId: string, type?: BirdTransactionType) {
+/** A farm's bird trade; `area` keeps it to the trade filed under that area (#190). */
+export function listBirdTransactions(
+  farmId: string,
+  type?: BirdTransactionType,
+  area?: FarmArea | null,
+) {
   return prisma.birdTransaction.findMany({
-    where: { farmId, ...(type ? { type } : {}) },
+    where: { farmId, ...(type ? { type } : {}), ...(area ? { area } : {}) },
     include: { birdGroup: { include: { breed: true } } },
     orderBy: { transactionDate: "desc" },
   });

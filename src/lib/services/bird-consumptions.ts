@@ -1,14 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import { adjustBirdGroupQuantityTx } from "@/lib/services/bird-groups";
 import { ValidationError } from "@/lib/errors";
-import type { Prisma } from "@/generated/prisma/client";
+import type { FarmArea, Prisma } from "@/generated/prisma/client";
 import type { CreateBirdConsumptionInput } from "@/lib/validation/bird-consumptions";
 
 type TxClient = Prisma.TransactionClient;
 
-export function listBirdConsumptions(farmId: string) {
+/**
+ * A farm's meat use; `area` keeps it to groups now in that area, the rule the
+ * Mėsa overview and the Finansai tab count by (#190).
+ */
+export function listBirdConsumptions(farmId: string, area?: FarmArea | null) {
   return prisma.birdConsumption.findMany({
-    where: { farmId },
+    where: { farmId, ...(area ? { birdGroup: { area } } : {}) },
     include: { birdGroup: { include: { breed: true } } },
     orderBy: { consumptionDate: "desc" },
   });

@@ -117,8 +117,6 @@ describe("AREA_RECORD_LINKS", () => {
   it("keeps each link inside the area it is listed under", () => {
     for (const [area, links] of Object.entries(AREA_RECORD_LINKS)) {
       for (const { href } of links) {
-        // Meat-bird sales use the same V1 sales list as laying birds for now.
-        if (area === "meat" && href === "/birds/sales") continue;
         const url = new URL(href, "http://x");
         expect(navKeyForPath(url.pathname, url.searchParams.get("area"))).toBe(area);
       }
@@ -211,6 +209,10 @@ describe("navKeyForPath with an area", () => {
     ["/bird-groups/new", "incubation", "incubation"],
     ["/birds/purchases/new", "meat", "meat"],
     ["/birds/sales/new", "eggs", "eggs"],
+    // #190: the sales and meat-use lists opened from Mėsa keep it lit.
+    ["/birds/sales", "meat", "meat"],
+    ["/birds/consumptions", "meat", "meat"],
+    ["/birds/consumptions/new", "meat", "meat"],
     ["/bird-groups", null, "eggs"],
     ["/bird-groups", "hens", "eggs"],
     // The area only steers the shared group and trade screens.

@@ -122,6 +122,7 @@ const AREA_PARAM_SCREENS: readonly { match: RegExp; accepts: "group" | "any" }[]
   { match: /^\/bird-groups(\/|$)/, accepts: "group" },
   { match: /^\/birds\/purchases(\/|$)/, accepts: "group" },
   { match: /^\/birds\/sales(\/|$)/, accepts: "group" },
+  { match: /^\/birds\/consumptions(\/|$)/, accepts: "group" },
   { match: /^\/expenses\/new$/, accepts: "any" },
   { match: /^\/expenses\/[^/]+\/edit$/, accepts: "any" },
   { match: /^\/losses\/new$/, accepts: "any" },
@@ -170,17 +171,17 @@ export const AREA_RECORD_LINKS: Record<"eggs" | "meat", readonly AreaRecordLink[
     { href: "/eggs/sales", label: "Kiaušinių pardavimai", stat: "eggSales" },
     { href: "/eggs/consumptions", label: "Suvartoti kiaušiniai", stat: "eggsConsumed" },
     { href: "/birds/purchases", label: "Paukščių pirkimai", stat: "purchases" },
-    { href: "/birds/sales", label: "Paukščių pardavimai", stat: "birdSales" },
+    { href: "/birds/sales?area=eggs", label: "Paukščių pardavimai", stat: "birdSales" },
     { href: "/bird-groups?area=eggs", label: "Dedeklių grupės", stat: "groups" },
     // Not in the design; kept so the report stays reachable in V2.
     { href: "/eggs/reports", label: "Kiaušinių ataskaita" },
   ],
-  // The Mėsa figures are the year's, as the design shows them (#190).
+  // The Mėsa use and sales figures are the year's, as the design shows them
+  // (#190); each list is kept to the area, so it holds what its figure counts.
   meat: [
     { href: "/bird-groups?area=meat", label: "Mėsinių grupės", stat: "groups" },
-    { href: "/birds/consumptions", label: "Suvartota mėsai", stat: "consumed" },
-    // The V1 sales list holds every area's sales; it has no area filter yet.
-    { href: "/birds/sales", label: "Mėsinių pardavimai", stat: "sales" },
+    { href: "/birds/consumptions?area=meat", label: "Suvartota mėsai", stat: "consumed" },
+    { href: "/birds/sales?area=meat", label: "Mėsinių pardavimai", stat: "sales" },
   ],
 };
 
@@ -223,7 +224,7 @@ export const AREA_NEW_RECORDS: Record<AreaSlug, NewRecordLinks> = {
     { href: "/losses/new?area=incubation", label: "Registruoti nuostolį" },
   ],
   meat: [
-    { href: "/birds/consumptions/new", label: "Suvartoti mėsai" },
+    { href: "/birds/consumptions/new?area=meat", label: "Suvartoti mėsai" },
     { href: "/birds/sales/new?area=meat", label: "Parduoti paukščių" },
     { href: "/birds/purchases/new?area=meat", label: "Pirkti jauniklių auginti" },
     { href: "/bird-groups/new?area=meat", label: "Nauja mėsinių grupė" },

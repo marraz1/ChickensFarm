@@ -15,6 +15,7 @@ vi.mock("@/lib/prisma", async () => {
 import { fakePrisma, resetFakePrisma } from "./fake-prisma";
 import { getMeatOverview } from "@/lib/services/area-overview";
 import { getAreaFinance } from "@/lib/services/area-finance";
+import { listBirdTransactions } from "@/lib/services/bird-transactions";
 import { resolveFinancePeriod } from "@/lib/finance-period";
 
 const FARM_ID = "farm-1";
@@ -166,5 +167,18 @@ describe("getMeatOverview (#190)", () => {
       stats: { groups: 0, consumed: 0, sales: 0 },
       recent: [],
     });
+  });
+});
+
+describe("listBirdTransactions with an area (#190)", () => {
+  it("keeps the sales list to the sales filed under that area", async () => {
+    await seedGroup("ducks", "MEAT", 12);
+    await seedGroup("layers", "EGGS", 30);
+    await seedSale("ducks", "MEAT", "2026-06-01", 100);
+    await seedSale("layers", "EGGS", "2026-06-01", 40);
+
+    const meat = await listBirdTransactions(FARM_ID, "SALE", "MEAT");
+    expect(meat.map((t) => Number(t.totalAmount))).toEqual([100]);
+    expect(await listBirdTransactions(FARM_ID, "SALE")).toHaveLength(2);
   });
 });

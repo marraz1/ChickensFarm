@@ -20,6 +20,8 @@ const farmYear = () =>
   new Intl.DateTimeFormat("en", { timeZone: "Europe/Vilnius", year: "numeric" }).format(new Date());
 
 const sheet = (page: Page) => page.getByRole("dialog", { name: "Naujas įrašas" });
+const areaBarLink = (page: Page, name: string) =>
+  page.getByRole("navigation", { name: "Ūkio sritys" }).getByRole("link", { name });
 
 /**
  * Opens the "Naujas įrašas" sheet. The button is server-rendered, so a click
@@ -264,6 +266,21 @@ test.describe("Mėsa (#190)", () => {
       "Registruoti nuostolį",
     ]);
     await sheet(page).getByRole("link", { name: "Suvartoti mėsai" }).click();
-    await expect(page).toHaveURL(/\/birds\/consumptions\/new$/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/birds\/consumptions\/new\?area=meat$/, { timeout: 15_000 });
+    await expect(areaBarLink(page, "Mėsa")).toHaveAttribute("aria-current", "page");
+  });
+
+  test("the meat-use and sales records open lists kept to Mėsa", async ({ page }) => {
+    await page.goto("/areas/meat");
+    await page.getByRole("link", { name: /^Suvartota mėsai\s*\d+/ }).click();
+    await expect(page).toHaveURL(/\/birds\/consumptions\?area=meat$/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Mėsai suvartoti paukščiai" })).toBeVisible();
+    await expect(areaBarLink(page, "Mėsa")).toHaveAttribute("aria-current", "page");
+
+    await page.goto("/areas/meat");
+    await page.getByRole("link", { name: /^Mėsinių pardavimai/ }).click();
+    await expect(page).toHaveURL(/\/birds\/sales\?area=meat$/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Mėsinių pardavimai" })).toBeVisible();
+    await expect(areaBarLink(page, "Mėsa")).toHaveAttribute("aria-current", "page");
   });
 });

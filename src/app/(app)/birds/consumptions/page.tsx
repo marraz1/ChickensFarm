@@ -5,19 +5,28 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { formatDateLT } from "@/lib/format";
 import { Plus } from "lucide-react";
+import { groupAreaFromParam, groupAreaSlug } from "@/lib/v2-navigation";
 
-export default async function BirdConsumptionsPage() {
+export default async function BirdConsumptionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ area?: string | string[] }>;
+}) {
+  // From an area's overview (?area=meat): only that area's groups' meat use,
+  // the records its "Suvartota mėsai" figure counts (#190).
+  const area = groupAreaFromParam((await searchParams).area);
   const { farm } = await requireActiveFarm();
-  const consumptions = await listBirdConsumptions(farm.id);
+  const consumptions = await listBirdConsumptions(farm.id, area);
+  const query = area ? `?area=${groupAreaSlug(area)}` : "";
 
   return (
     <div>
       <PageHeader
         title="Mėsai suvartoti paukščiai"
-        backHref="/birds"
+        backHref={area ? `/areas/${groupAreaSlug(area)}` : "/birds"}
         action={
           <Link
-            href="/birds/consumptions/new"
+            href={`/birds/consumptions/new${query}`}
             className="flex h-11 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
           >
             <Plus size={16} aria-hidden /> Naujas
