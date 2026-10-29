@@ -117,6 +117,7 @@ import {
 import { finalizeHatch, getIncubationCycle, recordCandling } from "@/lib/services/incubation";
 import { listAreaTargetOptions } from "@/lib/services/area-targets";
 import { getAreaFinance, getFarmFinance } from "@/lib/services/area-finance";
+import { getEggsOverview } from "@/lib/services/area-overview";
 
 const FARM_A_ID = "farm-a";
 const FARM_B_ID = "farm-b";
@@ -1057,6 +1058,17 @@ describe("area finance", () => {
 
     const farmB = await getFarmFinance(FARM_B_ID, period);
     expect(farmB.total).toEqual({ income: 250, expenses: 70, result: 180 });
+  });
+
+  it("keeps the Kiaušiniai overview to the farm's own eggs, groups and money", async () => {
+    const now = new Date("2026-10-28T12:00:00Z");
+    // Each farm sold 10 eggs and has one Mėsa group, so neither has layers.
+    const eggsA = await getEggsOverview(FARM_A_ID, now);
+    expect(eggsA).toMatchObject({ eggStock: -10, flock: { total: 0, groups: 0 } });
+    expect(eggsA.balance).toMatchObject({ income: 5, expenses: 0 });
+
+    const eggsB = await getEggsOverview(FARM_B_ID, now);
+    expect(eggsB.balance).toMatchObject({ income: 50 });
   });
 
   it("keeps each area to its own money, egg sales in Kiaušiniai only", async () => {

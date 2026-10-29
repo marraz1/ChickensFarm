@@ -6,6 +6,7 @@ import {
   isAreaSlug,
   navKeyForPath,
   AREA_RECORD_LINKS,
+  AREA_NEW_RECORDS,
   groupAreaFromParam,
   AREA_EXPENSE_TARGETS,
   AREA_LOSS_TARGETS,
@@ -110,6 +111,30 @@ describe("AREA_RECORD_LINKS", () => {
       for (const { href } of links) {
         // Meat-bird sales use the same V1 sales list as laying birds for now.
         if (area === "meat" && href === "/birds/sales") continue;
+        const url = new URL(href, "http://x");
+        expect(navKeyForPath(url.pathname, url.searchParams.get("area"))).toBe(area);
+      }
+    }
+  });
+});
+
+describe("AREA_NEW_RECORDS", () => {
+  it("offers the Kiaušiniai sheet's eight actions in design order", () => {
+    expect(AREA_NEW_RECORDS.eggs?.map((a) => a.label)).toEqual([
+      "Surinkti kiaušinius",
+      "Parduoti kiaušinius",
+      "Suvartoti kiaušinius",
+      "Pirkti paukščių",
+      "Parduoti paukščių",
+      "Nauja dedeklių grupė",
+      "Nauja išlaida",
+      "Registruoti nuostolį",
+    ]);
+  });
+
+  it("keeps every action inside its area, so the bar stays on it", () => {
+    for (const [area, actions] of Object.entries(AREA_NEW_RECORDS)) {
+      for (const { href } of actions ?? []) {
         const url = new URL(href, "http://x");
         expect(navKeyForPath(url.pathname, url.searchParams.get("area"))).toBe(area);
       }

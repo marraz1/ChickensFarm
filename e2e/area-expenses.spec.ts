@@ -137,7 +137,9 @@ test("an Eggs expense on an Eggs group is saved and returns to the area", async 
   await page.getByLabel("Aprašymas").fill(description);
   await page.getByRole("button", { name: "Išsaugoti" }).click();
 
-  await expect(page).toHaveURL(/\/areas\/eggs\/expenses$/);
+  // Save, then a client navigation that may compile the tab on a cold dev
+  // server: the default 5 s failed twice in full parallel runs.
+  await expect(page).toHaveURL(/\/areas\/eggs\/expenses$/, { timeout: 15_000 });
 
   const expenses = (await (await page.request.get("/api/expenses")).json()) as {
     id: string;
