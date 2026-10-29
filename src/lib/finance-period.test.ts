@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseUtcDateInput, resolveFinancePeriod, toDateInput } from "@/lib/finance-period";
+import { parseUtcDateInput, resolveFinancePeriod } from "@/lib/finance-period";
 
 const NOW = new Date("2026-10-29T10:00:00Z");
 const day = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -48,6 +48,22 @@ describe("resolveFinancePeriod", () => {
     expect(p.to).toEqual(day("2026-10-29"));
   });
 
+  it("starts a range given only its end on January 1st of that year", () => {
+    const p = resolveFinancePeriod({ period: "range", to: "2020-05-01" }, NOW);
+    expect(p.from).toEqual(day("2020-01-01"));
+    expect(p.to).toEqual(day("2020-05-01"));
+  });
+
+  it("ends a range no later than this year's end, so the month list stays bounded", () => {
+    const p = resolveFinancePeriod({ period: "range", from: "2000-01-01", to: "2099-12-31" }, NOW);
+    expect(p.from).toEqual(day("2000-01-01"));
+    expect(p.to).toEqual(day("2026-12-31"));
+
+    const future = resolveFinancePeriod({ period: "range", from: "2050-01-01" }, NOW);
+    expect(future.from).toEqual(day("2026-10-29"));
+    expect(future.to).toEqual(day("2026-12-31"));
+  });
+
   it("keeps the first of repeated parameters and ignores unknown periods", () => {
     expect(resolveFinancePeriod({ period: ["month", "range"] }, NOW).kind).toBe("month");
     expect(resolveFinancePeriod({ period: "week" }, NOW).kind).toBe("year");
@@ -62,7 +78,11 @@ describe("parseUtcDateInput", () => {
     expect(parseUtcDateInput(undefined)).toBeNull();
   });
 
-  it("round-trips through toDateInput", () => {
-    expect(toDateInput(parseUtcDateInput("2026-07-04")!)).toBe("2026-07-04");
+  it("rejects years outside 2000–2099 instead of shifting them", () => {
+    // Date.UTC would read year 50 as 1950.
+    expect(parseUtcDateInput("0050-06-01")).toBeNull();
+    expect(parseUtcDateInput("1000-01-01")).toBeNull();
+    expect(parseUtcDateInput("9999-12-31")).toBeNull();
+    expect(parseUtcDateInput("2000-01-01")).toEqual(day("2000-01-01"));
   });
 });

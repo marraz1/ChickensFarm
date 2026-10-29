@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { toDateInput, type FinancePeriod, type FinancePeriodKind } from "@/lib/finance-period";
+import type { FinancePeriod, FinancePeriodKind } from "@/lib/finance-period";
+import { toLocalDateString } from "@/lib/notification-schedule";
 import { cn } from "@/lib/utils";
 
 /**
@@ -44,14 +45,14 @@ export function PeriodSwitch({ basePath, period }: { basePath: string; period: F
           <input
             type="date"
             name="from"
-            defaultValue={toDateInput(period.from)}
+            defaultValue={toLocalDateString(period.from)}
             aria-label="Nuo"
             className="h-11 min-w-0 flex-1 rounded-lg border bg-transparent px-3 text-sm"
           />
           <input
             type="date"
             name="to"
-            defaultValue={toDateInput(period.to)}
+            defaultValue={toLocalDateString(period.to)}
             aria-label="Iki"
             className="h-11 min-w-0 flex-1 rounded-lg border bg-transparent px-3 text-sm"
           />

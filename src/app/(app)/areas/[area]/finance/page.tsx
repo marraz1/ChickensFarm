@@ -21,7 +21,8 @@ const NOTE = "text-[11px] leading-tight text-muted-foreground";
 
 /** What the Pajamos card says under its amount. */
 function incomeNotes(area: AreaSlug, f: AreaFinance): string[] {
-  if (f.income === 0) return ["Pardavimų nebuvo"];
+  // Birds given away at 0 € are still sales; only no money and no birds is none.
+  if (f.income === 0 && f.birdsSold === 0) return ["Pardavimų nebuvo"];
   if (area === "eggs") {
     return [`Kiaušiniai ${formatEUR(f.eggIncome)}`, `Paukščiai ${formatEUR(f.birdIncome)}`];
   }
