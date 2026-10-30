@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requestPasswordResetSchema, confirmPasswordResetSchema } from "@/lib/validation/auth";
 import { requestPasswordReset, confirmPasswordReset } from "@/lib/services/auth";
 import { checkRateLimit, getClientIp, normalizeEmailKey } from "@/lib/rate-limit";
+import { refuseWhileReadOnly } from "@/lib/read-only";
 
 // 10 requests per 15 min per IP guards against a single client hammering the
 // endpoint; 3 per 15 min per target email stops it being used to email-bomb
@@ -11,6 +12,10 @@ const PASSWORD_RESET_EMAIL_LIMIT = { limit: 3, windowMs: 15 * 60 * 1000 };
 
 // POST { email } -> request a reset link
 export async function POST(req: Request) {
+  // The middleware skips api/auth, so the read-only switch is checked here.
+  const readOnly = refuseWhileReadOnly(req);
+  if (readOnly) return readOnly;
+
   const ip = getClientIp(req);
   const ipRate = checkRateLimit(`password-reset:ip:${ip}`, PASSWORD_RESET_IP_LIMIT);
   if (!ipRate.allowed) {
@@ -49,6 +54,9 @@ export async function POST(req: Request) {
 
 // PATCH { token, password } -> confirm a reset
 export async function PATCH(req: Request) {
+  const readOnly = refuseWhileReadOnly(req);
+  if (readOnly) return readOnly;
+
   const body = await req.json();
   const parsed = confirmPasswordResetSchema.safeParse(body);
   if (!parsed.success) {

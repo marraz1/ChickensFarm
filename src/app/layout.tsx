@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "@/components/session-provider";
 import { BetaBanner } from "@/components/beta-banner";
+import { ReadOnlyBanner } from "@/components/read-only-banner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -43,6 +44,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-muted/30">
         <BetaBanner />
         <SessionProvider>
+          <ReadOnlyBanner />
           {children}
           <Toaster position="top-center" />
         </SessionProvider>

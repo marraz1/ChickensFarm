@@ -5,6 +5,7 @@ Design for the next version of the app. It does not describe the current app (th
 - Canvas: https://claude.ai/artifact/Ja2FadFrYtLSYrhmEdMenx, page **"V2 · sritys"** (private to the owner unless shared)
 - Look: unchanged from V1 — shadcn/ui base-nova tokens from `src/app/globals.css`, Geist, 44px touch targets, Lithuanian copy
 - Format: each `*.dc.html` is one 390-wide phone artboard; they render only in the canvas editor and serve here as source and reference
+- Implementation plan (separate V2 branch, Vercel project and database, V1→V2 data migration, cutover, backlog): [`V2-implementation-plan.md`](V2-implementation-plan.md)
 
 ## What changes in V2
 
