@@ -25,6 +25,20 @@ This is **V1's** line. V2 has its own, `v2/develop` → `main_app_V2` →
 `releaseV2`, released by PROD_deployment_V2 (#243). `main_app_V1` was called
 `main` until #242.
 
+Both apps release through one shared pipeline,
+`.github/workflows/release-pipeline.yml`. The two workflows you run are thin
+callers that only say which app: branches, tag prefix, production URL, secrets
+and Vercel project.
+
+| Workflow           | App | From          | To          | Tags       | URL / secret                   |
+| ------------------ | --- | ------------- | ----------- | ---------- | ------------------------------ |
+| PROD_deployment    | V1  | `main_app_V1` | `release`   | `v0.1.16`  | `APP_URL`, `CRON_SECRET`       |
+| PROD_deployment_V2 | V2  | `main_app_V2` | `releaseV2` | `v2-2.0.0` | `APP_URL_V2`, `CRON_SECRET_V2` |
+
+Each app reads only its own tags, and watches only its own Vercel project's
+production deployment. A change to the pipeline changes both apps' releases, so
+prove it with a dry run of each.
+
 `main_app_V1` is the repository's default branch until #244 moves the default
 to `main_app_V2`. The default branch matters: GitHub only runs scheduled
 workflows (`reminders.yml`, `status.yml`) and offers "Run workflow" from it, so
