@@ -50,6 +50,32 @@ flowchart LR
   C --> WP["web-push / Resend"] --> B
 ```
 
+## Two apps: V1 and V2
+
+Since the V2 cutover (#183) two copies of ChickensFarm run side by side, each its own
+Vercel project, Neon database and release line. They share this repository and the
+code layout above; V2 adds the farm areas (Kiaušiniai, Perekšlės, Perinimas, Mėsa).
+
+|                | V1 (the old app)                      | V2 (the main app)                               |
+| -------------- | ------------------------------------- | ----------------------------------------------- |
+| Address        | `chickensfarm-v1.vercel.app`          | `chickensfarm.vercel.app` (the owners' address) |
+| Vercel project | `chickensfarm`                        | `chickensfarm-v2`                               |
+| Database       | Neon project `ChickensFarm`           | Neon project `chickensfarm-v2`                  |
+| Release line   | `develop` → `main_app_V1` → `release` | `v2/develop` → `main_app_V2` → `releaseV2`      |
+| Released by    | PROD_deployment (tags `vX.Y.Z`)       | PROD_deployment_V2 (tags `v2-X.Y.Z`)            |
+| Reminders      | off (`REMINDERS_V1`)                  | on (`REMINDERS_V2`)                             |
+
+- **The data is not shared and never synced.** V2 was filled once from V1 by the final
+  data copy (`scripts/v2-migrate`); since then each app keeps its own records, and the
+  copy refuses to run into V2 production again (`V2_CUTOVER_DONE`).
+- **Only V2 sends reminders**, so owners, who exist in both apps, get each one once.
+- The default branch is `main_app_V2`. It runs Reminders and Status once per app, each
+  with that app's URL and secret. Both release workflows share
+  `.github/workflows/release-pipeline.yml`.
+- Details: [`RELEASE.md`](RELEASE.md) (both release lines),
+  [`v2-environment.md`](v2-environment.md) (V2's setup and day to day),
+  [`v2-cutover.md`](v2-cutover.md) (how the switch was made, and how to roll back).
+
 ## Multi-tenant data model
 
 **Tenant = `Farm`.** A `User` can belong to many farms through `FarmUser`
