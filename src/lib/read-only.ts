@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 
 // V1 read-only mode for the V2 cutover (#239, part of #182). While the final
 // copy of V1's data into V2 runs, nothing may be saved in V1 — it would be
-// left behind. `READ_ONLY_MODE=true` in Vercel (then a redeploy) freezes every
-// change and shows a banner; reading and signing in keep working. Off unless
-// set to exactly "true", so V1 behaves as before.
+// left behind. `READ_ONLY_MODE=true` in Vercel, then a rebuild (Redeploy),
+// freezes every change, pauses the reminder cron and shows a banner; reading
+// and signing in keep working. Off unless set to exactly "true", so V1
+// behaves as before.
+//
+// The middleware checks every route it sees. Routes its matcher skips
+// (api/auth, api/cron) call refuseWhileReadOnly themselves, and
+// read-only.test.ts fails if a writing one there does not.
 
 export const READ_ONLY_MESSAGE =
   "Programėlė perkeliama į naują versiją. Pakeitimų išsaugoti kol kas negalima.";

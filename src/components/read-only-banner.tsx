@@ -1,7 +1,9 @@
 import { READ_ONLY_BANNER, isReadOnlyMode } from "@/lib/read-only";
 
-// Shown on every page while V1 is frozen for the move to V2 (#239). Read on
-// the server at request time, so it follows READ_ONLY_MODE after a redeploy.
+// Shown on every page while V1 is frozen for the move to V2 (#239). Static
+// pages (sign-in, register) are prerendered, so the banner is fixed at build
+// time: a change of READ_ONLY_MODE needs a rebuild (Vercel's Redeploy), not a
+// promote or an instant rollback of an older build.
 export function ReadOnlyBanner() {
   if (!isReadOnlyMode()) return null;
   return (

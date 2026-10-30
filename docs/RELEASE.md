@@ -210,13 +210,17 @@ Then fix the migration and release again.
 - every change through `/api/*` answers **503** "Programėlė perkeliama į naują
   versiją. Pakeitimų išsaugoti kol kas negalima." — registration and password
   resets included;
+- the reminder cron answers 503 too, so reminders pause until V2 takes over
+  (the Reminders workflow goes red meanwhile, which is expected);
 - every page shows a banner saying the app is moving to a new version;
 - reading, signing in and switching the active farm keep working.
 
 Turn it on or off in Vercel → `chickensfarm` → Settings → Environment Variables
-(Production), then **redeploy** the current production deployment: the value is
-read at runtime, but a running deployment keeps the environment it started with.
-Any value other than `true`, or none, is off.
+(Production), then **Redeploy** the current production deployment. That rebuilds
+it, which matters: the sign-in and register pages are prerendered, so the banner
+is fixed at build time, and a running deployment keeps the environment it
+started with. Promoting or instantly rolling back to an older build does **not**
+pick up the change. Any value other than `true`, or none, is off.
 
 ---
 
