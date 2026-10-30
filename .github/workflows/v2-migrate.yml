@@ -13,6 +13,10 @@ name: V2 data copy
 #
 # A real run EMPTIES and reloads the target, and commits only if the copy
 # matches V1 exactly. See docs/v2-environment.md.
+#
+# Never into production after the cutover (#245): once owners enter data in
+# V2, a reload from V1 would delete it for good. The cutover sets the
+# repository variable V2_CUTOVER_DONE=true; a rollback clears it.
 
 on:
   workflow_dispatch:
@@ -49,6 +53,12 @@ jobs:
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
     steps:
+      - name: Refuse to overwrite V2 production after the cutover
+        if: inputs.target == 'production' && vars.V2_CUTOVER_DONE == 'true'
+        run: |
+          echo "::error::The cutover is done (V2_CUTOVER_DONE=true): V2 production holds data entered since then, and a copy would delete it. Nothing was changed."
+          exit 1
+
       - name: Check the Neon API key
         run: |
           if [ -z "$NEON_API_KEY" ]; then

@@ -148,7 +148,7 @@ the release, a reset of `preview` from `production` brings both back in line.
   release commits its version bump to `main_app_V2` only; until it is back on
   `v2/develop`, the next V1 → V2 sync conflicts on `package.json`'s version.
 - **V2's reminders** stay off until the cutover: the Reminders workflow runs V2's job
-  only when the repository variable `REMINDERS_V2` is `on` (and `APP_STAGE=beta`
+  only when the repository variable `REMINDERS_V2` is `on` (and V1's only when `REMINDERS_V1` is `on`) (and `APP_STAGE=beta`
   would refuse it anyway). The cutover (#245) sets it.
 - Bring V1 fixes across regularly: `git checkout v2/develop && git merge origin/main_app_V1`
   (via a PR). V1 migrations then apply to V2 on the next V2 release.

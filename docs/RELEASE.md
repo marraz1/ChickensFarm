@@ -45,8 +45,8 @@ before). The default branch matters: GitHub only runs scheduled workflows and
 offers "Run workflow" from it, so it carries the workflows of **both** apps:
 
 - **Reminders** (every 15 min) calls `reminders-dispatch.yml` once per app.
-  Repository variables switch each one: `REMINDERS_V1` (on unless `off`) and
-  `REMINDERS_V2` (off unless `on`).
+  Repository variables switch each one: an app sends only while its
+  `REMINDERS_V1` / `REMINDERS_V2` is `on`.
 - **Status** (daily) runs `status-check.yml` for V1 and for V2. Each has its own
   URL, secret, source branch (for CI), deployment records and Vercel project.
 - **PROD_deployment**, **PROD_deployment_V2** and **V2 data copy** are run by hand.
