@@ -63,6 +63,11 @@ on:
       vercel_project_id:
         type: string
         required: true
+      min_major:
+        description: "Lowest major version this app may release (V2 starts at 2, so it never reuses V1's numbers)"
+        type: number
+        required: false
+        default: 0
     secrets:
       cron_secret:
         required: false
@@ -81,6 +86,7 @@ env:
   APP: ${{ inputs.app }}
   VERCEL_ENVIRONMENT: ${{ inputs.vercel_environment }}
   VERCEL_PROJECT_ID: ${{ inputs.vercel_project_id }}
+  MIN_MAJOR: ${{ inputs.min_major }}
 
 jobs:
   preflight:
@@ -214,6 +220,22 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Version:** \`$PREVIOUS\` → \`$NEXT\` (\`$BUMP\`)" >> "$GITHUB_STEP_SUMMARY"
 
+          # 4c. Never below the app's first major: V2 starts at 2.0.0, so its
+          #     versions cannot repeat V1's (both apps share package.json's
+          #     history until V2's first release).
+          if [ "${NEXT%%.*}" -lt "$MIN_MAJOR" ]; then
+            echo "❌ $APP releases start at \`$MIN_MAJOR.0.0\`; \`$NEXT\` is below it. Run with **bump = custom** and **version = $MIN_MAJOR.0.0**." >> "$GITHUB_STEP_SUMMARY"
+            FAIL=1
+          fi
+
+          # 4d. The deployment record this release will wait for must exist
+          #     under exactly this name, or the deploy job would wait for a
+          #     record that never comes, after the release is pushed and tagged.
+          if [ "$(gh api -X GET "repos/$REPO/deployments" -f environment="$VERCEL_ENVIRONMENT" -f per_page=1 --jq 'length' 2>/dev/null || echo 0)" = "0" ]; then
+            echo "❌ No GitHub deployment record under \`$VERCEL_ENVIRONMENT\`. Check the environment name Vercel writes for this project." >> "$GITHUB_STEP_SUMMARY"
+            FAIL=1
+          fi
+
           # 5. What is live now, and what this release will migrate. Shown
           #    before anything is pushed, so the operator can still stop.
           APPLIED_BEFORE="[]"
@@ -248,6 +270,11 @@ jobs:
               fi
             else
               echo "⚠️ Could not read migration state (HTTP $code). Set \`CRON_SECRET\` to see it." >> "$GITHUB_STEP_SUMMARY"
+              # Verify needs it after the push; stop a real release here instead.
+              if [ "$DRY_RUN" != "true" ]; then
+                echo "❌ A release needs the app's \`CRON_SECRET\` to verify what it published." >> "$GITHUB_STEP_SUMMARY"
+                FAIL=1
+              fi
               {
                 echo "pending=?"
                 echo "pending_list="
@@ -255,6 +282,10 @@ jobs:
             fi
           else
             echo "⚠️ \`APP_URL\` is not set — cannot report what is live." >> "$GITHUB_STEP_SUMMARY"
+            if [ "$DRY_RUN" != "true" ]; then
+              echo "❌ A release needs the app's production URL to verify what it published." >> "$GITHUB_STEP_SUMMARY"
+              FAIL=1
+            fi
             {
               echo "pending=?"
               echo "pending_list="
@@ -430,7 +461,13 @@ jobs:
             printf '%s' "$PENDING_LIST" | jq -r '.[]' > to_scan.txt
             SOURCE="pending against production"
           elif [ -z "$PENDING_LIST" ]; then
-            PREV_TAG=$(git tag --list --sort=-v:refname | grep -E "^${TAG_PREFIX}[0-9]+\.[0-9]+\.[0-9]+$" | head -1 || true)
+            # This app's newest tag: the literal prefix followed by a plain
+            # X.Y.Z, so V1 (`v`) skips V2's `v2-2.0.0` and V2 skips `v0.1.x`.
+            PREV_TAG=""
+            while read -r t; do
+              rest=${t#"$TAG_PREFIX"}
+              if [[ $rest =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then PREV_TAG=$t; break; fi
+            done < <(git tag --list "${TAG_PREFIX}*" --sort=-v:refname)
             if [ -n "$PREV_TAG" ]; then
               git diff --name-only --diff-filter=A "$PREV_TAG"..HEAD -- prisma/migrations \
                 | awk -F/ '{print $3}' | sort -u > to_scan.txt
@@ -763,7 +800,7 @@ jobs:
             sleep 15
             POLL=$((POLL + 1))
             code=$(probe)
-            echo "  [${SECONDS}s] poll #$POLL: HTTP $code, serving v$(live_version | sed 's/^$/?/') ($(live_commit | cut -c1-7))"
+            echo "  [${SECONDS}s] poll #$POLL: HTTP $code, serving ${TAG_PREFIX}$(live_version | sed 's/^$/?/') ($(live_commit | cut -c1-7))"
           done
 
           LIVE_V=$(live_version)
@@ -774,7 +811,7 @@ jobs:
           else
             STATE=stale
             echo "❌ Expected **${TAG_PREFIX}$VERSION** at \`${SHA:0:7}\`, but production is serving" >> "$GITHUB_STEP_SUMMARY"
-            echo "**v${LIVE_V:-unknown}** at \`${LIVE_C:0:7}\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "**${TAG_PREFIX}${LIVE_V:-unknown}** at \`${LIVE_C:0:7}\`." >> "$GITHUB_STEP_SUMMARY"
           fi
 
           # What this release actually migrated, as a difference against the

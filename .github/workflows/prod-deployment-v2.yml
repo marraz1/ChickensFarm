@@ -54,6 +54,8 @@ jobs:
       app_url: ${{ vars.APP_URL_V2 }}
       vercel_environment: "Production – chickensfarm-v2"
       vercel_project_id: prj_M4VrMiPSLeBK1pDEGbW0f2q9lSOS
+      # V2's first release is 2.0.0 (bump = custom), so it never reuses V1's numbers.
+      min_major: 2
     secrets:
       cron_secret: ${{ secrets.CRON_SECRET_V2 }}
       vercel_token: ${{ secrets.VERCEL_TOKEN }}
