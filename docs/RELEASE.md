@@ -202,6 +202,22 @@ Then fix the migration and release again.
   keep serving an old build after a deploy.
 - **Actions → Status** — the general dashboard, on demand or daily.
 
+## Read-only mode (V2 cutover)
+
+`READ_ONLY_MODE=true` freezes V1 while its data is copied into V2 (#239, part of
+#182; the steps are in `docs/v2-cutover.md` on `v2/develop`):
+
+- every change through `/api/*` answers **503** "Programėlė perkeliama į naują
+  versiją. Pakeitimų išsaugoti kol kas negalima." — registration and password
+  resets included;
+- every page shows a banner saying the app is moving to a new version;
+- reading, signing in and switching the active farm keep working.
+
+Turn it on or off in Vercel → `chickensfarm` → Settings → Environment Variables
+(Production), then **redeploy** the current production deployment: the value is
+read at runtime, but a running deployment keeps the environment it started with.
+Any value other than `true`, or none, is off.
+
 ---
 
 ## A hazard worth knowing
