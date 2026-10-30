@@ -2,6 +2,26 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: "/"
+    # V1's line. Dependabot reads this file from the default branch
+    # (main_app_V2, #244), so each app's line is named.
+    target-branch: main_app_V1
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    ignore:
+      # eslint-plugin-react (bundled in eslint-config-next) only supports
+      # eslint <=9.7 as of 2026-09-08 — eslint 10 crashes the react/display-name
+      # rule. Remove once eslint-config-next ships a compatible major bump.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint (bundled in eslint-config-next) only supports
+      # typescript <6.1.0 as of 2026-09-08. Remove once it adds TS 7 support.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: npm
+    directory: "/"
+    # V2's line: updates land on v2/develop like any V2 change.
+    target-branch: v2/develop
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
