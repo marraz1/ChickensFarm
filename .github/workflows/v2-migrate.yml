@@ -1,7 +1,7 @@
 name: V2 data copy
 
 # Copies V1 production data into the V2 database (#180). Manual only. It lives
-# on main because GitHub only dispatches workflows from the default branch;
+# on the default branch because GitHub only dispatches workflows from it;
 # the code it runs (scripts/v2-migrate) is checked out from v2/develop. It
 # changes nothing about the V1 app.
 #

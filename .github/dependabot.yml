@@ -2,6 +2,9 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: "/"
+    # V1's line (#242). Named explicitly: Dependabot otherwise follows the
+    # default branch, which becomes main_app_V2 (#244).
+    target-branch: main_app_V1
     schedule:
       interval: weekly
     open-pull-requests-limit: 10

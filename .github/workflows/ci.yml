@@ -11,11 +11,13 @@ name: CI
 # is unchanged or better.
 
 on:
-  # Every branch in the promotion chain: feature -> develop -> main -> release.
+  # Every branch in V1's promotion chain: feature -> develop -> main_app_V1 ->
+  # release (#242). `main` stays listed only until it is renamed to
+  # main_app_V1; #244 drops it.
   pull_request:
-    branches: [develop, main, release]
+    branches: [develop, main, main_app_V1, release]
   push:
-    branches: [develop, main, release]
+    branches: [develop, main, main_app_V1, release]
 
 permissions:
   contents: read
@@ -114,7 +116,7 @@ jobs:
   preview:
     name: Preview build
     runs-on: ubuntu-latest
-    # Only on a PR. A push to main produces a production deployment, which the
+    # Only on a PR. A push to main_app_V1 produces a production deployment, which the
     # Status workflow already watches — doing it here too would just duplicate.
     if: github.event_name == 'pull_request'
     outputs:
