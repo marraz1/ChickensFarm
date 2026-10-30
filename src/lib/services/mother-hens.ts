@@ -196,6 +196,7 @@ export async function addMotherHenLog(
       entryDate: new Date(input.entryDate),
       note: input.note || null,
       photoUrl: input.photoUrl || null,
+      brokenEggs: input.brokenEggs ?? null,
     },
   });
 }

@@ -3,23 +3,25 @@ import { notFound } from "next/navigation";
 import { ChevronRight, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { requireActiveFarm } from "@/lib/session";
-import { getAreaLosses } from "@/lib/services/losses";
+import { getAreaLossInsight, getAreaLosses } from "@/lib/services/losses";
+import { LossInsightCard } from "@/components/v2/loss-insight-card";
 import { AREA_LOSS_COPY } from "@/lib/area-losses";
 import { countNounLT } from "@/lib/format";
 import { AREA_SLUGS, isAreaSlug } from "@/lib/v2-navigation";
 
 // The area's Nuostoliai tab (#196, V2-<Area>-Losses): the year's dead birds
-// split by cause, and every loss of the area, newest first. "Nuostolis" opens
-// the area loss form (#195).
+// split by cause, the area's own losses beyond dead birds (#197), and every
+// loss of the area, newest first. "Nuostolis" opens the area loss form (#195).
 export default async function AreaLossesPage({ params }: { params: Promise<{ area: string }> }) {
   const { area } = await params;
   // The area layout already 404s an unknown slug; this narrows the type.
   if (!isAreaSlug(area)) notFound();
   const { farm } = await requireActiveFarm();
   // Rows carry ?area= so the edit screen returns here and keeps the area lit.
-  const { year, total, byReason, rows, hasMore } = await getAreaLosses(farm.id, AREA_SLUGS[area], {
-    linkQuery: `?area=${area}`,
-  });
+  const [{ year, total, byReason, rows, hasMore }, insight] = await Promise.all([
+    getAreaLosses(farm.id, AREA_SLUGS[area], { linkQuery: `?area=${area}` }),
+    getAreaLossInsight(farm.id, area),
+  ]);
   const copy = AREA_LOSS_COPY[area];
   const heading = `${copy.heading} · ${year} m.`;
 
@@ -49,6 +51,8 @@ export default async function AreaLossesPage({ params }: { params: Promise<{ are
           ))}
         </dl>
       </Card>
+
+      <LossInsightCard area={area} insight={insight} />
 
       {/* None this year; earlier years' records are still listed below. */}
       {total === 0 && (

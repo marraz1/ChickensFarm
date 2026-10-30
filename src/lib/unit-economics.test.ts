@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { unitFigure } from "@/lib/unit-economics";
+import { unitDivisor, unitFigure } from "@/lib/unit-economics";
 import type { AreaFinance } from "@/lib/area-finance";
 
 function finance(overrides: Partial<AreaFinance> = {}): AreaFinance {
@@ -63,5 +63,13 @@ describe("unitFigure", () => {
 
   it("rounds a per-unit cost to the cent", () => {
     expect(text("hens", finance({ expenses: 10 }), 3)).toBe("3,33 € vienai perekšlei");
+  });
+
+  // #197: the Mėsa Nuostoliai tab divides by the same birds.
+  it("spreads Mėsa's expenses over the birds now, lost, sold and used at home", () => {
+    const f = finance({ birdsSold: 5, homeUse: 9 });
+    expect(unitDivisor("meat", f, 6)).toBe(20);
+    expect(unitDivisor("hens", f, 2)).toBe(2);
+    expect(unitDivisor("eggs", f, 7)).toBe(0);
   });
 });

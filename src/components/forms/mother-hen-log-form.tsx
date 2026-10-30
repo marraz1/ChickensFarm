@@ -13,6 +13,7 @@ import {
   type CreateMotherHenLogInput,
 } from "@/lib/validation/mother-hens";
 import { todayInputValue } from "@/lib/format";
+import type { z } from "zod";
 
 export function MotherHenLogForm({ motherHenId }: { motherHenId: string }) {
   const router = useRouter();
@@ -24,9 +25,9 @@ export function MotherHenLogForm({ motherHenId }: { motherHenId: string }) {
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<CreateMotherHenLogInput>({
+  } = useForm<z.input<typeof createMotherHenLogSchema>, unknown, CreateMotherHenLogInput>({
     resolver: zodResolver(createMotherHenLogSchema),
-    defaultValues: { entryDate: todayInputValue(), note: "", photoUrl: "" },
+    defaultValues: { entryDate: todayInputValue(), note: "", photoUrl: "", brokenEggs: "" },
   });
 
   const photoUrl = watch("photoUrl");
@@ -66,6 +67,23 @@ export function MotherHenLogForm({ motherHenId }: { motherHenId: string }) {
           placeholder="Kaip sekasi šiandien..."
           {...register("note")}
         />
+      </div>
+
+      {/* Counted on the Perekšlės Nuostoliai tab (#197). */}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="brokenEggs">Sudaužyti kiaušiniai</Label>
+        <Input
+          id="brokenEggs"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          className="h-11"
+          {...register("brokenEggs")}
+        />
+        {errors.brokenEggs && (
+          <p className="text-sm text-destructive">{errors.brokenEggs.message}</p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">

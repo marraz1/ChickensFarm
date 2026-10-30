@@ -225,3 +225,42 @@ test("Perinimas counts dead chicks", async ({ page }) => {
     page.getByRole("region", { name: `Žuvę jaunikliai · ${farmToday().slice(0, 4)} m.` }),
   ).toBeVisible();
 });
+
+// #197: each area's own losses beyond dead birds. The preview farm is shared,
+// so the cards are checked by shape; the counts are in the service tests.
+test("each area's Nuostoliai tab shows the losses that matter there", async ({ page }) => {
+  for (const [area, title, text] of [
+    ["eggs", "Sudaužyti kiaušiniai", "Iš surinkimų · šį mėnesį"],
+    ["hens", "Sudaužyti perinti kiaušiniai", "Pagal perekšlių dienoraštį"],
+    ["incubation", "Kiaušiniai, iš kurių neišsirito", "Apvaisinti, bet neišsirito"],
+    ["meat", "Prarasta pašarų vertė", "Apytiksliai, pagal vidutines išlaidas vienam paukščiui"],
+  ] as const) {
+    await page.goto(`/areas/${area}/losses`);
+    const card = page.getByRole("region", { name: title });
+    await expect(card).toContainText(text);
+  }
+  await expect(
+    page.getByRole("region", { name: "Prarasta pašarų vertė" }).getByText(/^(≈ .*€|—)$/),
+  ).toBeVisible();
+});
+
+test("a hen's diary entry records broken incubating eggs", async ({ page }) => {
+  const hen = await page.request.post("/api/mother-hens", {
+    data: { name: `E2E perekšlė ${created.tag}` },
+  });
+  expect(hen.ok()).toBe(true);
+  const henId = (await hen.json()).id as string;
+  // Deleting her removes the diary entry with her.
+  created.henIds.push(henId);
+
+  await page.goto(`/mother-hens/${henId}/logs/new`);
+  // The form saves through its script: tap until it answers.
+  await expect(async () => {
+    await page.getByLabel("Sudaužyti kiaušiniai").fill("2");
+    await page.getByRole("button", { name: "Pridėti įrašą" }).click();
+    await expect(page).toHaveURL((url) => url.pathname === `/mother-hens/${henId}`, {
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 15_000 });
+  await expect(page.getByText("Sudaužyti kiaušiniai: 2").first()).toBeVisible();
+});

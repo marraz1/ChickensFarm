@@ -12,8 +12,16 @@ import { birdGroupLabel, cycleLabel, lossReasonLabels } from "@/lib/labels";
 import {
   AREA_LOSS_LIST_LIMIT,
   buildAreaLossSummary,
+  feedValueLostCents,
+  unhatchedEggs,
+  type AreaLossInsight,
   type AreaLossSummary,
 } from "@/lib/area-losses";
+import { getAreaFinance, getAreaUnitBase } from "@/lib/services/area-finance";
+import { resolveFinancePeriod } from "@/lib/finance-period";
+import { toCents } from "@/lib/finance-math";
+import { unitDivisor } from "@/lib/unit-economics";
+import type { AreaSlug } from "@/lib/v2-navigation";
 import { currentYearLT } from "@/lib/format";
 import type { FarmArea, Prisma } from "@/generated/prisma/client";
 import type { CreateLossInput } from "@/lib/validation/losses";
@@ -79,6 +87,84 @@ export async function getAreaLosses(
         (l.incubationCycle ? cycleLabel(l.incubationCycle) : null),
     })),
   });
+}
+
+/**
+ * The extra card under an area's dead birds (#197, V2-<Area>-Losses), over
+ * the same year as the tab (the farm's, Europe/Vilnius) — except Kiaušiniai's
+ * broken eggs, which are this month's. Farm-scoped throughout.
+ */
+export async function getAreaLossInsight(
+  farmId: string,
+  area: AreaSlug,
+  now: Date = new Date(),
+): Promise<AreaLossInsight> {
+  const year = resolveFinancePeriod({}, now);
+  const yearRange = { gte: year.from, lte: year.to };
+
+  switch (area) {
+    case "eggs": {
+      const month = resolveFinancePeriod({ period: "month" }, now);
+      const broken = await prisma.eggCollection.aggregate({
+        where: {
+          farmId,
+          quality: "BROKEN",
+          collectionDate: { gte: month.from, lte: month.to },
+        },
+        _sum: { quantity: true },
+      });
+      return { kind: "broken", count: broken._sum.quantity ?? 0 };
+    }
+    case "hens": {
+      // Through the farm's hens: a diary entry carries no farmId.
+      const hens = await prisma.motherHen.findMany({ where: { farmId }, select: { id: true } });
+      if (hens.length === 0) return { kind: "broken", count: 0 };
+      const broken = await prisma.motherHenLog.aggregate({
+        where: { motherHenId: { in: hens.map((h) => h.id) }, entryDate: yearRange },
+        _sum: { brokenEggs: true },
+      });
+      return { kind: "broken", count: broken._sum.brokenEggs ?? 0 };
+    }
+    case "incubation": {
+      // Eggs are found infertile when candled, soon after the start; the
+      // fertile ones that did not hatch are known at the hatch.
+      const [infertile, hatched] = await Promise.all([
+        prisma.incubationCycle.aggregate({
+          where: { farmId, startDate: yearRange },
+          _sum: { eggsInfertile: true },
+        }),
+        prisma.incubationCycle.findMany({
+          where: { farmId, hatchDate: yearRange },
+          select: { eggsFertile: true, hatchedCount: true },
+        }),
+      ]);
+      return {
+        kind: "unhatched",
+        infertile: infertile._sum.eggsInfertile ?? 0,
+        unhatched: unhatchedEggs(hatched),
+      };
+    }
+    case "meat": {
+      const [finance, base, lost] = await Promise.all([
+        getAreaFinance(farmId, "MEAT", year),
+        getAreaUnitBase(farmId, "meat", year),
+        prisma.loss.aggregate({
+          where: { farmId, area: "MEAT", lossDate: yearRange },
+          _sum: { quantity: true },
+        }),
+      ]);
+      const lostBirds = lost._sum.quantity ?? 0;
+      return {
+        kind: "feed",
+        lost: lostBirds,
+        valueCents: feedValueLostCents(
+          toCents(finance.expenses),
+          unitDivisor("meat", finance, base),
+          lostBirds,
+        ),
+      };
+    }
+  }
 }
 
 export type LossArea = Exclude<FarmArea, "SHARED">;
