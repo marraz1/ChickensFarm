@@ -346,5 +346,8 @@ The steps are in `docs/v2-cutover.md`.
 **Consequences:** Installed apps and bookmarks open V2 with no action from
 owners, and nobody gets each reminder twice. V1 remains usable on its own
 address, but anything entered there after the cutover stays in V1; the two
-apps' data is never synced, and the V2 data copy is never run again after the
-cutover.
+apps' data is never synced, and the V2 data copy is never run into V2
+production again after a cutover that was kept (`V2_CUTOVER_DONE=true` makes the
+workflow refuse it; a rollback clears it). Both reminder switches are explicit
+(`on` sends, anything else does not), so a deleted variable never starts V1's
+reminders again.

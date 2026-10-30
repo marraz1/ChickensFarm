@@ -2,9 +2,10 @@ name: Reminders
 
 # Each app's reminders, from the default branch (#244). The batch itself is in
 # reminders-dispatch.yml. Repository variables switch each app:
-#   REMINDERS_V1 — on unless set to "off" (V1 sends, as before);
-#   REMINDERS_V2 — off unless set to "on" (V2's beta blocks its cron anyway;
-#                  the cutover, #245, turns it on).
+#   REMINDERS_V1, REMINDERS_V2 — an app sends only when its variable is "on".
+# Explicit on purpose: a deleted or mistyped variable stops reminders rather
+# than starting a second app's (after the cutover both apps hold the same
+# users, and only V2 sends — #245).
 
 on:
   schedule:
@@ -24,7 +25,7 @@ concurrency:
 jobs:
   v1:
     name: V1 reminders
-    if: vars.REMINDERS_V1 != 'off'
+    if: vars.REMINDERS_V1 == 'on'
     uses: ./.github/workflows/reminders-dispatch.yml
     with:
       app: V1
