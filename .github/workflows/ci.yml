@@ -11,13 +11,17 @@ name: CI
 # is unchanged or better.
 
 on:
-  # Every branch in the promotion chain: feature -> develop -> main -> release,
-  # plus the long-lived V2 line (v2/<type>/<N>-slug -> v2/develop), see
-  # docs/V2_app_designs/V2-implementation-plan.md.
+  # Both apps' promotion chains (#242, #243):
+  #   V1: feature -> develop -> main_app_V1 -> release
+  #   V2: v2/<type>/<N>-slug -> v2/develop -> main_app_V2 -> releaseV2
+  # `main` stays listed only until #244 tidies the old name away.
   pull_request:
-    branches: [develop, main, release, v2/develop]
+    branches: [develop, main, main_app_V1, release, v2/develop, main_app_V2, releaseV2]
   push:
-    branches: [develop, main, release, v2/develop]
+    branches: [develop, main, main_app_V1, release, v2/develop, main_app_V2, releaseV2]
+  # By hand, e.g. right after a branch is created or renamed: the release
+  # pipeline's preflight needs a completed run on the branch it releases from.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -116,8 +120,9 @@ jobs:
   preview:
     name: Preview build
     runs-on: ubuntu-latest
-    # Only on a PR. A push to main produces a production deployment, which the
-    # Status workflow already watches — doing it here too would just duplicate.
+    # Only on a PR. A push builds its branch's own deployment (production only
+    # for `release`), which the Status workflow already watches — doing it here
+    # too would just duplicate.
     if: github.event_name == 'pull_request'
     outputs:
       state: ${{ steps.wait.outputs.state }}
@@ -138,7 +143,7 @@ jobs:
           # Vercel project (docs/v2-environment.md); the V1 project skips them.
           # Both projects can leave a deployment record on the same commit, so
           # V2 PRs only look at V2's. Empty for V1 PRs: no filter, as before.
-          VERCEL_PROJECT: ${{ startsWith(github.base_ref, 'v2/') && 'chickensfarm-v2' || '' }}
+          VERCEL_PROJECT: ${{ (startsWith(github.base_ref, 'v2/') || github.base_ref == 'main_app_V2') && 'chickensfarm-v2' || '' }}
         run: |
           echo "## Preview build" >> "$GITHUB_STEP_SUMMARY"
           {
@@ -299,10 +304,10 @@ jobs:
       # Seeded test user for e2e/signed-in.spec.ts. Only V2 previews get it:
       # they run on the V2 preview database, where the user is seeded. V1
       # previews share the production database, so the spec skips there.
-      E2E_USER_EMAIL: ${{ startsWith(github.base_ref, 'v2/') && secrets.E2E_USER_EMAIL || '' }}
-      E2E_USER_PASSWORD: ${{ startsWith(github.base_ref, 'v2/') && secrets.E2E_USER_PASSWORD || '' }}
+      E2E_USER_EMAIL: ${{ (startsWith(github.base_ref, 'v2/') || github.base_ref == 'main_app_V2') && secrets.E2E_USER_EMAIL || '' }}
+      E2E_USER_PASSWORD: ${{ (startsWith(github.base_ref, 'v2/') || github.base_ref == 'main_app_V2') && secrets.E2E_USER_PASSWORD || '' }}
       # V2 previews run with APP_STAGE=beta, so e2e/beta.spec.ts expects the banner there.
-      E2E_EXPECT_BETA: ${{ startsWith(github.base_ref, 'v2/') && '1' || '' }}
+      E2E_EXPECT_BETA: ${{ (startsWith(github.base_ref, 'v2/') || github.base_ref == 'main_app_V2') && '1' || '' }}
     steps:
       - uses: actions/checkout@v5
 

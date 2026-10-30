@@ -1,0 +1,161 @@
+name: V2 data copy
+
+# Copies V1 production data into the V2 database (#180). Manual only. It lives
+# on the default branch because GitHub only dispatches workflows from it;
+# the code it runs (scripts/v2-migrate) is checked out from v2/develop. It
+# changes nothing about the V1 app.
+#
+# V1 is never written: the script reads a throwaway Neon branch of V1
+# production (copy-on-write, deleted at the end) through a role that has
+# SELECT and nothing else. That role is created with plain SQL on the
+# snapshot branch only: roles made through the Neon API join neon_superuser
+# and could write.
+#
+# A real run EMPTIES and reloads the target, and commits only if the copy
+# matches V1 exactly. See docs/v2-environment.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: V2 branch to load
+        type: choice
+        options: [production, preview]
+        default: production
+      dry_run:
+        description: Dry run (read and plan only, write nothing)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-migrate
+  cancel-in-progress: false
+
+env:
+  NEON_API: https://console.neon.tech/api/v2
+  V1_PROJECT: empty-feather-56999950 # ChickensFarm (V1)
+  V2_PROJECT: old-feather-85056286 # chickensfarm-v2
+  DB_NAME: neondb
+  OWNER_ROLE: neondb_owner
+
+jobs:
+  copy:
+    name: Copy V1 → V2 (${{ inputs.target }}${{ inputs.dry_run && ', dry run' || '' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+    steps:
+      - name: Check the Neon API key
+        run: |
+          if [ -z "$NEON_API_KEY" ]; then
+            echo "::error::Add a NEON_API_KEY repository secret (Neon console → Account settings → API keys)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          ref: v2/develop
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+        env:
+          # prisma generate (postinstall) only needs a syntactically valid URL.
+          DATABASE_URL: postgresql://user:pass@localhost:5432/placeholder
+
+      - name: Snapshot V1 production as a throwaway branch
+        id: snapshot
+        run: |
+          set -euo pipefail
+          api() { curl -sSf -H "Authorization: Bearer $NEON_API_KEY" -H "Content-Type: application/json" "$@"; }
+          NAME="etl-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          BRANCH=$(api -X POST "$NEON_API/projects/$V1_PROJECT/branches" \
+            -d "{\"branch\":{\"name\":\"$NAME\"},\"endpoints\":[{\"type\":\"read_write\"}]}" | jq -r '.branch.id')
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Snapshot branch $NAME ($BRANCH)"
+          for _ in $(seq 1 60); do
+            STATE=$(api "$NEON_API/projects/$V1_PROJECT/branches/$BRANCH" | jq -r '.branch.current_state')
+            [ "$STATE" = "ready" ] && break
+            sleep 5
+          done
+          [ "$STATE" = "ready" ] || { echo "::error::Snapshot branch not ready ($STATE)"; exit 1; }
+
+      - name: Create a SELECT-only role on the snapshot
+        id: role
+        env:
+          BRANCH: ${{ steps.snapshot.outputs.branch }}
+        run: |
+          set -euo pipefail
+          api() { curl -sSf -H "Authorization: Bearer $NEON_API_KEY" "$@"; }
+          OWNER_URL=$(api "$NEON_API/projects/$V1_PROJECT/connection_uri?branch_id=$BRANCH&database_name=$DB_NAME&role_name=$OWNER_ROLE&pooled=true" | jq -r '.uri')
+          echo "::add-mask::$OWNER_URL"
+          PASS=$(openssl rand -hex 24)
+          echo "::add-mask::$PASS"
+          OWNER_URL="$OWNER_URL" PASS="$PASS" node --input-type=module -e '
+            import { Pool } from "@neondatabase/serverless";
+            const pool = new Pool({ connectionString: process.env.OWNER_URL });
+            await pool.query(`CREATE ROLE v1_etl_ro LOGIN PASSWORD '"'"'${process.env.PASS}'"'"' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
+            await pool.query(`GRANT USAGE ON SCHEMA public TO v1_etl_ro`);
+            await pool.query(`GRANT SELECT ON ALL TABLES IN SCHEMA public TO v1_etl_ro`);
+            await pool.end();'
+          RO_URL=$(node -e 'const u = new URL(process.argv[1]); u.username = "v1_etl_ro"; u.password = process.argv[2]; console.log(u.toString())' "$OWNER_URL" "$PASS")
+          echo "::add-mask::$RO_URL"
+          echo "url=$RO_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the V2 target
+        id: target
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          api() { curl -sSf -H "Authorization: Bearer $NEON_API_KEY" "$@"; }
+          BRANCH=$(api "$NEON_API/projects/$V2_PROJECT/branches" | jq -r --arg n "$TARGET" '.branches[] | select(.name == $n) | .id')
+          [ -n "$BRANCH" ] || { echo "::error::No V2 branch named $TARGET"; exit 1; }
+          URL=$(api "$NEON_API/projects/$V2_PROJECT/connection_uri?branch_id=$BRANCH&database_name=$DB_NAME&role_name=$OWNER_ROLE&pooled=true" | jq -r '.uri')
+          echo "::add-mask::$URL"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "V2 target: $TARGET ($BRANCH)"
+
+      - name: Copy and verify
+        env:
+          V1_DATABASE_URL: ${{ steps.role.outputs.url }}
+          V2_DATABASE_URL: ${{ steps.target.outputs.url }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -o pipefail
+          ARGS=(--report report.json)
+          [ "$DRY_RUN" = "true" ] && ARGS+=(--dry-run)
+          npm run -s v2:migrate -- "${ARGS[@]}" | tee output.txt
+          STATUS=${PIPESTATUS[0]}
+          {
+            echo "## V2 data copy → \`${{ inputs.target }}\`$([ "$DRY_RUN" = "true" ] && echo ' (dry run)')"
+            echo '```'
+            grep -v '^copied ' output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$STATUS"
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: v2-migrate-report
+          path: report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Delete the snapshot branch
+        if: always() && steps.snapshot.outputs.branch != ''
+        env:
+          BRANCH: ${{ steps.snapshot.outputs.branch }}
+        run: |
+          curl -sS -X DELETE -H "Authorization: Bearer $NEON_API_KEY" \
+            "$NEON_API/projects/$V1_PROJECT/branches/$BRANCH" > /dev/null
+          echo "Deleted snapshot branch $BRANCH"

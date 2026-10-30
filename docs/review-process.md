@@ -2,7 +2,7 @@
 
 > Adopted 2026-09-15 — see the entry in [`decisions.md`](decisions.md) for why.
 
-Every pull request into `main` already gets CI (`.github/workflows/ci.yml`) and
+Every pull request into `main_app_V1` already gets CI (`.github/workflows/ci.yml`) and
 a self-review against [`REVIEW.md`](../REVIEW.md). That is enough for most
 changes. For the small set of changes where a mistake leaks one farm's data,
 corrupts money figures, or cannot be rolled back, we additionally ask **one

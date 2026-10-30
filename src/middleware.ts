@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import authConfig from "@/lib/auth.config";
+import { refuseWhileReadOnly } from "@/lib/read-only";
 
 const { auth } = NextAuth(authConfig);
 
@@ -14,6 +15,11 @@ const ALWAYS_ACCESSIBLE_PATHS = ["/privacy"];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+
+  // V1 frozen for the move to V2 (#239): refuse every change before any
+  // redirect, so a signed-out caller gets the same 503.
+  const readOnly = refuseWhileReadOnly(req);
+  if (readOnly) return readOnly;
   const isAlwaysAccessible = ALWAYS_ACCESSIBLE_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );

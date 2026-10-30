@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { runReminderBatch } from "@/lib/services/reminders";
 import { isBeta } from "@/lib/app-stage";
+import { refuseWhileReadOnly } from "@/lib/read-only";
 
 export const maxDuration = 60;
 
@@ -31,6 +32,12 @@ export async function POST(req: Request) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // A batch writes each reminder's claim. While V1 is frozen for the move to
+  // V2 (#239) those claims would be left behind and V2 would send the same
+  // reminders again, so reminders pause until V2 takes over. Checked here: the
+  // middleware skips api/cron.
+  const readOnly = refuseWhileReadOnly(req);
+  if (readOnly) return readOnly;
 
   // Errors are deliberately not routed through handleApiError: a 500 makes the
   // scheduled workflow go red, which is the only way a broken batch gets noticed.

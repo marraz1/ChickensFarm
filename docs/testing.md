@@ -20,7 +20,7 @@ fails (exit code 1) if no test files are found. Deleting the suites does not
 leave CI green.
 
 CI ([ci.yml](../.github/workflows/ci.yml)) runs on PRs and pushes to `develop`,
-`main` and `release`, as separate parallel jobs: Prettier on changed files and
+`main_app_V1` and `release`, as separate parallel jobs: Prettier on changed files and
 ESLint (`Lint`), `npm run typecheck`, `npm test` (`Test`), `npm audit` for
 high/critical CVEs, and a Vercel preview build on PRs. `prod-deployment.yml`
 also runs lint, typecheck and tests before promotion. The Playwright smoke suite
