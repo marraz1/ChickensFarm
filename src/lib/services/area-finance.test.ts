@@ -331,8 +331,10 @@ describe("getAreaUnitBase", () => {
       ["kept", "2025-05-01", null],
       ["died-in-period", "2025-05-01", "2026-03-01"],
       ["died-before", "2025-05-01", "2025-12-31"],
-      ["added-in-period", "2026-12-31T22:00:00Z", null],
-      ["added-after", "2027-01-01T00:00:00Z", null],
+      // 23:59 on 31 December in Vilnius: still 2026.
+      ["added-last-minute", "2026-12-31T21:59:00Z", null],
+      // 00:30 on 1 January in Vilnius, though still 2026 in UTC.
+      ["added-after", "2026-12-31T22:30:00Z", null],
     ] as const) {
       await fakePrisma.motherHen.create({
         data: {
@@ -367,7 +369,7 @@ describe("getAreaUnitBase", () => {
     expect(await getAreaUnitBase(FARM_ID, "incubation", PERIOD)).toBe(31);
   });
 
-  it("counts Mėsa's birds now plus those lost in the period", async () => {
+  it("counts Mėsa's birds now plus those lost in the period, now only if it reaches today", async () => {
     for (const [id, area, lossDate, quantity] of [
       ["meat-2026", "MEAT", "2026-06-01", 3],
       ["meat-2025", "MEAT", "2025-06-01", 7],
@@ -389,6 +391,9 @@ describe("getAreaUnitBase", () => {
       });
     }
     expect(await getAreaUnitBase(FARM_ID, "meat", PERIOD)).toBe(103);
+    // Last year: today's 100 birds were not part of it, only its 7 lost.
+    const lastYear = { from: day("2025-01-01"), to: day("2025-12-31"), today: PERIOD.today };
+    expect(await getAreaUnitBase(FARM_ID, "meat", lastYear)).toBe(7);
   });
 
   it("needs nothing for Kiaušiniai's margin", async () => {

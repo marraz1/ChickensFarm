@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { buildAreaFinance, type AreaFinance, type AreaFinanceInput } from "@/lib/area-finance";
 import { farmAreaOrder } from "@/lib/labels";
-import { getAreaLossCounts } from "@/lib/services/losses";
+import { parseUtcDateInput } from "@/lib/finance-period";
+import { DEFAULT_TIME_ZONE, getLocalNow } from "@/lib/notification-schedule";
 import type { AreaSlug } from "@/lib/v2-navigation";
 import type { FarmArea } from "@/generated/prisma/client";
 
@@ -159,13 +160,11 @@ export async function getFarmFinance(farmId: string, period: Period): Promise<Fa
   };
 }
 
-const DAY_MS = 86_400_000;
-
 /**
  * What an area's per-unit figure divides by over a period (#199, see
- * unit-economics.ts): hens kept, chicks hatched, or Mėsa birds now plus those
- * lost (the figure adds the sold and eaten ones from the area's finances).
- * Kiaušiniai's margin needs none. Farm-scoped throughout.
+ * unit-economics.ts): hens kept, chicks hatched, or Mėsa birds on hand plus
+ * those lost (the figure adds the sold and eaten ones from the area's
+ * finances). Kiaušiniai's margin needs none. Farm-scoped throughout.
  */
 export async function getAreaUnitBase(
   farmId: string,
@@ -177,13 +176,17 @@ export async function getAreaUnitBase(
       return 0;
     case "hens": {
       // Kept during the period: added by its last day, not dead before its
-      // first. Filtered here: the counts are tiny and need an OR otherwise.
+      // first. A hen's createdAt is an instant, so it is compared as the
+      // farm's (Vilnius) date, which a database count cannot do; hens are few.
       const hens = await prisma.motherHen.findMany({
         where: { farmId },
         select: { createdAt: true, diedAt: true },
       });
-      const end = new Date(period.to.getTime() + DAY_MS);
-      return hens.filter((h) => h.createdAt < end && (!h.diedAt || h.diedAt >= period.from)).length;
+      const addedOn = (at: Date) =>
+        parseUtcDateInput(getLocalNow(at, DEFAULT_TIME_ZONE).date) ?? at;
+      return hens.filter(
+        (h) => addedOn(h.createdAt) <= period.to && (!h.diedAt || h.diedAt >= period.from),
+      ).length;
     }
     case "incubation": {
       const hatched = await prisma.incubationCycle.aggregate({
@@ -193,11 +196,22 @@ export async function getAreaUnitBase(
       return hatched._sum.hatchedCount ?? 0;
     }
     case "meat": {
-      const [now, losses] = await Promise.all([
-        prisma.birdGroup.aggregate({ where: { farmId, area: "MEAT" }, _sum: { quantity: true } }),
-        getAreaLossCounts(farmId, period),
+      // The birds in Mėsa groups now were bought for a period that reaches
+      // today; a past one counts only the birds that left during it.
+      const reachesToday = period.to >= period.today;
+      const [onHand, lost] = await Promise.all([
+        reachesToday
+          ? prisma.birdGroup.aggregate({
+              where: { farmId, area: "MEAT" },
+              _sum: { quantity: true },
+            })
+          : null,
+        prisma.loss.aggregate({
+          where: { farmId, area: "MEAT", lossDate: { gte: period.from, lte: period.to } },
+          _sum: { quantity: true },
+        }),
       ]);
-      return (now._sum.quantity ?? 0) + losses.MEAT;
+      return (onHand?._sum.quantity ?? 0) + (lost._sum.quantity ?? 0);
     }
   }
 }
