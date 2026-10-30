@@ -200,6 +200,49 @@ test("Sritys opens one area tile at a time", async ({ page }) => {
   expect((await box("Mėsiniai paukščiai")).width).toBe((await box("Bendros išlaidos")).width);
 });
 
+test("Ūkis dabar links each count to its area", async ({ page }) => {
+  await page.goto("/");
+  const now = page.getByRole("region", { name: "Ūkis dabar" });
+  const links = now.getByRole("link");
+  await expect(links).toHaveCount(4);
+  for (const [name, href] of [
+    ["Kiaušinių likutis", "/areas/eggs"],
+    ["Paukščių iš viso", "/areas/eggs"],
+    ["Aktyvūs ciklai", "/areas/incubation"],
+    [`Nuostoliai · ${farmYear()} m.`, "/areas/eggs/losses"],
+  ]) {
+    await expect(now.getByRole("link", { name: new RegExp(`^${name}`) })).toHaveAttribute(
+      "href",
+      href,
+    );
+  }
+});
+
+test("Daugiau statistikos opens the period's categories and months", async ({ page }) => {
+  const date = quietDay();
+  await createExpense(page, "MEAT", date, 3);
+  await createExpense(page, "SHARED", date, 1);
+
+  await page.goto(`/?period=range&from=${date}&to=${date}`);
+  const stats = page.getByRole("region", { name: "Daugiau statistikos" });
+  const toggle = stats.getByRole("button", { name: "Daugiau statistikos" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(stats).not.toContainText("Išlaidos pagal kategoriją");
+
+  // The card answers once the page has hydrated: tap until it opens.
+  await expect(async () => {
+    if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true", { timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+
+  await expect(stats).toContainText("Išlaidos pagal kategoriją");
+  // Both expenses are "Kita": one row with all of the spend.
+  await expect(stats).toContainText(/Kita\s*4,00\s€\s*100,0\s%/);
+  await expect(stats).toContainText("Pagal mėnesius · visas ūkis");
+  await expect(stats).toContainText("Pajamos 0,00 € · Išlaidos 4,00 €");
+  await expect(stats).toContainText("−4,00");
+});
+
 test("Išlaida opens the general expense form", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Išlaida", exact: true }).click();

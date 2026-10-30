@@ -124,6 +124,7 @@ import {
 } from "@/lib/services/incubation";
 import { expenseTargetLabel, listAreaTargetOptions } from "@/lib/services/area-targets";
 import { getAreaFinance, getFarmFinance } from "@/lib/services/area-finance";
+import { getFarmNow } from "@/lib/services/dashboard";
 import {
   getEggsOverview,
   getHensOverview,
@@ -998,6 +999,79 @@ describe("area loss list", () => {
       HENS: 0,
       INC: 0,
       MEAT: 0,
+    });
+  });
+});
+
+describe("Ūkis dabar (overview counts)", () => {
+  const now = new Date("2026-10-28T12:00:00Z");
+
+  beforeEach(async () => {
+    await seedTwoFarms();
+    for (const farmId of [FARM_A_ID, FARM_B_ID]) {
+      const n = farmId === FARM_A_ID ? 1 : 100;
+      const day = new Date("2026-10-01");
+      await fakePrisma.eggCollection.create({
+        data: { farmId, collectionDate: day, quantity: 30 * n },
+      });
+      await fakePrisma.eggSale.create({
+        data: {
+          farmId,
+          saleDate: day,
+          quantity: 10 * n,
+          unitPrice: 0.3,
+          totalAmount: "3.00",
+          buyer: null,
+        },
+      });
+      await fakePrisma.eggConsumption.create({
+        data: { farmId, consumptionDate: day, quantity: 2 * n },
+      });
+      await fakePrisma.birdGroup.create({
+        data: {
+          id: `group-${farmId}`,
+          farmId,
+          breedId: null,
+          name: "G",
+          quantity: 12 * n,
+          area: "EGGS",
+        },
+      });
+      await fakePrisma.incubationCycle.create({
+        data: { id: `cycle-${farmId}`, farmId, startDate: day, hatchDate: null },
+      });
+      for (const [id, lossDate, quantity] of [
+        [`loss-${farmId}`, new Date("2026-03-01"), 3 * n],
+        [`loss-old-${farmId}`, new Date("2025-12-31"), 50],
+      ] as const) {
+        await fakePrisma.loss.create({
+          data: { id, farmId, area: null, lossDate, quantity, reasonType: "OTHER", comment: null },
+        });
+      }
+    }
+    // A hatched cycle is no longer active.
+    await fakePrisma.incubationCycle.create({
+      data: {
+        id: "cycle-done",
+        farmId: FARM_A_ID,
+        startDate: new Date("2026-05-01"),
+        hatchDate: new Date("2026-05-22"),
+      },
+    });
+  });
+
+  it("counts only the farm's own eggs, birds, cycles and this year's losses", async () => {
+    await expect(getFarmNow(FARM_A_ID, now)).resolves.toEqual({
+      eggStock: 18,
+      totalBirds: 12,
+      activeCycles: 1,
+      losses: { year: 2026, count: 3 },
+    });
+    await expect(getFarmNow(FARM_B_ID, now)).resolves.toEqual({
+      eggStock: 1800,
+      totalBirds: 1200,
+      activeCycles: 1,
+      losses: { year: 2026, count: 300 },
     });
   });
 });

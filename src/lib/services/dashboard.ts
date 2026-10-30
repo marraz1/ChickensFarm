@@ -1,144 +1,41 @@
 import { prisma } from "@/lib/prisma";
-import type { BirdType } from "@/generated/prisma/client";
-import { birdTypeOrder } from "@/lib/labels";
+import { resolveFinancePeriod } from "@/lib/finance-period";
 
-export type ActivityItem = {
-  id: string;
-  type: "EGG_COLLECTION" | "LOSS" | "MEAT_USE" | "MOTHER_HEN_LOG";
-  summary: string;
-  createdAt: Date;
+export type FarmNow = {
+  /** Eggs on hand: all ever collected, minus sold and eaten. */
+  eggStock: number;
+  /** Birds in every group of the farm. */
+  totalBirds: number;
+  /** Incubation cycles not hatched yet, as the Perinimas area counts them. */
+  activeCycles: number;
+  /** Birds lost this year (the farm's, Europe/Vilnius), whatever their area. */
+  losses: { year: number; count: number };
 };
 
-export async function getDashboardData(farmId: string) {
-  const now = new Date();
-  const currentYear = now.getUTCFullYear();
-  const currentMonth = now.getUTCMonth();
-  // Boundaries are built in UTC because the date columns are `@db.Date`, which
-  // Prisma returns at exactly 00:00:00.000Z. A local-midnight boundary west of
-  // UTC lands *after* that, silently excluding records dated the 1st.
-  const monthStart = new Date(Date.UTC(currentYear, currentMonth, 1));
-  const yearStart = new Date(Date.UTC(currentYear, 0, 1));
-  const thirtyDaysAgo = new Date(Date.UTC(currentYear, currentMonth, now.getUTCDate() - 29));
+/**
+ * The overview's "Ūkis dabar" boxes (#204, V2-Overview): the farm as it is
+ * now, whatever period the page shows. Farm-scoped throughout.
+ */
+export async function getFarmNow(farmId: string, now: Date = new Date()): Promise<FarmNow> {
+  const year = resolveFinancePeriod({}, now);
 
-  const [
-    totalBirdsAgg,
-    birdGroupsForTypes,
-    activeIncubationCount,
-    eggsThisMonthAgg,
-    eggsThisYearAgg,
-    eggsCollectedTotalAgg,
-    eggsSoldTotalAgg,
-    eggsConsumedTotalAgg,
-    lossesLast30dAgg,
-    recentCollections,
-    recentLosses,
-    recentMeatUse,
-    recentHenLogs,
-  ] = await Promise.all([
-    prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    // Current live headcount per species (birdType lives on the breed, so we
-    // pull each group's breed type and sum in code). Lets the dashboard show a
-    // by-species summary that always reflects what the farm actually holds.
-    prisma.birdGroup.findMany({
-      where: { farmId },
-      select: { quantity: true, breed: { select: { birdType: true } } },
-    }),
-    prisma.incubationCycle.count({ where: { farmId, hatchDate: null } }),
-    prisma.eggCollection.aggregate({
-      where: { farmId, collectionDate: { gte: monthStart } },
-      _sum: { quantity: true },
-    }),
-    prisma.eggCollection.aggregate({
-      where: { farmId, collectionDate: { gte: yearStart } },
-      _sum: { quantity: true },
-    }),
-    // Remaining stock = all eggs ever collected minus those sold and consumed (eaten).
+  const [collected, sold, eaten, birds, activeCycles, losses] = await Promise.all([
     prisma.eggCollection.aggregate({ where: { farmId }, _sum: { quantity: true } }),
     prisma.eggSale.aggregate({ where: { farmId }, _sum: { quantity: true } }),
     prisma.eggConsumption.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    // The money figures moved to the V2 overview's result card (#201), which
-    // reads them per area from getFarmFinance.
+    prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
+    prisma.incubationCycle.count({ where: { farmId, hatchDate: null } }),
     prisma.loss.aggregate({
-      where: { farmId, lossDate: { gte: thirtyDaysAgo } },
+      where: { farmId, lossDate: { gte: year.from, lte: year.to } },
       _sum: { quantity: true },
-    }),
-    prisma.eggCollection.findMany({
-      where: { farmId },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    }),
-    prisma.loss.findMany({
-      where: { farmId },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: { birdGroup: { include: { breed: true } } },
-    }),
-    // Listed alongside losses, never merged into them: a bird eaten at home is
-    // not a loss, and the feed says so in its own words.
-    prisma.birdConsumption.findMany({
-      where: { farmId },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    }),
-    prisma.motherHenLog.findMany({
-      where: { motherHen: { farmId } },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: { motherHen: { select: { name: true } } },
     }),
   ]);
 
-  const eggsRemaining =
-    (eggsCollectedTotalAgg._sum.quantity ?? 0) -
-    (eggsSoldTotalAgg._sum.quantity ?? 0) -
-    (eggsConsumedTotalAgg._sum.quantity ?? 0);
-
-  const activity: ActivityItem[] = [
-    ...recentCollections.map((c) => ({
-      id: c.id,
-      type: "EGG_COLLECTION" as const,
-      summary: `Surinkta ${c.quantity} kiaušiniai`,
-      createdAt: c.createdAt,
-    })),
-    ...recentLosses.map((l) => ({
-      id: l.id,
-      type: "LOSS" as const,
-      summary: `Nuostolis: ${l.reasonType === "PREDATOR" ? "plėšrūnas" : l.reasonType === "DISEASE" ? "liga" : "kita"}, ${l.quantity} vnt.`,
-      createdAt: l.createdAt,
-    })),
-    ...recentMeatUse.map((c) => ({
-      id: c.id,
-      type: "MEAT_USE" as const,
-      summary: `Suvartota mėsai: ${c.quantity} vnt.`,
-      createdAt: c.createdAt,
-    })),
-    ...recentHenLogs.map((log) => ({
-      id: log.id,
-      type: "MOTHER_HEN_LOG" as const,
-      summary: `Perekšlė ${log.motherHen.name} – naujas įrašas`,
-      createdAt: log.createdAt,
-    })),
-  ]
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    .slice(0, 10);
-
-  const quantityByType = new Map<BirdType, number>();
-  for (const group of birdGroupsForTypes) {
-    const type = group.breed.birdType;
-    quantityByType.set(type, (quantityByType.get(type) ?? 0) + group.quantity);
-  }
-  const birdsByType = birdTypeOrder
-    .map((birdType) => ({ birdType, quantity: quantityByType.get(birdType) ?? 0 }))
-    .filter((entry) => entry.quantity > 0);
-
   return {
-    totalBirds: totalBirdsAgg._sum.quantity ?? 0,
-    birdsByType,
-    activeIncubationCount,
-    eggsThisMonth: eggsThisMonthAgg._sum.quantity ?? 0,
-    eggsThisYear: eggsThisYearAgg._sum.quantity ?? 0,
-    eggsRemaining,
-    lossesLast30d: lossesLast30dAgg._sum.quantity ?? 0,
-    activity,
+    eggStock:
+      (collected._sum.quantity ?? 0) - (sold._sum.quantity ?? 0) - (eaten._sum.quantity ?? 0),
+    totalBirds: birds._sum.quantity ?? 0,
+    activeCycles,
+    losses: { year: year.year, count: losses._sum.quantity ?? 0 },
   };
 }

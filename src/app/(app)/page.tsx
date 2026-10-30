@@ -1,31 +1,25 @@
 import Link from "next/link";
 import { requireActiveFarm } from "@/lib/session";
-import { getDashboardData } from "@/lib/services/dashboard";
+import { getFarmNow } from "@/lib/services/dashboard";
 import { getFarmFinance } from "@/lib/services/area-finance";
 import { getAreaLossCounts } from "@/lib/services/losses";
 import { resolveFinancePeriod, type SearchParam } from "@/lib/finance-period";
 import { Card } from "@/components/ui/card";
 import { PeriodSwitch } from "@/components/v2/period-switch";
-import { formatEUR, formatRelativeLT } from "@/lib/format";
-import { birdTypeLabels } from "@/lib/labels";
+import { formatEUR } from "@/lib/format";
 import { AreaSplitCard } from "@/components/v2/area-split-card";
 import { areaSplits } from "@/lib/area-split";
 import { AreaTiles } from "@/components/v2/area-tiles";
 import { areaTiles } from "@/lib/area-tiles";
+import { FarmNow } from "@/components/v2/farm-now";
+import { MoreStats } from "@/components/v2/more-stats";
+import { farmStats } from "@/lib/farm-stats";
 import { cn } from "@/lib/utils";
-import { Egg, AlertTriangle, Heart, Drumstick, Plus } from "lucide-react";
-
-const ACTIVITY_ICONS = {
-  EGG_COLLECTION: Egg,
-  LOSS: AlertTriangle,
-  MEAT_USE: Drumstick,
-  MOTHER_HEN_LOG: Heart,
-} as const;
+import { Plus } from "lucide-react";
 
 // The V2 farm overview (V2-Overview): the title with "Išlaida", the period
-// switch and the farm result (#201), spending and income by area (#202) and the
-// area tiles (#203). "Ūkis dabar"/"Daugiau statistikos" (#204) come later; until
-// then the V1 dashboard's counts and recent activity stay below.
+// switch and the farm result (#201), spending and income by area (#202), the
+// area tiles (#203), then "Ūkis dabar" and "Daugiau statistikos" (#204).
 export default async function OverviewPage({
   searchParams,
 }: {
@@ -33,8 +27,8 @@ export default async function OverviewPage({
 }) {
   const [query, { farm }] = await Promise.all([searchParams, requireActiveFarm()]);
   const period = resolveFinancePeriod(query);
-  const [data, finance, losses] = await Promise.all([
-    getDashboardData(farm.id),
+  const [now, finance, losses] = await Promise.all([
+    getFarmNow(farm.id),
     getFarmFinance(farm.id, period),
     getAreaLossCounts(farm.id, period),
   ]);
@@ -93,60 +87,12 @@ export default async function OverviewPage({
         <AreaTiles tiles={areaTiles(finance.areas, losses)} />
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 px-4">
-        <Card className="p-3">
-          <p className="mb-1 text-xs text-muted-foreground">Paukščių iš viso</p>
-          <p className="text-xl font-medium">{data.totalBirds}</p>
-          <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
-            {data.birdsByType.length > 0
-              ? data.birdsByType
-                  .map((entry) => `${birdTypeLabels[entry.birdType]} ${entry.quantity}`)
-                  .join(" · ")
-              : "Nėra paukščių"}
-          </p>
-        </Card>
-        <Card className="p-3">
-          <p className="mb-1 text-xs text-muted-foreground">Kiaušinių likutis</p>
-          <p className="text-xl font-medium">{data.eggsRemaining}</p>
-          <p className="mt-1 text-[11px] leading-tight text-muted-foreground">
-            Šį mėn. {data.eggsThisMonth} · Metais {data.eggsThisYear}
-          </p>
-        </Card>
-        {/* Odd card out in a 2-column grid — span both so no empty cell is left. */}
-        <Card className="col-span-2 p-3">
-          <p className="mb-1 text-xs text-muted-foreground">Aktyvus perinimas</p>
-          <p className="text-xl font-medium">{data.activeIncubationCount} ciklai</p>
-        </Card>
+      <div className="px-4">
+        <FarmNow data={now} />
       </div>
 
-      <div className="px-4 pt-1">
-        <p className="mb-2 text-sm text-muted-foreground">Paskutiniai įrašai</p>
-        <div className="flex flex-col">
-          {data.activity.length === 0 && (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Dar nėra jokios veiklos.
-            </p>
-          )}
-          {data.activity.map((item) => {
-            const Icon = ACTIVITY_ICONS[item.type];
-            return (
-              <div
-                key={`${item.type}-${item.id}`}
-                className="flex items-center gap-3 border-t py-3 first:border-t-0"
-              >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent">
-                  <Icon size={16} className="text-accent-foreground" aria-hidden />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm">{item.summary}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatRelativeLT(item.createdAt)}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="px-4">
+        <MoreStats stats={farmStats(finance.areas)} />
       </div>
     </div>
   );

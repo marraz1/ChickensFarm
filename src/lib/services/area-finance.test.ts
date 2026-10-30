@@ -21,6 +21,7 @@ import {
 } from "@/lib/services/bird-transactions";
 import { getProfitLossReport } from "@/lib/services/reports";
 import { areaSplits } from "@/lib/area-split";
+import { farmStats } from "@/lib/farm-stats";
 import type { FarmArea } from "@/generated/prisma/client";
 
 const FARM_ID = "farm-1";
@@ -282,6 +283,17 @@ describe("getFarmFinance", () => {
     const splits = areaSplits(farm.areas);
     expect(splits.expenses.total).toBe(farm.total.expenses);
     expect(splits.income.total).toBe(farm.total.income);
+  });
+
+  // #204: "Daugiau statistikos" lists the same money by category and month.
+  it("gives the statistics the farm's expenses by category and month, to the cent", async () => {
+    await seedMixedFarm();
+    const farm = await getFarmFinance(FARM_ID, PERIOD);
+    const stats = farmStats(farm.areas);
+    const cents = (values: number[]) => values.reduce((sum, v) => sum + Math.round(v * 100), 0);
+    expect(cents(stats.categories.map((c) => c.amount))).toBe(cents([farm.total.expenses]));
+    expect(cents(stats.months.map((m) => m.expenses))).toBe(cents([farm.total.expenses]));
+    expect(cents(stats.months.map((m) => m.income))).toBe(cents([farm.total.income]));
   });
 
   it("files home use under each group's area", async () => {
