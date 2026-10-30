@@ -79,7 +79,7 @@ export default async function MotherHenDetailPage({ params }: { params: Promise<
               <Card key={log.id} className="p-4">
                 <p className="text-xs text-muted-foreground">{formatDateLT(log.entryDate)}</p>
                 {log.note && <p className="mt-1 text-sm">{log.note}</p>}
-                {log.brokenEggs != null && log.brokenEggs > 0 && (
+                {log.brokenEggs != null && (
                   <p className="mt-1 text-sm">Sudaužyti kiaušiniai: {log.brokenEggs}</p>
                 )}
                 {log.photoUrl && (

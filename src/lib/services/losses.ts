@@ -153,14 +153,12 @@ export async function getAreaLossInsight(
           _sum: { quantity: true },
         }),
       ]);
-      const lostBirds = lost._sum.quantity ?? 0;
       return {
         kind: "feed",
-        lost: lostBirds,
         valueCents: feedValueLostCents(
           toCents(finance.expenses),
           unitDivisor("meat", finance, base),
-          lostBirds,
+          lost._sum.quantity ?? 0,
         ),
       };
     }

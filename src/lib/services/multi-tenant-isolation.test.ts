@@ -1205,9 +1205,10 @@ describe("area loss insights (#197)", () => {
       infertile: 4,
       unhatched: 1,
     });
-    await expect(getAreaLossInsight(FARM_A_ID, "meat", now)).resolves.toMatchObject({
+    // No Mėsa expenses on either farm: 5 own birds lost cost nothing yet.
+    await expect(getAreaLossInsight(FARM_A_ID, "meat", now)).resolves.toEqual({
       kind: "feed",
-      lost: 5,
+      valueCents: 0,
     });
     await expect(getAreaLossInsight(FARM_B_ID, "hens", now)).resolves.toEqual({
       kind: "broken",

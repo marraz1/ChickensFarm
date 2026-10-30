@@ -159,7 +159,6 @@ describe("Mėsa: feed value lost", () => {
     // 17 now + 3 lost = 20 birds: 30,70 € each, 3 lost ≈ 92,10 €.
     await expect(getAreaLossInsight(FARM_ID, "meat", NOW)).resolves.toEqual({
       kind: "feed",
-      lost: 3,
       valueCents: 9210,
     });
   });
@@ -167,7 +166,6 @@ describe("Mėsa: feed value lost", () => {
   it("cannot value anything without birds", async () => {
     await expect(getAreaLossInsight(FARM_ID, "meat", NOW)).resolves.toEqual({
       kind: "feed",
-      lost: 0,
       valueCents: null,
     });
   });
@@ -188,5 +186,13 @@ describe("the diary's broken eggs field", () => {
     expect(parse("1.5").success).toBe(false);
     expect(parse("1,5").success).toBe(false);
     expect(parse("du").success).toBe(false);
+    // Number() would take these as 100 and 16.
+    expect(parse("1e2").success).toBe(false);
+    expect(parse("0x10").success).toBe(false);
+  });
+
+  it("reads blanks as nothing, not 0", () => {
+    expect(parse("  ").data?.brokenEggs).toBeUndefined();
+    expect(parse(" 4 ").data?.brokenEggs).toBe(4);
   });
 });

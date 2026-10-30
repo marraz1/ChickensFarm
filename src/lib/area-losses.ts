@@ -69,8 +69,8 @@ export type AreaLossInsight =
   | { kind: "broken"; count: number }
   /** Perinimas, this year: eggs found infertile, and fertile eggs that did not hatch. */
   | { kind: "unhatched"; infertile: number; unhatched: number }
-  /** Mėsa, this year: birds lost and the feed they took, at the cost per bird; null when it cannot be worked out. */
-  | { kind: "feed"; lost: number; valueCents: number | null };
+  /** Mėsa, this year: the feed the dead birds took, at the cost per bird; null when it cannot be worked out. */
+  | { kind: "feed"; valueCents: number | null };
 
 /**
  * Fertile eggs that did not hatch, over hatched cycles. A cycle without both
