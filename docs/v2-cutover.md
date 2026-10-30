@@ -1,10 +1,23 @@
 # V1 → V2 cutover runbook
 
-How the farm owners move from V1 (`chickensfarm`, branch `main`) to V2
-(`chickensfarm-v2`, branch `v2/develop`) without losing a record, and how to go
-back. Story #182; the V1 freeze switch is #239. Setup of the V2 environment is
-in [`v2-environment.md`](v2-environment.md); making V2 the main app afterwards is
-#183.
+How the farm owners move from V1 to V2 without losing a record, how V1 stays
+live next to it, and how to go back. Stories #182 and #245; the V1 freeze switch
+is #239. Each app has its own release line (`docs/RELEASE.md`) and its own
+environment (`v2-environment.md`).
+
+| After the cutover | V1                                          | V2                                               |
+| ----------------- | ------------------------------------------- | ------------------------------------------------ |
+| Address           | `https://chickensfarm-v1.vercel.app` (new)  | `https://chickensfarm.vercel.app` (owners')      |
+| Released by       | PROD_deployment (`main_app_V1` → `release`) | PROD_deployment_V2 (`main_app_V2` → `releaseV2`) |
+| Database          | V1's own                                    | V2's own, filled by the final copy               |
+| Reminders         | **off** (`REMINDERS_V1=off`)                | **on** (`REMINDERS_V2=on`)                       |
+| Status            | daily, on its own address                   | daily, on its own address                        |
+
+The owners' address moves to V2, so bookmarks and installed home-screen apps open
+the new app with nothing to do. V1 stays reachable on its own address. **From
+the final copy on, the two apps' data is separate: nothing is ever synced
+between them, in either direction.** Only V2 sends reminders, so nobody gets two
+of each.
 
 **Who runs it:** the owner of the GitHub repository, Vercel and Neon accounts
 (the steps need all three). Plan an hour; the data steps take seconds (see the
@@ -13,8 +26,15 @@ rehearsal log), the rest is checking.
 ## Before the day
 
 - [ ] V1 production runs a release with `READ_ONLY_MODE` (#239), **switched off**.
-- [ ] V1 fixes are merged into `v2/develop` (`git merge origin/main` via a PR), and
-      V2's production deploy of that merge is green.
+- [ ] V1 fixes are merged into `v2/develop` (`git merge origin/main_app_V1` via a
+      PR), promoted to `main_app_V2`, and **released with PROD_deployment_V2**.
+      Status is green for both apps.
+- [ ] **V1's new address works:** Vercel → `chickensfarm` → Settings → Domains → add
+      `chickensfarm-v1.vercel.app`, and check that `https://chickensfarm-v1.vercel.app/login`
+      answers 200. Owners notice nothing; their address is unchanged.
+- [ ] Repository variables `REMINDERS_V1` = `on`, `REMINDERS_V2` = `off` (or unset),
+      and `V2_CUTOVER_DONE` unset. An app sends reminders only while its variable
+      is exactly `on`.
 - [ ] Repository secrets `NEON_API_KEY` and `VERCEL_AUTOMATION_BYPASS_SECRET` are set
       (`v2-environment.md` § 2 and § "Copying V1 data into V2").
 - [ ] A rehearsal (below) passed within the last week, against the current code.
@@ -30,37 +50,40 @@ costs nothing.
 
 Tell every farm owner, ahead of the window:
 
-- when V1 becomes read-only and for how long;
-- that afterwards the same address opens the new version, and they **sign in
-  again** with the same email and password (V2 has its own `AUTH_SECRET`, so V1
+- when the app becomes read-only and for how long;
+- that afterwards **the same address opens the new version**, and they **sign in
+  again** with the same email and password (V2 has its own `AUTH_SECRET`, so old
   sessions end);
-- that **reminders pause** from the freeze until V2 takes over (step 6), and that
-  phone notifications must be **switched on again** in V2 (push subscriptions are
-  not copied).
+- that **reminders pause** during the window, and that phone notifications must be
+  **switched on again** in the new app (push subscriptions are not copied);
+- that the old version stays available at `https://chickensfarm-v1.vercel.app`, but
+  **anything entered there after the move is not in the new app**.
 
-Tell the V2 beta testers too: stay out of V2 from step 3 until step 7. The final
+Tell the V2 beta testers too: stay out of V2 from step 3 until step 8. The final
 copy empties and reloads every V2 table, so anything they entered is replaced,
 and their requests wait behind the copy's locks.
 
 ### 2. Freeze V1
 
-Vercel → `chickensfarm` → Settings → Environment Variables → Production:
-`READ_ONLY_MODE` = `true`. Then Deployments → the current production deployment →
-**Redeploy**. Redeploy rebuilds, which the switch needs: the sign-in page is
-prerendered with or without the banner, and a running deployment keeps the
-environment it started with. A promote or an instant rollback does not pick up
-the change.
+1. Repository variable **`REMINDERS_V1` = `off`**, so the Reminders workflow stops
+   calling V1. A reminder sent now would write its claim to V1 after the copy, and
+   V2 would send it again. Then wait until Actions → Reminders shows **no run in
+   progress or queued**: a run triggered before the change still calls V1. (Frozen
+   V1 would refuse a late one, which only turns that run red.)
+2. Vercel → `chickensfarm` → Settings → Environment Variables → Production:
+   `READ_ONLY_MODE` = `true`. Then Deployments → the current production deployment
+   → **Redeploy**. Redeploy rebuilds, which the switch needs: the sign-in page is
+   prerendered with or without the banner, and a running deployment keeps the
+   environment it started with. A promote or an instant rollback does not pick up
+   the change.
 
-Check, on the production URL:
+Check, on `https://chickensfarm.vercel.app`:
 
 - every page shows "Programėlė perkeliama į naują versiją. Kol kas duomenų keisti
   negalima.";
 - saving anything (e.g. a new egg collection) fails with "Programėlė perkeliama į
   naują versiją. Pakeitimų išsaugoti kol kas negalima.": every change through
   `/api/*` answers 503, registration and password resets included;
-- the reminder cron answers 503 too, so the **Reminders** workflow goes red until
-  step 6. That is expected: a reminder sent now would write its claim to V1 after
-  the copy, and V2 would send it again;
 - signing in, reading and switching farms still work (and `/api/health` answers).
 
 From here no change can reach V1, so the copy in step 3 is final.
@@ -86,90 +109,107 @@ either fix and re-run or roll back (V1 is only frozen: switch it back on).
   money and stock itself).
 - Pick one farm and compare in both apps: the year's income and expenses, bird
   count, egg stock.
-- V2 `production`'s `_prisma_migrations` (Neon → SQL editor) lists every folder in
-  `prisma/migrations`, none failed or rolled back. (V2's `/api/health` reports this
-  only with a `CRON_SECRET`, which V2 gets in step 6.)
-- Sign in to the V2 production URL (still the `chickensfarm-v2` address) as a real
-  owner and open each area.
+- Actions → **Status** → Run workflow: the **V2** section is green, including
+  Migrations (V2's live database against `releaseV2`).
+- Sign in to V2 (still `https://chickensfarm-v2.vercel.app`) as a real owner and
+  open each area.
 
 **No-go:** roll back (below). Nothing has changed for the owners yet.
 
-### 5. Move the domain
+### 5. Move the address
 
-Vercel → `chickensfarm` → Settings → Domains: remove the production domain.
-Vercel → `chickensfarm-v2` → Settings → Domains: add it. Then set each app's own
-address (Environment Variables → Production) and **Redeploy both**:
+Do the two halves back to back: a `vercel.app` name that is released can be
+claimed by anyone.
 
-- `chickensfarm-v2`: `AUTH_URL` and `APP_URL` = the production domain (they were
-  the beta URL);
-- `chickensfarm`: `AUTH_URL` and `APP_URL` = V1's own address (its
-  `chickensfarm.vercel.app` URL, or a domain of its own). Without this, signing in
-  to V1 redirects to the production domain, which is now V2.
+1. Vercel → `chickensfarm` → Settings → Domains: remove `chickensfarm.vercel.app`.
+2. Vercel → `chickensfarm-v2` → Settings → Domains: add `chickensfarm.vercel.app`.
+3. Environment Variables → Production on each project:
+   - `chickensfarm-v2`: `AUTH_URL` and `APP_URL` = `https://chickensfarm.vercel.app`
+     (they were the beta URL);
+   - `chickensfarm`: `AUTH_URL` and `APP_URL` = `https://chickensfarm-v1.vercel.app`.
+     Without this, signing in to V1 redirects to the owners' address, which is now
+     V2.
+4. **End V2's beta in the same change**, so owners never see the beta banner on
+   their address: on `chickensfarm-v2` remove `APP_STAGE` from Production and
+   Preview (it shows the banner "Beta: duomenys gali būti perrašyti" and blocks
+   V2's cron, #181), and set `SENTRY_ENVIRONMENT` and
+   `NEXT_PUBLIC_SENTRY_ENVIRONMENT` (Production) from `v2-beta` to `production`.
+5. Repository variables: `APP_URL` = `https://chickensfarm-v1.vercel.app` (V1) and
+   `APP_URL_V2` = `https://chickensfarm.vercel.app` (V2). Reminders, Status and
+   both release workflows read these.
+6. **Redeploy both** production deployments (Deployments → current production →
+   Redeploy), once, so they pick up all of the above.
 
 Password-reset links and email reminders use `APP_URL`.
 
-### 6. Switch reminders
+### 6. Reminders to V2
 
-Reminders are sent by the **Reminders** workflow, which calls
-`vars.APP_URL/api/cron/reminders` with the `CRON_SECRET` repository secret.
+V2 left the beta in step 5, so its cron now accepts the batch.
 
-- **A new `CRON_SECRET`:** GitHub never shows a saved secret's value, so generate
-  a fresh one (`openssl rand -base64 32`) and set it in both places, same value:
-  the repository secret `CRON_SECRET` and V2 → Environment Variables → Production
-  `CRON_SECRET`.
-- **V2** → Environment Variables: **remove `APP_STAGE`** from Production and
-  Preview. `APP_STAGE` is what blocks V2's cron and shows the beta banner (#181).
-  Set `SENTRY_ENVIRONMENT` and `NEXT_PUBLIC_SENTRY_ENVIRONMENT` (Production) from
-  `v2-beta` to `production`, so V2's errors land in production alerts.
-- **In the same change** (a PR into `v2/develop`): delete the `E2E_EXPECT_BETA`
-  line from `.github/workflows/ci.yml`, or every later V2 PR fails `e2e/beta.spec.ts`.
-- **V1** → Environment Variables → Production: remove `CRON_SECRET`, then
-  **Redeploy V1**, so its endpoint answers 503 even if something still calls it
-  (a running deployment keeps the old value until then).
-- Repository variables: `APP_URL` = the production domain (now served by V2), and
-  `VERCEL_PROJECT` = the `chickensfarm-v2` project id, so the Status workflow reads
-  V2's builds.
-- Redeploy V2 production, then run Actions → **Reminders** → Run workflow once and
-  check it answers 200. Reminders resume from here.
+1. Delete the `E2E_EXPECT_BETA` line from `.github/workflows/ci.yml` (a PR into
+   `v2/develop`, then `v2/develop` → `main_app_V2`), or every later V2 PR fails
+   `e2e/beta.spec.ts`.
+2. Repository variable **`REMINDERS_V2` = `on`** (`REMINDERS_V1` stays `off`).
+3. Actions → **Reminders** → Run workflow once: `V2 reminders` is green and
+   `V1 reminders` is skipped. V2 already has its `CRON_SECRET` (the repository
+   secret `CRON_SECRET_V2`, #243). Reminders resume from here, from V2 only.
 
-### 7. Smoke and e2e
+### 7. Unfreeze V1 on its own address
 
-- Actions → **Status** → Run workflow: health, version and migrations of the
-  production URL.
-- As a real owner, on a phone: sign in, open each area, save one harmless record
-  (e.g. an egg collection) and delete it again.
+Vercel → `chickensfarm` → Environment Variables → Production: `READ_ONLY_MODE` =
+`false` (or remove it), then **Redeploy**.
+
+Then repository variable **`V2_CUTOVER_DONE` = `true`**. From now on the V2 data
+copy refuses `target: production`: a copy would empty V2 and reload it from V1,
+deleting everything owners entered in V2. (Run that workflow only from the
+default branch, `main_app_V2`, whose copy has this guard; `main_app_V1` keeps an
+older copy without it.)
+
+V1 is live again on `https://chickensfarm-v1.vercel.app`, with its own database,
+and still released by PROD_deployment. It sends no reminders. **Anything entered
+in V1 from now on stays in V1** — it is not in V2, and nothing will ever copy it
+there.
+
+### 8. Smoke and Status
+
+- Actions → **Status** → Run workflow: **V1 and V2 both green**, each on its new
+  address (V2's version is what PROD_deployment_V2 last released).
+- As a real owner, on a phone, from the home-screen app: it opens V2; sign in, open
+  each area, save one harmless record (e.g. an egg collection) and delete it again.
 - Switch phone notifications on in V2's profile screen and send the test
   notification.
-- If production has the e2e user, run the signed-in e2e against it; otherwise the
-  manual checks above are the e2e.
+- Open `https://chickensfarm-v1.vercel.app` and sign in: V1 works, with no banner.
 
-Tell the owners V2 is live. Keep V1 read-only (do not delete the project); #183
-decides when it is archived.
+Tell the owners the new app is live.
 
 ## Rollback
 
 Possible at any step. **Anything entered in V2 after the cutover is lost on
-rollback**: V1 never received it, and nothing copies V2 back into V1. The later
-you roll back, the more the owners re-enter by hand, so decide early: at step 4
-at the latest, and within the first day after step 7.
+rollback**: V1 never received it, and nothing copies V2 back into V1. Anything
+entered in V1 on its own address after step 7 is kept — V1 is the same app
+throughout. The later you roll back, the more the owners re-enter by hand, so
+decide early: at step 4 at the latest, and within the first day after step 8.
 
-1. **Domain:** move the production domain back from `chickensfarm-v2` to
-   `chickensfarm` (Settings → Domains on both), and set V2's `AUTH_URL` /
-   `APP_URL` back to the beta URL.
-2. **Unfreeze V1:** `READ_ONLY_MODE` = `false` (or remove it) on `chickensfarm`
-   Production, then redeploy.
-3. **Reminders:** put `CRON_SECRET` back on V1 Production; on V2 remove
-   `CRON_SECRET` and put back `APP_STAGE=beta` (Production and Preview); restore the
-   `E2E_EXPECT_BETA` line in `ci.yml` if it was removed; set V2's Sentry
-   environment back to `v2-beta`; set V1's `AUTH_URL` / `APP_URL` back to the
-   production domain; set the repository variables `APP_URL` and `VERCEL_PROJECT`
-   back to V1's; give V1 and the repository secret the same `CRON_SECRET`. Redeploy
-   both. A rollback on the cutover day may resend that day's reminders: V2's
-   claims stay in V2, and V1's are from before the copy.
-4. **Tell the owners:** V1 is back; anything they entered in V2 since the cutover
-   must be entered again in V1; sign in again; re-enable phone notifications in V1.
-5. Leave V2's data as it is for diagnosis. The next cutover's step 3 replaces it
-   anyway.
+1. **Address:** back to back, remove `chickensfarm.vercel.app` from
+   `chickensfarm-v2` and add it to `chickensfarm`. Set V1's `AUTH_URL` / `APP_URL`
+   back to `https://chickensfarm.vercel.app` and V2's back to
+   `https://chickensfarm-v2.vercel.app`; repository variables `APP_URL` and
+   `APP_URL_V2` likewise.
+2. **Unfreeze V1** if it is still frozen (rollback before step 7):
+   `READ_ONLY_MODE` = `false` on `chickensfarm` Production.
+3. **Reminders and beta:** `REMINDERS_V2` = `off`, `REMINDERS_V1` = `on`, and
+   remove `V2_CUTOVER_DONE`. On V2 put back `APP_STAGE=beta` (Production and
+   Preview) and the Sentry environment `v2-beta`. If step 6 removed the
+   `E2E_EXPECT_BETA` line, restore it the same way: a PR into `v2/develop`, then
+   promoted to `main_app_V2`. **V1 will resend that day's reminders** on its next
+   run: V1's last claims are from the freeze, and V2's stay in V2. After a rollback
+   on a later day, only that day's are resent.
+4. **Redeploy both** production deployments.
+5. **Tell the owners:** the old version is back on the usual address; anything they
+   entered in the new app since the cutover must be entered again; sign in again;
+   re-enable phone notifications.
+6. Leave V2's data as it is for diagnosis. A rolled-back cutover is not a cutover:
+   the next attempt starts from the top, and its step 3 replaces V2's data.
 
 ## Rehearsal
 
@@ -178,9 +218,9 @@ to V1, and V2 `production` and `preview` are untouched.
 
 1. **V1 snapshot:** in V1's Neon project, create a branch from `production`. On it
    only, create a SELECT-only role with plain SQL, exactly as the workflow does
-   (`CREATE ROLE v1_etl_ro LOGIN PASSWORD '…' NOSUPERUSER NOCREATEDB NOCREATEROLE
-NOINHERIT`, `GRANT USAGE ON SCHEMA public`, `GRANT SELECT ON ALL TABLES IN SCHEMA
-public`). Roles made through the Neon API can write; do not use them.
+   (`CREATE ROLE v1_etl_ro LOGIN PASSWORD '…' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`,
+   `GRANT USAGE ON SCHEMA public`, `GRANT SELECT ON ALL TABLES IN SCHEMA public`).
+   Roles made through the Neon API can write; do not use them.
 2. **V2 target:** in V2's Neon project, create a branch from `production` (it has
    V2's schema). Check its `_prisma_migrations` lists every folder in
    `prisma/migrations` (Prisma's own `migrate status` needs port 5432, which some
