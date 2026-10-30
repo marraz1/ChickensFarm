@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { buildAreaFinance, type AreaFinance, type AreaFinanceInput } from "@/lib/area-finance";
 import { farmAreaOrder } from "@/lib/labels";
+import { getAreaLossCounts } from "@/lib/services/losses";
+import type { AreaSlug } from "@/lib/v2-navigation";
 import type { FarmArea } from "@/generated/prisma/client";
 
 type Period = AreaFinanceInput["period"];
@@ -155,4 +157,47 @@ export async function getFarmFinance(farmId: string, period: Period): Promise<Fa
       result: (incomeCents - expensesCents) / 100,
     },
   };
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * What an area's per-unit figure divides by over a period (#199, see
+ * unit-economics.ts): hens kept, chicks hatched, or Mėsa birds now plus those
+ * lost (the figure adds the sold and eaten ones from the area's finances).
+ * Kiaušiniai's margin needs none. Farm-scoped throughout.
+ */
+export async function getAreaUnitBase(
+  farmId: string,
+  area: AreaSlug,
+  period: Period,
+): Promise<number> {
+  switch (area) {
+    case "eggs":
+      return 0;
+    case "hens": {
+      // Kept during the period: added by its last day, not dead before its
+      // first. Filtered here: the counts are tiny and need an OR otherwise.
+      const hens = await prisma.motherHen.findMany({
+        where: { farmId },
+        select: { createdAt: true, diedAt: true },
+      });
+      const end = new Date(period.to.getTime() + DAY_MS);
+      return hens.filter((h) => h.createdAt < end && (!h.diedAt || h.diedAt >= period.from)).length;
+    }
+    case "incubation": {
+      const hatched = await prisma.incubationCycle.aggregate({
+        where: { farmId, hatchDate: { gte: period.from, lte: period.to } },
+        _sum: { hatchedCount: true },
+      });
+      return hatched._sum.hatchedCount ?? 0;
+    }
+    case "meat": {
+      const [now, losses] = await Promise.all([
+        prisma.birdGroup.aggregate({ where: { farmId, area: "MEAT" }, _sum: { quantity: true } }),
+        getAreaLossCounts(farmId, period),
+      ]);
+      return (now._sum.quantity ?? 0) + losses.MEAT;
+    }
+  }
 }

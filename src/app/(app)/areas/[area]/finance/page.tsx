@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { PeriodSwitch } from "@/components/v2/period-switch";
 import { requireActiveFarm } from "@/lib/session";
-import { getAreaFinance } from "@/lib/services/area-finance";
+import { getAreaFinance, getAreaUnitBase } from "@/lib/services/area-finance";
+import { unitFigure } from "@/lib/unit-economics";
 import { resolveFinancePeriod, type SearchParam } from "@/lib/finance-period";
 import { AREA_LOSS_COPY } from "@/lib/area-losses";
 import type { AreaFinance } from "@/lib/area-finance";
@@ -38,7 +39,8 @@ function expenseNote(area: AreaSlug, f: AreaFinance): string | null {
 
 // The area's Finansai tab (#198, V2-<Area>-Finance): the period's result,
 // income and expenses, spend by category and the months. Which money counts
-// where is decided in getAreaFinance; per-unit figures come with #199.
+// where is decided in getAreaFinance; each area's per-unit figure (#199) in
+// unit-economics.ts.
 export default async function AreaFinancePage({
   params,
   searchParams,
@@ -51,17 +53,23 @@ export default async function AreaFinancePage({
   if (!isAreaSlug(area)) notFound();
   const { farm } = await requireActiveFarm();
   const period = resolveFinancePeriod(query);
-  const f = await getAreaFinance(farm.id, AREA_SLUGS[area], period);
+  const [f, unitBase] = await Promise.all([
+    getAreaFinance(farm.id, AREA_SLUGS[area], period),
+    getAreaUnitBase(farm.id, area, period),
+  ]);
+  const unit = unitFigure(area, f, unitBase);
 
   const isProfit = f.result >= 0;
   const heading = `${isProfit ? "Pelnas" : "Nuostolis"} · ${period.label}`;
   const maxShare = f.byCategory[0]?.share ?? 0;
   const notes = [
+    unit.placement === "result" && unit.text,
     area === "hens" && "Išperinti jaunikliai įskaitomi Perinimo srityje",
     f.homeUse > 0 &&
       `Namuose suvartota ${countNounLT(f.homeUse, AREA_LOSS_COPY[area].unit)} — į pajamas neįskaičiuojama`,
   ].filter((note): note is string => Boolean(note));
-  const expNote = expenseNote(area, f);
+  // Perekšlės and Mėsa put their per-unit cost where the top categories go.
+  const expNote = unit.placement === "expenses" ? unit.text : expenseNote(area, f);
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-4">

@@ -13,7 +13,12 @@ vi.mock("@/lib/prisma", async () => {
 });
 
 import { fakePrisma, resetFakePrisma } from "./fake-prisma";
-import { getAreaFinance, getAreaFinances, getFarmFinance } from "@/lib/services/area-finance";
+import {
+  getAreaFinance,
+  getAreaFinances,
+  getAreaUnitBase,
+  getFarmFinance,
+} from "@/lib/services/area-finance";
 import {
   createBirdTransaction,
   transactionArea,
@@ -315,5 +320,78 @@ describe("getFarmFinance", () => {
   it("is all zero for a farm with no records", async () => {
     const farm = await getFarmFinance(FARM_ID, PERIOD);
     expect(farm.total).toEqual({ income: 0, expenses: 0, result: 0 });
+  });
+});
+
+// #199: what each area's per-unit figure divides by, over the period
+// (PERIOD is 2026; the seeded g-meat holds 100 birds).
+describe("getAreaUnitBase", () => {
+  it("counts the hens kept during the period", async () => {
+    for (const [id, createdAt, diedAt] of [
+      ["kept", "2025-05-01", null],
+      ["died-in-period", "2025-05-01", "2026-03-01"],
+      ["died-before", "2025-05-01", "2025-12-31"],
+      ["added-in-period", "2026-12-31T22:00:00Z", null],
+      ["added-after", "2027-01-01T00:00:00Z", null],
+    ] as const) {
+      await fakePrisma.motherHen.create({
+        data: {
+          id,
+          farmId: FARM_ID,
+          name: id,
+          createdAt: new Date(createdAt),
+          diedAt: diedAt ? day(diedAt) : null,
+        },
+      });
+    }
+    expect(await getAreaUnitBase(FARM_ID, "hens", PERIOD)).toBe(3);
+  });
+
+  it("counts the chicks hatched during the period", async () => {
+    for (const [id, hatchDate, hatchedCount] of [
+      ["spring", "2026-04-20", 12],
+      ["autumn", "2026-09-10", 19],
+      ["last-year", "2025-08-01", 40],
+      ["running", null, null],
+    ] as const) {
+      await fakePrisma.incubationCycle.create({
+        data: {
+          id,
+          farmId: FARM_ID,
+          startDate: day("2025-07-01"),
+          hatchDate: hatchDate ? day(hatchDate) : null,
+          hatchedCount,
+        },
+      });
+    }
+    expect(await getAreaUnitBase(FARM_ID, "incubation", PERIOD)).toBe(31);
+  });
+
+  it("counts Mėsa's birds now plus those lost in the period", async () => {
+    for (const [id, area, lossDate, quantity] of [
+      ["meat-2026", "MEAT", "2026-06-01", 3],
+      ["meat-2025", "MEAT", "2025-06-01", 7],
+      ["eggs-2026", "EGGS", "2026-06-01", 5],
+    ] as const) {
+      await fakePrisma.loss.create({
+        data: {
+          id,
+          farmId: FARM_ID,
+          area,
+          birdGroupId: null,
+          motherHenId: null,
+          incubationCycleId: null,
+          lossDate: day(lossDate),
+          quantity,
+          reasonType: "DISEASE",
+          comment: null,
+        },
+      });
+    }
+    expect(await getAreaUnitBase(FARM_ID, "meat", PERIOD)).toBe(103);
+  });
+
+  it("needs nothing for Kiaušiniai's margin", async () => {
+    expect(await getAreaUnitBase(FARM_ID, "eggs", PERIOD)).toBe(0);
   });
 });
