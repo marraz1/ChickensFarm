@@ -3,7 +3,7 @@ name: PROD_deployment
 # The only way code reaches production.
 #
 # Production is deployed from `release`, and this workflow is the only thing
-# that writes to it: it versions `main`, fast-forwards `release`, tags, and then
+# that writes to it: it versions `main_app_V1`, fast-forwards `release`, tags, and then
 # watches Vercel build and deploy the result until a health check confirms that
 # the exact version published is the one being served.
 #
@@ -52,7 +52,7 @@ concurrency:
 
 env:
   RELEASE_BRANCH: release
-  SOURCE_BRANCH: main
+  SOURCE_BRANCH: main_app_V1
 
 jobs:
   preflight:
@@ -87,7 +87,7 @@ jobs:
           echo "## Preflight" >> "$GITHUB_STEP_SUMMARY"
           FAIL=0
 
-          # 1. Released from main only. Dispatching from a feature branch would
+          # 1. Released from main_app_V1 only. Dispatching from a feature branch would
           #    quietly ship whatever happened to be on it.
           if [ "$GITHUB_REF_NAME" != "$SOURCE_BRANCH" ]; then
             echo "❌ Dispatch this from \`$SOURCE_BRANCH\`, not \`$GITHUB_REF_NAME\`." >> "$GITHUB_STEP_SUMMARY"
@@ -95,7 +95,7 @@ jobs:
             exit 1
           fi
 
-          # 2. CI must be green on main. Only a completed run can be judged — an
+          # 2. CI must be green on main_app_V1. Only a completed run can be judged — an
           #    in-progress one says nothing, and treating it as a failure (or as
           #    a pass) would both be wrong.
           runs=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=$SOURCE_BRANCH&per_page=20" 2>/dev/null || echo '{}')
@@ -121,7 +121,7 @@ jobs:
           git fetch --force --tags origin \
             "+refs/heads/*:refs/remotes/origin/*"
 
-          # 3. release must be a fast-forward of main. Anything else means
+          # 3. release must be a fast-forward of main_app_V1. Anything else means
           #    someone pushed to release directly, and merging would either
           #    conflict or silently revert their commit.
           if git rev-parse --verify "origin/$RELEASE_BRANCH" >/dev/null 2>&1; then
@@ -159,7 +159,7 @@ jobs:
             esac
           fi
 
-          # 4b. main must still be what was dispatched — or that plus this very
+          # 4b. main_app_V1 must still be what was dispatched — or that plus this very
           #     release's bump commit, which means an earlier attempt of this
           #     run got part-way (e.g. the tag push failed) and is being re-run.
           REMOTE_HEAD=$(git rev-parse "origin/$SOURCE_BRANCH")
@@ -513,13 +513,13 @@ jobs:
             && [ "$(git log -1 --format=%s "$REMOTE_HEAD")" = "chore(release): v$VERSION" ]; then
             echo "🔁 \`$SOURCE_BRANCH\` already bumped to \`$VERSION\` by an earlier attempt" >> "$GITHUB_STEP_SUMMARY"
           else
-            # Preflight checked this, but main can move while the gates run.
+            # Preflight checked this, but main_app_V1 can move while the gates run.
             echo "❌ \`$SOURCE_BRANCH\` moved since dispatch — start a new run." >> "$GITHUB_STEP_SUMMARY"
             echo "::error::$SOURCE_BRANCH moved since this run was dispatched; start a new PROD_deployment run."
             exit 1
           fi
 
-          # Fast-forward release onto main. Preflight already proved this is
+          # Fast-forward release onto main_app_V1. Preflight already proved this is
           # possible, so a merge commit is never needed and never created.
           if git rev-parse --verify "origin/$RELEASE_BRANCH" >/dev/null 2>&1; then
             git checkout -B "$RELEASE_BRANCH" "origin/$RELEASE_BRANCH"

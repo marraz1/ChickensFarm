@@ -11,22 +11,31 @@ served.
 ## Branches
 
 ```
-feature/*  ──>  develop  ──>  main  ──>  release  ──>  production
+feature/*  ──>  develop  ──>  main_app_V1  ──>  release  ──>  production
 ```
 
-| Branch      | Purpose                                                         | Who writes to it               |
-| ----------- | --------------------------------------------------------------- | ------------------------------ |
-| `feature/*` | One change at a time.                                           | You                            |
-| `develop`   | Where all new work lands. Integration happens here first.       | Pull requests from `feature/*` |
-| `main`      | Reviewed and green. The candidate for the next release.         | Pull requests from `develop`   |
-| `release`   | **Production.** Always a fast-forward of `main`, always tagged. | **PROD_deployment only**       |
+| Branch        | Purpose                                                                | Who writes to it               |
+| ------------- | ---------------------------------------------------------------------- | ------------------------------ |
+| `feature/*`   | One change at a time.                                                  | You                            |
+| `develop`     | Where all new work lands. Integration happens here first.              | Pull requests from `feature/*` |
+| `main_app_V1` | Reviewed and green. The candidate for the next release.                | Pull requests from `develop`   |
+| `release`     | **Production.** Always a fast-forward of `main_app_V1`, always tagged. | **PROD_deployment only**       |
 
-`main` stays the repository's default branch. That is deliberate: GitHub only
-runs scheduled workflows from the default branch, and both `reminders.yml` and
-the daily `status.yml` check depend on it.
+This is **V1's** line. V2 has its own, `v2/develop` → `main_app_V2` →
+`releaseV2`, released by PROD_deployment_V2 (#243). `main_app_V1` was called
+`main` until #242.
+
+`main_app_V1` is the repository's default branch until #244 moves the default
+to `main_app_V2`. The default branch matters: GitHub only runs scheduled
+workflows (`reminders.yml`, `status.yml`) and offers "Run workflow" from it, so
+it carries the workflows of both apps.
+
+Right after a rename of the source branch, run **Actions → CI → Run workflow** on
+it once: past CI runs are recorded under the old name, and PROD_deployment's
+preflight needs a completed run on the branch it releases from.
 
 Never push to `release` by hand. The workflow refuses to run if `release` has
-commits that `main` does not, because merging over them would either conflict or
+commits that `main_app_V1` does not, because merging over them would either conflict or
 silently revert someone's work.
 
 ---
@@ -34,7 +43,7 @@ silently revert someone's work.
 ## One-time setup
 
 1. **Vercel → Project → Settings → Git → Production Branch → `release`.**
-   Until this is changed, `main` is still what goes live and the workflow will
+   Until this is changed, Vercel's original production branch (`main`) is still what goes live and the workflow will
    report that no deployment appeared.
 2. **Repository secret `VERCEL_TOKEN`** — create at
    <https://vercel.com/account/tokens>. Optional, but without it the workflow
@@ -44,16 +53,16 @@ silently revert someone's work.
    by the reminder cron. The release workflow needs both to read
    `/api/health`, which is how it verifies what is live.
 
-After step 1, pushes to `develop` and `main` produce **Preview** deployments and
+After step 1, pushes to `develop` and `main_app_V1` produce **Preview** deployments and
 only `release` reaches production.
 
 ---
 
 ## Cutting a release
 
-1. Get the change into `main` (`feature/*` → `develop` → `main`), and let CI go
+1. Get the change into `main_app_V1` (`feature/*` → `develop` → `main_app_V1`), and let CI go
    green there.
-2. **Actions → PROD_deployment → Run workflow**, with the branch set to `main`.
+2. **Actions → PROD_deployment → Run workflow**, with the branch set to `main_app_V1`.
 3. Choose the bump:
    - `patch` — fixes only (0.1.0 → 0.1.1)
    - `minor` — new features, backwards compatible (0.1.0 → 0.2.0)
@@ -112,9 +121,9 @@ Two ways forward:
 
 | Job           | What it establishes                                                                                                                                                                                                   |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Preflight** | Dispatched from `main`; CI green there; `release` fast-forwards cleanly; the version is free; and _which migrations this release will apply_. Nothing has been pushed yet.                                            |
+| **Preflight** | Dispatched from `main_app_V1`; CI green there; `release` fast-forwards cleanly; the version is free; and _which migrations this release will apply_. Nothing has been pushed yet.                                     |
 | **Gates**     | Lint, Typecheck, Test, Production build and Schema checks, against the commit being released. Still nothing pushed.                                                                                                   |
-| **Version**   | `package.json` bumped and committed to `main`, `release` fast-forwarded, tag `vX.Y.Z` pushed. The push to `release` is what starts Vercel.                                                                            |
+| **Version**   | `package.json` bumped and committed to `main_app_V1`, `release` fast-forwarded, tag `vX.Y.Z` pushed. The push to `release` is what starts Vercel.                                                                     |
 | **Build**     | Watches Vercel's deployment state as it changes, and prints the build output. Fails the release if the build fails.                                                                                                   |
 | **Verify**    | Polls `/api/health` until both the **version** and the **commit** match what was just published, reports exactly which migrations were applied, then smoke-tests `/login`, `/manifest.webmanifest`, `/sw.js` and `/`. |
 | **E2E**       | Runs the Playwright smoke suite (`e2e/`, checked out at the release commit) in Chromium against `APP_URL`: login renders, signed-out `/` redirects to login, `/privacy` is public. Skipped on dry runs.               |
@@ -126,16 +135,16 @@ A release is only successful if every one of them is.
 
 ## Reading a failure
 
-### Preflight — "CI is not green on main"
+### Preflight — "CI is not green on main_app_V1"
 
-Fix `main` first. The release refuses to ship code that has not passed.
+Fix `main_app_V1` first. The release refuses to ship code that has not passed.
 
-### Preflight — "`release` has commits that are not on `main`"
+### Preflight — "`release` has commits that are not on `main_app_V1`"
 
 Someone pushed to `release` directly. Bring it back before releasing:
 
 ```bash
-git checkout main && git merge origin/release && git push
+git checkout main_app_V1 && git merge origin/release && git push
 ```
 
 ### Schema checks — "schema.prisma has changes with no migration behind them"
@@ -165,7 +174,8 @@ live, so roll back in Vercel if users are affected.
 
 ### Build — "No deployment record appeared"
 
-Vercel's Production Branch is probably still `main`. See One-time setup.
+Vercel's Production Branch is probably still the original `main` (Vercel does not
+follow a GitHub rename). See One-time setup.
 
 ### Build — the build failed
 
@@ -226,7 +236,7 @@ pick up the change. Any value other than `true`, or none, is off.
 
 ## A hazard worth knowing
 
-Preview deployments (`develop`, `main`, pull requests) point at the **same Neon
+Preview deployments (`develop`, `main_app_V1`, pull requests) point at the **same Neon
 database** as production, but migrations only run on production builds
 (`vercel-build` checks `VERCEL_ENV=production`).
 
