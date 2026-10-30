@@ -31,6 +31,10 @@ on:
         description: "The branch the app releases from; its CI is reported"
         type: string
         required: true
+      release_branch:
+        description: "What production is built from; its migrations are compared with the live database"
+        type: string
+        required: true
       vercel_environment:
         description: "GitHub deployment environment Vercel writes for this app's production"
         type: string
@@ -349,7 +353,11 @@ jobs:
       state: ${{ steps.compare.outputs.state }}
       pending: ${{ steps.compare.outputs.pending }}
     steps:
+      # What is deployed, not whatever branch this ran from: the default branch
+      # is V2's line, and its migrations are not V1's.
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_branch }}
 
       - name: Compare repository against the live database
         id: compare

@@ -34,6 +34,7 @@ jobs:
       app: V1
       app_url: ${{ vars.APP_URL }}
       source_branch: main_app_V1
+      release_branch: release
       vercel_environment: "Production – chickensfarm"
       vercel_project: prj_lGxEKWmVzsIDudrrmIjQr4e2ojq8
     secrets:
@@ -47,6 +48,7 @@ jobs:
       app: V2
       app_url: ${{ vars.APP_URL_V2 }}
       source_branch: main_app_V2
+      release_branch: releaseV2
       vercel_environment: "Production – chickensfarm-v2"
       vercel_project: prj_M4VrMiPSLeBK1pDEGbW0f2q9lSOS
     secrets:
