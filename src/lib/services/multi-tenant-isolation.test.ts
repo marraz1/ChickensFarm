@@ -103,6 +103,7 @@ import {
   createLoss,
   deleteLoss,
   getAreaLossCounts,
+  getAreaLossInsight,
   getAreaLosses,
   getLoss,
   listLosses,
@@ -1136,6 +1137,83 @@ describe("area unit economics", () => {
     await expect(getAreaUnitBase(FARM_A_ID, "incubation", period)).resolves.toBe(4);
     await expect(getAreaUnitBase(FARM_A_ID, "meat", period)).resolves.toBe(8);
     await expect(getAreaUnitBase(FARM_B_ID, "meat", period)).resolves.toBe(80);
+  });
+});
+
+describe("area loss insights (#197)", () => {
+  // 09:00 on October 29th 2026 in Vilnius.
+  const now = new Date("2026-10-29T07:00:00Z");
+
+  beforeEach(async () => {
+    await seedTwoFarms();
+    for (const farmId of [FARM_A_ID, FARM_B_ID]) {
+      const n = farmId === FARM_A_ID ? 1 : 10;
+      await fakePrisma.eggCollection.create({
+        data: {
+          farmId,
+          collectionDate: new Date("2026-10-05"),
+          quantity: 2 * n,
+          quality: "BROKEN",
+        },
+      });
+      await fakePrisma.motherHen.create({
+        data: { id: `hen-${farmId}`, farmId, name: "Hen", diedAt: null },
+      });
+      await fakePrisma.motherHenLog.create({
+        data: {
+          motherHenId: `hen-${farmId}`,
+          entryDate: new Date("2026-05-01"),
+          brokenEggs: 3 * n,
+        },
+      });
+      await fakePrisma.incubationCycle.create({
+        data: {
+          id: `cycle-${farmId}`,
+          farmId,
+          startDate: new Date("2026-03-01"),
+          hatchDate: new Date("2026-03-22"),
+          eggsFertile: 10 * n,
+          eggsInfertile: 4 * n,
+          hatchedCount: 9 * n,
+        },
+      });
+      await fakePrisma.loss.create({
+        data: {
+          id: `loss-${farmId}`,
+          farmId,
+          area: "MEAT",
+          lossDate: new Date("2026-04-01"),
+          quantity: 5 * n,
+          reasonType: "OTHER",
+          comment: null,
+        },
+      });
+    }
+  });
+
+  it("never counts another farm's collections, diary, cycles or losses", async () => {
+    await expect(getAreaLossInsight(FARM_A_ID, "eggs", now)).resolves.toEqual({
+      kind: "broken",
+      count: 2,
+    });
+    await expect(getAreaLossInsight(FARM_A_ID, "hens", now)).resolves.toEqual({
+      kind: "broken",
+      count: 3,
+    });
+    await expect(getAreaLossInsight(FARM_A_ID, "incubation", now)).resolves.toEqual({
+      kind: "unhatched",
+      infertile: 4,
+      unhatched: 1,
+    });
+    // No Mėsa expenses on either farm: 5 own birds lost cost nothing yet.
+    await expect(getAreaLossInsight(FARM_A_ID, "meat", now)).resolves.toEqual({
+      kind: "feed",
+      valueCents: 0,
+    });
+    await expect(getAreaLossInsight(FARM_B_ID, "hens", now)).resolves.toEqual({
+      kind: "broken",
+      count: 30,
+    });
   });
 });
 

@@ -21,9 +21,28 @@ export const createMotherHenSchema = z.object({
 });
 export type CreateMotherHenInput = z.infer<typeof createMotherHenSchema>;
 
+// Incubating eggs the hen broke that day (#197): a whole number, or left empty.
+// Plain digits only: Number() would read " " as 0 and "1e2" as 100.
+const brokenEggsField = z.preprocess(
+  (v) => {
+    if (v === null || v === undefined) return undefined;
+    if (typeof v === "number") return v;
+    const s = String(v).trim();
+    if (s === "") return undefined;
+    return /^\d+$/.test(s) ? Number(s) : NaN;
+  },
+  z
+    .number({ error: "Įveskite skaičių" })
+    .int("Įveskite sveiką skaičių")
+    .min(0, "Skaičius negali būti neigiamas")
+    .max(1000)
+    .optional(),
+);
+
 export const createMotherHenLogSchema = z.object({
   entryDate: z.string().min(1, "Įveskite datą"),
   note: z.string().trim().max(1000).optional().or(z.literal("")),
   photoUrl: z.string().url().optional().or(z.literal("")),
+  brokenEggs: brokenEggsField,
 });
 export type CreateMotherHenLogInput = z.infer<typeof createMotherHenLogSchema>;

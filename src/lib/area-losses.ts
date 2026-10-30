@@ -63,6 +63,46 @@ export const AREA_LOSS_COPY: Record<AreaSlug, { heading: string; unit: Forms; em
 
 const REASON_ORDER: LossReasonType[] = ["DISEASE", "PREDATOR", "OTHER"];
 
+/** The extra card each area's tab shows under its dead birds (#197). */
+export type AreaLossInsight =
+  /** Kiaušiniai: broken eggs from this month's collections; Perekšlės: from the hen diary, this year. */
+  | { kind: "broken"; count: number }
+  /** Perinimas, this year: eggs found infertile, and fertile eggs that did not hatch. */
+  | { kind: "unhatched"; infertile: number; unhatched: number }
+  /** Mėsa, this year: the feed the dead birds took, at the cost per bird; null when it cannot be worked out. */
+  | { kind: "feed"; valueCents: number | null };
+
+/**
+ * Fertile eggs that did not hatch, over hatched cycles. A cycle without both
+ * counts is skipped, and one that reports more chicks than fertile eggs
+ * counts as none rather than taking from the others.
+ */
+export function unhatchedEggs(
+  cycles: readonly { eggsFertile: number | null; hatchedCount: number | null }[],
+): number {
+  return cycles.reduce(
+    (sum, c) =>
+      c.eggsFertile == null || c.hatchedCount == null
+        ? sum
+        : sum + Math.max(c.eggsFertile - c.hatchedCount, 0),
+    0,
+  );
+}
+
+/**
+ * The feed value of the birds lost (design: "Apytiksliai, pagal vidutines
+ * išlaidas vienam paukščiui"): the expenses per bird, as the Finansai tab's
+ * "vienam paukščiui" (#199), times the birds lost. Null with no birds to
+ * divide by.
+ */
+export function feedValueLostCents(
+  expensesCents: number,
+  birds: number,
+  lost: number,
+): number | null {
+  return birds > 0 ? Math.round((expensesCents * lost) / birds) : null;
+}
+
 export function buildAreaLossSummary(input: {
   year: number;
   /** The year's birds lost per cause (counted in the database). */

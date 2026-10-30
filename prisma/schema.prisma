@@ -335,6 +335,7 @@ model MotherHenLog {
   entryDate   DateTime  @db.Date
   note        String?
   photoUrl    String?
+  brokenEggs  Int? // incubating eggs she broke that day (#197)
   createdAt   DateTime  @default(now())
 
   @@index([motherHenId, entryDate])

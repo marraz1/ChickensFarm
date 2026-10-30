@@ -3,6 +3,8 @@ import {
   AREA_LOSS_COPY,
   AREA_LOSS_LIST_LIMIT,
   buildAreaLossSummary,
+  feedValueLostCents,
+  unhatchedEggs,
   type AreaLossInput,
 } from "./area-losses";
 import { countNounLT } from "./format";
@@ -152,5 +154,40 @@ describe("AREA_LOSS_COPY", () => {
   it("says Perekšlės had no losses this year, as designed", () => {
     expect(AREA_LOSS_COPY.hens.empty).toBe("Šiais metais perekšlių nuostolių nebuvo.");
     expect(AREA_LOSS_COPY.eggs.empty).toBe("Šiais metais nuostolių nebuvo.");
+  });
+});
+
+// #197: the extra card under each area's dead birds.
+describe("unhatchedEggs", () => {
+  it("adds the fertile eggs that did not hatch, skipping cycles without counts", () => {
+    expect(
+      unhatchedEggs([
+        { eggsFertile: 10, hatchedCount: 8 },
+        { eggsFertile: 6, hatchedCount: 5 },
+        { eggsFertile: null, hatchedCount: 4 },
+        { eggsFertile: 7, hatchedCount: null },
+      ]),
+    ).toBe(3);
+  });
+
+  it("never lets a cycle with more chicks than fertile eggs take from the others", () => {
+    expect(
+      unhatchedEggs([
+        { eggsFertile: 4, hatchedCount: 6 },
+        { eggsFertile: 5, hatchedCount: 2 },
+      ]),
+    ).toBe(3);
+  });
+});
+
+describe("feedValueLostCents", () => {
+  it("values the birds lost at the expenses per bird, as the design (about 92 EUR)", () => {
+    // 614 EUR over 20 birds is 30,70 each; 3 lost.
+    expect(feedValueLostCents(61400, 20, 3)).toBe(9210);
+  });
+
+  it("is null with no birds to divide by, and 0 with none lost", () => {
+    expect(feedValueLostCents(61400, 0, 3)).toBeNull();
+    expect(feedValueLostCents(61400, 20, 0)).toBe(0);
   });
 });

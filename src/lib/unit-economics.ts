@@ -22,6 +22,15 @@ export type UnitFigure = {
 };
 
 /**
+ * How many units an area's expenses are spread over: getAreaUnitBase's count,
+ * plus, for Mėsa, the birds sold and used at home. Kiaušiniai has none (0).
+ * Shared with the Mėsa Nuostoliai tab's feed value lost (#197).
+ */
+export function unitDivisor(area: AreaSlug, f: AreaFinance, base: number): number {
+  return area === "meat" ? base + f.birdsSold + f.homeUse : area === "eggs" ? 0 : base;
+}
+
+/**
  * `base` is getAreaUnitBase's count: hens kept, chicks hatched, or Mėsa birds
  * now plus those lost. Kiaušiniai needs none.
  */
@@ -36,16 +45,19 @@ export function unitFigure(area: AreaSlug, f: AreaFinance, base: number): UnitFi
       return { placement: "result", text: `Pelno marža ${margin}` };
     }
     case "hens":
-      return { placement: "expenses", text: `${perUnit(base)} vienai perekšlei` };
+      return {
+        placement: "expenses",
+        text: `${perUnit(unitDivisor(area, f, base))} vienai perekšlei`,
+      };
     case "incubation":
       return {
         placement: "result",
-        text: `Vieno išsiritusio jauniklio kaina ${perUnit(base)}`,
+        text: `Vieno išsiritusio jauniklio kaina ${perUnit(unitDivisor(area, f, base))}`,
       };
     case "meat":
       return {
         placement: "expenses",
-        text: `${perUnit(base + f.birdsSold + f.homeUse)} vienam paukščiui`,
+        text: `${perUnit(unitDivisor(area, f, base))} vienam paukščiui`,
       };
   }
 }
