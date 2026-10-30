@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { registerSchema } from "@/lib/validation/auth";
 import { registerUser } from "@/lib/services/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { refuseWhileReadOnly } from "@/lib/read-only";
 
 // 8 registrations per 15 min per IP — generous for real signups, tight
 // enough to blunt scripted bulk account creation.
 const REGISTER_LIMIT = { limit: 8, windowMs: 15 * 60 * 1000 };
 
 export async function POST(req: Request) {
+  // The middleware skips api/auth, so the read-only switch is checked here.
+  const readOnly = refuseWhileReadOnly(req);
+  if (readOnly) return readOnly;
+
   const ip = getClientIp(req);
   const rate = checkRateLimit(`register:${ip}`, REGISTER_LIMIT);
   if (!rate.allowed) {

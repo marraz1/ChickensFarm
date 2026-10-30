@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "@/components/session-provider";
+import { ReadOnlyBanner } from "@/components/read-only-banner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,12 +39,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="lt"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="lt" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-muted/30">
         <SessionProvider>
+          <ReadOnlyBanner />
           {children}
           <Toaster position="top-center" />
         </SessionProvider>
