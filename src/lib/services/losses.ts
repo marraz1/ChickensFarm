@@ -81,6 +81,30 @@ export async function getAreaLosses(
   });
 }
 
+export type LossArea = Exclude<FarmArea, "SHARED">;
+
+/**
+ * Birds lost per area over a period (#203, the overview's area tiles), counted
+ * in the database by the area stored on each loss — the same records each
+ * area's Nuostoliai tab lists. Areas with none are 0.
+ */
+export async function getAreaLossCounts(
+  farmId: string,
+  period: { from: Date; to: Date },
+): Promise<Record<LossArea, number>> {
+  const groups = await prisma.loss.groupBy({
+    by: ["area"],
+    where: { farmId, lossDate: { gte: period.from, lte: period.to } },
+    _sum: { quantity: true },
+  });
+  const counts: Record<LossArea, number> = { EGGS: 0, HENS: 0, INC: 0, MEAT: 0 };
+  for (const g of groups) {
+    // A loss with no target has no area and belongs to no tile.
+    if (g.area && g.area !== "SHARED") counts[g.area] += g._sum.quantity ?? 0;
+  }
+  return counts;
+}
+
 export function getLoss(farmId: string, id: string) {
   return prisma.loss.findFirst({
     where: { id, farmId },

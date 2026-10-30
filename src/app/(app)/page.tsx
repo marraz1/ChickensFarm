@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireActiveFarm } from "@/lib/session";
 import { getDashboardData } from "@/lib/services/dashboard";
 import { getFarmFinance } from "@/lib/services/area-finance";
+import { getAreaLossCounts } from "@/lib/services/losses";
 import { resolveFinancePeriod, type SearchParam } from "@/lib/finance-period";
 import { Card } from "@/components/ui/card";
 import { PeriodSwitch } from "@/components/v2/period-switch";
@@ -9,6 +10,8 @@ import { formatEUR, formatRelativeLT } from "@/lib/format";
 import { birdTypeLabels } from "@/lib/labels";
 import { AreaSplitCard } from "@/components/v2/area-split-card";
 import { areaSplits } from "@/lib/area-split";
+import { AreaTiles } from "@/components/v2/area-tiles";
+import { areaTiles } from "@/lib/area-tiles";
 import { cn } from "@/lib/utils";
 import { Egg, AlertTriangle, Heart, Drumstick, Plus } from "lucide-react";
 
@@ -20,9 +23,9 @@ const ACTIVITY_ICONS = {
 } as const;
 
 // The V2 farm overview (V2-Overview): the title with "Išlaida", the period
-// switch and the farm result (#201), then spending and income by area (#202).
-// The area tiles (#203) and "Ūkis dabar"/"Daugiau statistikos" (#204) come
-// later; until then the V1 dashboard's counts and recent activity stay below.
+// switch and the farm result (#201), spending and income by area (#202) and the
+// area tiles (#203). "Ūkis dabar"/"Daugiau statistikos" (#204) come later; until
+// then the V1 dashboard's counts and recent activity stay below.
 export default async function OverviewPage({
   searchParams,
 }: {
@@ -30,9 +33,10 @@ export default async function OverviewPage({
 }) {
   const [query, { farm }] = await Promise.all([searchParams, requireActiveFarm()]);
   const period = resolveFinancePeriod(query);
-  const [data, finance] = await Promise.all([
+  const [data, finance, losses] = await Promise.all([
     getDashboardData(farm.id),
     getFarmFinance(farm.id, period),
+    getAreaLossCounts(farm.id, period),
   ]);
   const { income, expenses, result } = finance.total;
   const heading = `${result >= 0 ? "Pelnas" : "Nuostolis"} · ${period.label}`;
@@ -83,6 +87,10 @@ export default async function OverviewPage({
       <div className="px-4">
         {/* Both views worked out here; the card only picks one and draws it. */}
         <AreaSplitCard splits={areaSplits(finance.areas)} />
+      </div>
+
+      <div className="px-4">
+        <AreaTiles tiles={areaTiles(finance.areas, losses)} />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 px-4">

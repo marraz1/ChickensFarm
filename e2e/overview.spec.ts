@@ -147,6 +147,59 @@ test("Pagal sritį splits the period's spending or income by area", async ({ pag
   await expect(card.getByRole("img")).toHaveAccessibleName(/^Pajamos pagal sritį: /);
 });
 
+test("Sritys opens one area tile at a time", async ({ page }) => {
+  const date = quietDay();
+  await createExpense(page, "MEAT", date, 3);
+  await createExpense(page, "SHARED", date, 1);
+
+  await page.goto(`/?period=range&from=${date}&to=${date}`);
+  const tiles = page.getByRole("region", { name: "Sritys" });
+  const tile = (name: string) => tiles.getByRole("button", { name: new RegExp(`^${name}`) });
+
+  await expect(tiles.getByRole("button")).toHaveCount(5);
+  await expect(tile("Mėsiniai paukščiai")).toContainText("−3,00");
+  await expect(tile("Bendros išlaidos")).toContainText("Nepriskirtos sričiai");
+  await expect(tile("Bendros išlaidos")).toContainText("Kita");
+
+  // The tiles answer once the page has hydrated: tap until one opens.
+  await expect(async () => {
+    if ((await tile("Mėsiniai paukščiai").getAttribute("aria-expanded")) !== "true") {
+      await tile("Mėsiniai paukščiai").click();
+    }
+    await expect(tile("Mėsiniai paukščiai")).toHaveAttribute("aria-expanded", "true", {
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 15_000 });
+  await expect(tiles).toContainText("Didžiausios išlaidos");
+  await expect(tiles).toContainText("Nuostoliai");
+  await expect(tiles).toContainText("0 paukščių");
+  await expect(tiles).toContainText("Pagal mėnesius");
+  await expect(tiles.getByRole("link", { name: "Atidaryti sritį" })).toHaveAttribute(
+    "href",
+    "/areas/meat",
+  );
+  await expect(tiles.getByRole("link", { name: "Finansai" })).toHaveAttribute(
+    "href",
+    "/areas/meat/finance",
+  );
+
+  // Opening Bendros closes Mėsa; Bendros has no losses and no links.
+  await tile("Bendros išlaidos").click();
+  await expect(tile("Bendros išlaidos")).toHaveAttribute("aria-expanded", "true");
+  await expect(tile("Mėsiniai paukščiai")).toHaveAttribute("aria-expanded", "false");
+  await expect(tiles).toContainText("Didžiausios išlaidos");
+  await expect(tiles).not.toContainText("Nuostoliai");
+  await expect(tiles.getByRole("link")).toHaveCount(0);
+
+  // Opening a right-hand tile leaves no hole: Perinimas moves up beside
+  // Kiaušiniai and Mėsa, the odd one out, spans the row.
+  await tile("Perekšlės").click();
+  await expect(tile("Perekšlės")).toHaveAttribute("aria-expanded", "true");
+  const box = async (name: string) => (await tile(name).boundingBox())!;
+  expect((await box("Perinimas")).y).toBe((await box("Kiaušiniai")).y);
+  expect((await box("Mėsiniai paukščiai")).width).toBe((await box("Bendros išlaidos")).width);
+});
+
 test("Išlaida opens the general expense form", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Išlaida", exact: true }).click();

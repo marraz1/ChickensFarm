@@ -102,6 +102,7 @@ import {
 import {
   createLoss,
   deleteLoss,
+  getAreaLossCounts,
   getAreaLosses,
   getLoss,
   listLosses,
@@ -973,6 +974,31 @@ describe("area loss list", () => {
     expect(meatA.total).toBe(2);
     expect(meatA.byReason.map((r) => r.count)).toEqual([0, 2, 0]);
     expect(meatA.rows.map((r) => r.key)).toEqual(["loss-a-meat", "loss-a-meat-2025"]);
+  });
+
+  // #203: the overview's area tiles.
+  it("counts each area's losses over a period, never another farm's", async () => {
+    const october = { from: new Date("2026-10-01"), to: new Date("2026-10-31") };
+    await expect(getAreaLossCounts(FARM_A_ID, october)).resolves.toEqual({
+      EGGS: 2,
+      HENS: 0,
+      INC: 0,
+      MEAT: 2,
+    });
+    await expect(getAreaLossCounts(FARM_B_ID, october)).resolves.toEqual({
+      EGGS: 0,
+      HENS: 0,
+      INC: 0,
+      MEAT: 2,
+    });
+    // Outside the period nothing counts.
+    const september = { from: new Date("2026-09-01"), to: new Date("2026-09-30") };
+    await expect(getAreaLossCounts(FARM_A_ID, september)).resolves.toEqual({
+      EGGS: 0,
+      HENS: 0,
+      INC: 0,
+      MEAT: 0,
+    });
   });
 });
 
