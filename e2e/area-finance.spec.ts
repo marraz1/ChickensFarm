@@ -98,8 +98,10 @@ test("an area's expenses over a chosen period give its loss, by category", async
   await expect(page.getByRole("region", { name: "Pajamos", exact: true })).toContainText(
     "Pardavimų nebuvo",
   );
+  // Mėsa's cost per bird takes the note's place (#199). The preview farm's
+  // birds vary, so the amount is checked in the unit tests.
   await expect(page.getByRole("region", { name: "Išlaidos", exact: true })).toContainText(
-    "Vaistai, pašarai",
+    /(\d+,\d{2}\s€|—) vienam paukščiui/,
   );
 
   const categories = page.getByRole("region", { name: "Išlaidos pagal kategoriją" });
@@ -111,6 +113,24 @@ test("an area's expenses over a chosen period give its loss, by category", async
   const months = page.getByRole("region", { name: "Pagal mėnesius" });
   await expect(months.getByRole("listitem")).toHaveCount(1);
   await expect(months).toContainText("Išlaidos 12,00");
+
+  // Perinimas's 50 € on a day nothing hatched: no chick to divide by.
+  await page.goto(`/areas/incubation/finance?period=range&from=${date}&to=${date}`);
+  await expect(page.getByRole("region", { name: `Nuostolis · ${date} – ${date}` })).toContainText(
+    "Vieno išsiritusio jauniklio kaina —",
+  );
+});
+
+test("Kiaušiniai shows its profit margin, as — without income", async ({ page }) => {
+  const date = quietDay();
+  await createExpense(page, { area: "EGGS", expenseDate: date, category: "FEED", amount: 2 });
+  await page.goto(`/areas/eggs/finance?period=range&from=${date}&to=${date}`);
+  await expect(page.getByRole("region", { name: `Nuostolis · ${date} – ${date}` })).toContainText(
+    "Pelno marža —",
+  );
+  // The year view always has a margin line, whatever the farm's money.
+  await page.goto("/areas/eggs/finance");
+  await expect(page.getByText(/^Pelno marža /)).toBeVisible();
 });
 
 test("Perekšlės notes where hatched chicks count, and the farm link goes to the overview", async ({
@@ -118,6 +138,9 @@ test("Perekšlės notes where hatched chicks count, and the farm link goes to th
 }) => {
   await page.goto("/areas/hens/finance");
   await expect(page.getByText("Išperinti jaunikliai įskaitomi Perinimo srityje")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Išlaidos", exact: true })).toContainText(
+    /(\d+,\d{2}\s€|—) vienai perekšlei/,
+  );
 
   await page.getByRole("link", { name: "Visi ūkio finansai" }).click();
   await expect(page).toHaveURL((url) => url.pathname === "/", { timeout: 15_000 });

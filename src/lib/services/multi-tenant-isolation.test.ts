@@ -123,7 +123,7 @@ import {
   recordCandling,
 } from "@/lib/services/incubation";
 import { expenseTargetLabel, listAreaTargetOptions } from "@/lib/services/area-targets";
-import { getAreaFinance, getFarmFinance } from "@/lib/services/area-finance";
+import { getAreaFinance, getAreaUnitBase, getFarmFinance } from "@/lib/services/area-finance";
 import { getFarmNow } from "@/lib/services/dashboard";
 import {
   getEggsOverview,
@@ -1073,6 +1073,69 @@ describe("Ūkis dabar (overview counts)", () => {
       activeCycles: 1,
       losses: { year: 2026, count: 300 },
     });
+  });
+});
+
+describe("area unit economics", () => {
+  const period = {
+    from: new Date("2026-01-01"),
+    to: new Date("2026-12-31"),
+    today: new Date("2026-10-28"),
+  };
+
+  beforeEach(async () => {
+    await seedTwoFarms();
+    for (const farmId of [FARM_A_ID, FARM_B_ID]) {
+      const n = farmId === FARM_A_ID ? 1 : 10;
+      for (let i = 0; i < n; i++) {
+        await fakePrisma.motherHen.create({
+          data: {
+            id: `hen-${farmId}-${i}`,
+            farmId,
+            name: "Hen",
+            createdAt: new Date("2026-02-01"),
+            diedAt: null,
+          },
+        });
+      }
+      await fakePrisma.incubationCycle.create({
+        data: {
+          id: `cycle-${farmId}`,
+          farmId,
+          startDate: new Date("2026-03-01"),
+          hatchDate: new Date("2026-03-22"),
+          hatchedCount: 4 * n,
+        },
+      });
+      await fakePrisma.birdGroup.create({
+        data: {
+          id: `meat-${farmId}`,
+          farmId,
+          breedId: null,
+          name: "M",
+          quantity: 6 * n,
+          area: "MEAT",
+        },
+      });
+      await fakePrisma.loss.create({
+        data: {
+          id: `loss-${farmId}`,
+          farmId,
+          area: "MEAT",
+          lossDate: new Date("2026-04-01"),
+          quantity: 2 * n,
+          reasonType: "OTHER",
+          comment: null,
+        },
+      });
+    }
+  });
+
+  it("never counts another farm's hens, hatched chicks, meat birds or losses", async () => {
+    await expect(getAreaUnitBase(FARM_A_ID, "hens", period)).resolves.toBe(1);
+    await expect(getAreaUnitBase(FARM_A_ID, "incubation", period)).resolves.toBe(4);
+    await expect(getAreaUnitBase(FARM_A_ID, "meat", period)).resolves.toBe(8);
+    await expect(getAreaUnitBase(FARM_B_ID, "meat", period)).resolves.toBe(80);
   });
 });
 
