@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { PeriodSwitch } from "@/components/v2/period-switch";
 import { formatEUR, formatRelativeLT } from "@/lib/format";
 import { birdTypeLabels } from "@/lib/labels";
+import { AreaSplitCard } from "@/components/v2/area-split-card";
+import { areaSplits } from "@/lib/area-split";
 import { cn } from "@/lib/utils";
 import { Egg, AlertTriangle, Heart, Drumstick, Plus } from "lucide-react";
 
@@ -17,10 +19,10 @@ const ACTIVITY_ICONS = {
   MOTHER_HEN_LOG: Heart,
 } as const;
 
-// The V2 farm overview (V2-Overview). #201 adds its top: the title with
-// "Išlaida", the period switch and the farm result. The donut (#202), area
-// tiles (#203) and "Ūkis dabar"/"Daugiau statistikos" (#204) come later; until
-// then the V1 dashboard's counts and recent activity stay below the result.
+// The V2 farm overview (V2-Overview): the title with "Išlaida", the period
+// switch and the farm result (#201), then spending and income by area (#202).
+// The area tiles (#203) and "Ūkis dabar"/"Daugiau statistikos" (#204) come
+// later; until then the V1 dashboard's counts and recent activity stay below.
 export default async function OverviewPage({
   searchParams,
 }: {
@@ -39,8 +41,7 @@ export default async function OverviewPage({
     <div className="flex flex-col gap-3 pt-2">
       <div className="flex items-center justify-between gap-3 px-4">
         <h1 className="text-lg font-semibold">Ūkio apžvalga</h1>
-        {/* The general form: it files the expense under Bendra until #193 adds
-            the area chooser. */}
+        {/* The general form, which asks for the area, "Bendra" included (#193). */}
         <Link
           href="/expenses/new"
           className="flex h-11 items-center gap-1 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
@@ -77,6 +78,11 @@ export default async function OverviewPage({
             </div>
           </div>
         </Card>
+      </div>
+
+      <div className="px-4">
+        {/* Both views worked out here; the card only picks one and draws it. */}
+        <AreaSplitCard splits={areaSplits(finance.areas)} />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 px-4">
