@@ -1,0 +1,60 @@
+name: PROD_deployment_V2
+
+# Releases V2: `main_app_V2` → `releaseV2` → V2 production, tagged `v2-X.Y.Z`.
+# Run it from `main_app_V2`; the work is in
+# release-pipeline.yml, shared with the other app (#243).
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump"
+        type: choice
+        required: true
+        default: patch
+        options: [patch, minor, major, custom]
+      version:
+        description: "Exact version, when bump = custom (e.g. 1.4.0)"
+        type: string
+        required: false
+      dry_run:
+        description: "Run every check and change nothing"
+        type: boolean
+        required: false
+        default: false
+      allow_destructive:
+        description: "Proceed even if a pending migration drops or rewrites data"
+        type: boolean
+        required: false
+        default: false
+
+
+permissions:
+  contents: write
+  deployments: read
+  actions: read
+
+concurrency:
+  # Never two releases of this app at once: they would race for the same
+  # branch and tag. The other app's releases are independent.
+  group: prod-deployment-v2
+  cancel-in-progress: false
+
+jobs:
+  release:
+    uses: ./.github/workflows/release-pipeline.yml
+    with:
+      bump: ${{ inputs.bump }}
+      version: ${{ inputs.version }}
+      dry_run: ${{ inputs.dry_run }}
+      allow_destructive: ${{ inputs.allow_destructive }}
+      app: V2
+      source_branch: main_app_V2
+      release_branch: releaseV2
+      tag_prefix: "v2-"
+      app_url: ${{ vars.APP_URL_V2 }}
+      vercel_environment: "Production – chickensfarm-v2"
+      vercel_project_id: prj_M4VrMiPSLeBK1pDEGbW0f2q9lSOS
+    secrets:
+      cron_secret: ${{ secrets.CRON_SECRET_V2 }}
+      vercel_token: ${{ secrets.VERCEL_TOKEN }}
