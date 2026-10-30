@@ -96,4 +96,10 @@ describe("farmStats months", () => {
     );
     expect(months.map((m) => m.label)).toEqual(["Sausis 2026", "Gruodis 2025"]);
   });
+
+  it("tells a period with records from one of empty months", () => {
+    const empty = finance({ months: [month(2026, 9, 0, 0)] });
+    expect(farmStats(farm({ EGGS: empty, SHARED: empty })).hasRecords).toBe(false);
+    expect(farmStats(farm({ SHARED: finance({ hasRecords: true }) })).hasRecords).toBe(true);
+  });
 });

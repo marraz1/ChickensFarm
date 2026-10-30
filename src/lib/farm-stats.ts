@@ -15,6 +15,8 @@ export type FarmStats = {
   categories: { label: string; amount: number; share: number; bar: number }[];
   /** Newest first, every month of the period. */
   months: { key: string; label: string; income: number; expenses: number; result: number }[];
+  /** Any money recorded in the period; without it the months are all zero. */
+  hasRecords: boolean;
 };
 
 export function farmStats(areas: Record<FarmArea, AreaFinance>): FarmStats {
@@ -61,5 +63,6 @@ export function farmStats(areas: Record<FarmArea, AreaFinance>): FarmStats {
       expenses: m.expenses / 100,
       result: (m.income - m.expenses) / 100,
     })),
+    hasRecords: farmAreaOrder.some((area) => areas[area].hasRecords),
   };
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { resolveFinancePeriod } from "@/lib/finance-period";
+import { getEggStock } from "@/lib/services/egg-sales";
 
 export type FarmNow = {
   /** Eggs on hand: all ever collected, minus sold and eaten. */
@@ -19,10 +20,8 @@ export type FarmNow = {
 export async function getFarmNow(farmId: string, now: Date = new Date()): Promise<FarmNow> {
   const year = resolveFinancePeriod({}, now);
 
-  const [collected, sold, eaten, birds, activeCycles, losses] = await Promise.all([
-    prisma.eggCollection.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    prisma.eggSale.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    prisma.eggConsumption.aggregate({ where: { farmId }, _sum: { quantity: true } }),
+  const [eggStock, birds, activeCycles, losses] = await Promise.all([
+    getEggStock(farmId),
     prisma.birdGroup.aggregate({ where: { farmId }, _sum: { quantity: true } }),
     prisma.incubationCycle.count({ where: { farmId, hatchDate: null } }),
     prisma.loss.aggregate({
@@ -32,8 +31,7 @@ export async function getFarmNow(farmId: string, now: Date = new Date()): Promis
   ]);
 
   return {
-    eggStock:
-      (collected._sum.quantity ?? 0) - (sold._sum.quantity ?? 0) - (eaten._sum.quantity ?? 0),
+    eggStock,
     totalBirds: birds._sum.quantity ?? 0,
     activeCycles,
     losses: { year: year.year, count: losses._sum.quantity ?? 0 },

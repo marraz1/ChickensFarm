@@ -225,22 +225,27 @@ test("Daugiau statistikos opens the period's categories and months", async ({ pa
 
   await page.goto(`/?period=range&from=${date}&to=${date}`);
   const stats = page.getByRole("region", { name: "Daugiau statistikos" });
-  const toggle = stats.getByRole("button", { name: "Daugiau statistikos" });
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await expect(stats).not.toContainText("Išlaidos pagal kategoriją");
+  // A native <details>: it opens without the page's script, so one tap does.
+  await expect(stats.locator("details")).not.toHaveAttribute("open");
+  await expect(stats.getByText("Išlaidos pagal kategoriją")).toBeHidden();
+  await stats.locator("summary").click();
+  await expect(stats.locator("details")).toHaveAttribute("open");
 
-  // The card answers once the page has hydrated: tap until it opens.
-  await expect(async () => {
-    if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true", { timeout: 2_000 });
-  }).toPass({ timeout: 15_000 });
-
-  await expect(stats).toContainText("Išlaidos pagal kategoriją");
+  await expect(stats.getByText("Išlaidos pagal kategoriją")).toBeVisible();
   // Both expenses are "Kita": one row with all of the spend.
   await expect(stats).toContainText(/Kita\s*4,00\s€\s*100,0\s%/);
   await expect(stats).toContainText("Pagal mėnesius · visas ūkis");
   await expect(stats).toContainText("Pajamos 0,00 € · Išlaidos 4,00 €");
   await expect(stats).toContainText("−4,00");
+});
+
+test("Daugiau statistikos says so when the period has no records", async ({ page }) => {
+  // No spec writes to 2000.
+  await page.goto("/?period=range&from=2000-02-29&to=2000-02-29");
+  const stats = page.getByRole("region", { name: "Daugiau statistikos" });
+  await stats.locator("summary").click();
+  await expect(stats.getByText("Šiuo laikotarpiu finansinių įrašų nėra.")).toBeVisible();
+  await expect(stats.getByText("Pagal mėnesius · visas ūkis")).toHaveCount(0);
 });
 
 test("Išlaida opens the general expense form", async ({ page }) => {
