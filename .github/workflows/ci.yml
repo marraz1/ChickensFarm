@@ -14,11 +14,10 @@ on:
   # Both apps' promotion chains (#242, #243):
   #   V1: feature -> develop -> main_app_V1 -> release
   #   V2: v2/<type>/<N>-slug -> v2/develop -> main_app_V2 -> releaseV2
-  # `main` stays listed only until #244 tidies the old name away.
   pull_request:
-    branches: [develop, main, main_app_V1, release, v2/develop, main_app_V2, releaseV2]
+    branches: [develop, main_app_V1, release, v2/develop, main_app_V2, releaseV2]
   push:
-    branches: [develop, main, main_app_V1, release, v2/develop, main_app_V2, releaseV2]
+    branches: [develop, main_app_V1, release, v2/develop, main_app_V2, releaseV2]
   # By hand, e.g. right after a branch is created or renamed: the release
   # pipeline's preflight needs a completed run on the branch it releases from.
   workflow_dispatch:

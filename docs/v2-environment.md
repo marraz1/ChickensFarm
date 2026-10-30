@@ -144,6 +144,12 @@ the release, a reset of `preview` from `production` brings both back in line.
   the version, fast-forwards `releaseV2`, tags `v2-X.Y.Z`, and Vercel's production build of
   `releaseV2` runs `prisma migrate deploy` against V2's database. V2's first release is
   `bump = custom`, `version = 2.0.0`; the workflow refuses anything below 2.0.0.
+- **After each V2 release, merge `main_app_V2` back into `v2/develop`** (a PR). The
+  release commits its version bump to `main_app_V2` only; until it is back on
+  `v2/develop`, the next V1 → V2 sync conflicts on `package.json`'s version.
+- **V2's reminders** stay off until the cutover: the Reminders workflow runs V2's job
+  only when the repository variable `REMINDERS_V2` is `on` (and `APP_STAGE=beta`
+  would refuse it anyway). The cutover (#245) sets it.
 - Bring V1 fixes across regularly: `git checkout v2/develop && git merge origin/main_app_V1`
   (via a PR). V1 migrations then apply to V2 on the next V2 release.
 

@@ -40,10 +40,22 @@ production deployment. V2's day-to-day release steps are in `docs/v2-environment
 (§ Day to day). A change to the pipeline changes both apps' releases, so
 prove it with a dry run of each.
 
-`main_app_V1` is the repository's default branch until #244 moves the default
-to `main_app_V2`. The default branch matters: GitHub only runs scheduled
-workflows (`reminders.yml`, `status.yml`) and offers "Run workflow" from it, so
-it carries the workflows of both apps.
+**`main_app_V2` is the repository's default branch** (#244; it was `main_app_V1`
+before). The default branch matters: GitHub only runs scheduled workflows and
+offers "Run workflow" from it, so it carries the workflows of **both** apps:
+
+- **Reminders** (every 15 min) calls `reminders-dispatch.yml` once per app.
+  Repository variables switch each one: `REMINDERS_V1` (on unless `off`) and
+  `REMINDERS_V2` (off unless `on`).
+- **Status** (daily) runs `status-check.yml` for V1 and for V2. Each has its own
+  URL, secret, source branch (for CI), deployment records and Vercel project.
+- **PROD_deployment**, **PROD_deployment_V2** and **V2 data copy** are run by hand.
+
+So a change to Reminders or Status goes into **V2's line** (`v2/develop` →
+`main_app_V2`). V1's copies of these files on `main_app_V1` no longer run on a
+schedule; keep them in step when syncing, but they are not what runs.
+Dependabot also reads its config from the default branch, and names both
+lines (`main_app_V1` and `v2/develop`).
 
 Right after a rename of the source branch, run **Actions → CI → Run workflow** on
 it once: past CI runs are recorded under the old name, and PROD_deployment's
