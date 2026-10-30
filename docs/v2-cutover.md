@@ -34,22 +34,34 @@ Tell every farm owner, ahead of the window:
 - that afterwards the same address opens the new version, and they **sign in
   again** with the same email and password (V2 has its own `AUTH_SECRET`, so V1
   sessions end);
-- that phone notifications must be **switched on again** in V2 (push
-  subscriptions are not copied); email reminders carry on.
+- that **reminders pause** from the freeze until V2 takes over (step 6), and that
+  phone notifications must be **switched on again** in V2 (push subscriptions are
+  not copied).
+
+Tell the V2 beta testers too: stay out of V2 from step 3 until step 7. The final
+copy empties and reloads every V2 table, so anything they entered is replaced,
+and their requests wait behind the copy's locks.
 
 ### 2. Freeze V1
 
 Vercel → `chickensfarm` → Settings → Environment Variables → Production:
 `READ_ONLY_MODE` = `true`. Then Deployments → the current production deployment →
-**Redeploy** (the variable is read by the running deployment's environment).
+**Redeploy**. Redeploy rebuilds, which the switch needs: the sign-in page is
+prerendered with or without the banner, and a running deployment keeps the
+environment it started with. A promote or an instant rollback does not pick up
+the change.
 
 Check, on the production URL:
 
 - every page shows "Programėlė perkeliama į naują versiją. Kol kas duomenų keisti
   negalima.";
 - saving anything (e.g. a new egg collection) fails with "Programėlė perkeliama į
-  naują versiją. Pakeitimų išsaugoti kol kas negalima." (`/api/*` answers 503);
-- signing in and reading still work.
+  naują versiją. Pakeitimų išsaugoti kol kas negalima.": every change through
+  `/api/*` answers 503, registration and password resets included;
+- the reminder cron answers 503 too, so the **Reminders** workflow goes red until
+  step 6. That is expected: a reminder sent now would write its claim to V1 after
+  the copy, and V2 would send it again;
+- signing in, reading and switching farms still work (and `/api/health` answers).
 
 From here no change can reach V1, so the copy in step 3 is final.
 
@@ -85,29 +97,40 @@ either fix and re-run or roll back (V1 is only frozen: switch it back on).
 ### 5. Move the domain
 
 Vercel → `chickensfarm` → Settings → Domains: remove the production domain.
-Vercel → `chickensfarm-v2` → Settings → Domains: add it. Then, in
-`chickensfarm-v2` → Environment Variables → Production:
+Vercel → `chickensfarm-v2` → Settings → Domains: add it. Then set each app's own
+address (Environment Variables → Production) and **Redeploy both**:
 
-- `AUTH_URL` and `APP_URL` = the production domain (they were the beta URL);
+- `chickensfarm-v2`: `AUTH_URL` and `APP_URL` = the production domain (they were
+  the beta URL);
+- `chickensfarm`: `AUTH_URL` and `APP_URL` = V1's own address (its
+  `chickensfarm.vercel.app` URL, or a domain of its own). Without this, signing in
+  to V1 redirects to the production domain, which is now V2.
 
-and redeploy V2 production. Password-reset links and email reminders use
-`APP_URL`.
+Password-reset links and email reminders use `APP_URL`.
 
 ### 6. Switch reminders
 
 Reminders are sent by the **Reminders** workflow, which calls
 `vars.APP_URL/api/cron/reminders` with the `CRON_SECRET` repository secret.
 
-- **V2** → Environment Variables → Production: set `CRON_SECRET` to the repository
-  secret's value, and **remove `APP_STAGE`** from Production and Preview. `APP_STAGE`
-  is what blocks V2's cron and shows the beta banner (#181).
+- **A new `CRON_SECRET`:** GitHub never shows a saved secret's value, so generate
+  a fresh one (`openssl rand -base64 32`) and set it in both places, same value:
+  the repository secret `CRON_SECRET` and V2 → Environment Variables → Production
+  `CRON_SECRET`.
+- **V2** → Environment Variables: **remove `APP_STAGE`** from Production and
+  Preview. `APP_STAGE` is what blocks V2's cron and shows the beta banner (#181).
+  Set `SENTRY_ENVIRONMENT` and `NEXT_PUBLIC_SENTRY_ENVIRONMENT` (Production) from
+  `v2-beta` to `production`, so V2's errors land in production alerts.
 - **In the same change** (a PR into `v2/develop`): delete the `E2E_EXPECT_BETA`
   line from `.github/workflows/ci.yml`, or every later V2 PR fails `e2e/beta.spec.ts`.
-- **V1** → Environment Variables → Production: remove `CRON_SECRET`, so V1's
-  endpoint answers 503 even if something still calls it.
-- Repository variable `APP_URL`: the production domain (now served by V2).
+- **V1** → Environment Variables → Production: remove `CRON_SECRET`, then
+  **Redeploy V1**, so its endpoint answers 503 even if something still calls it
+  (a running deployment keeps the old value until then).
+- Repository variables: `APP_URL` = the production domain (now served by V2), and
+  `VERCEL_PROJECT` = the `chickensfarm-v2` project id, so the Status workflow reads
+  V2's builds.
 - Redeploy V2 production, then run Actions → **Reminders** → Run workflow once and
-  check it answers 200.
+  check it answers 200. Reminders resume from here.
 
 ### 7. Smoke and e2e
 
@@ -137,8 +160,12 @@ at the latest, and within the first day after step 7.
    Production, then redeploy.
 3. **Reminders:** put `CRON_SECRET` back on V1 Production; on V2 remove
    `CRON_SECRET` and put back `APP_STAGE=beta` (Production and Preview); restore the
-   `E2E_EXPECT_BETA` line in `ci.yml` if it was removed; set the repository variable
-   `APP_URL` back to V1's address. Redeploy both.
+   `E2E_EXPECT_BETA` line in `ci.yml` if it was removed; set V2's Sentry
+   environment back to `v2-beta`; set V1's `AUTH_URL` / `APP_URL` back to the
+   production domain; set the repository variables `APP_URL` and `VERCEL_PROJECT`
+   back to V1's; give V1 and the repository secret the same `CRON_SECRET`. Redeploy
+   both. A rollback on the cutover day may resend that day's reminders: V2's
+   claims stay in V2, and V1's are from before the copy.
 4. **Tell the owners:** V1 is back; anything they entered in V2 since the cutover
    must be entered again in V1; sign in again; re-enable phone notifications in V1.
 5. Leave V2's data as it is for diagnosis. The next cutover's step 3 replaces it
@@ -160,15 +187,17 @@ public`). Roles made through the Neon API can write; do not use them.
    networks block; a query over Neon's driver works everywhere).
 3. **Copy:** from a `v2/develop` checkout,
 
-   ```bash
-   V1_DATABASE_URL="<v1_etl_ro on the snapshot>" \
-   V2_DATABASE_URL="<owner URL of the V2 rehearsal branch>" \
-   npm run v2:migrate -- --dry-run --report dry.json
-   # then the real run:
-   npm run v2:migrate -- --report report.json
-   ```
+   Save the two URLs in private files first (here `v1.url` holds the read-only
+   role on the snapshot, `v2.url` the owner URL of the V2 rehearsal branch), so
+   they never appear in the shell history or a ticket:
 
-   Keep the URLs in private files, never in the shell history or a ticket.
+   ```bash
+   V1_DATABASE_URL="$(cat v1.url)" V2_DATABASE_URL="$(cat v2.url)" \
+     npm run v2:migrate -- --dry-run --report dry.json
+   # then the real run, with the same variables:
+   V1_DATABASE_URL="$(cat v1.url)" V2_DATABASE_URL="$(cat v2.url)" \
+     npm run v2:migrate -- --report report.json
+   ```
 
 4. **Pass:** exit 0, `OK`, no `MISMATCH`, every table's V1 and V2 counts equal, and
    the backfill checks at 0.
