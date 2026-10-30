@@ -310,3 +310,23 @@ changed the `test` script to `vitest run`. CI and PROD_deployment both call
 
 **Consequences:** The Test gate can now fail where it used to pass
 vacuously, so a PR that removes all tests cannot go green.
+
+## 2026-10-30 — Two release lines, default branch `main_app_V2`: adopted
+
+**Context:** V1 stays live on its own address after the V2 cutover, so both
+apps need their own production line (Sprint 10:
+[#242](https://github.com/marraz1/ChickensFarm/issues/242)–[#245](https://github.com/marraz1/ChickensFarm/issues/245)).
+GitHub runs scheduled workflows, and offers "Run workflow", only from the
+default branch, which the entries above kept as `main` for that reason.
+
+**Decision:** `main` was renamed `main_app_V1` (V1: `develop` → `main_app_V1` →
+`release`, PROD_deployment). V2 got `main_app_V2` → `releaseV2` and
+PROD_deployment_V2, sharing one `release-pipeline.yml`. The default branch
+moved to `main_app_V2`, the future main app, and carries both apps' workflows:
+Reminders and Status run once per app with that app's URL, secret and Vercel
+project.
+
+**Consequences:** Changes to the scheduled workflows go into V2's line. Each app
+is released separately and tagged separately (`vX.Y.Z`, `v2-X.Y.Z`). V2's
+reminders stay off (`REMINDERS_V2`) until the cutover decides which app sends
+them, so owners do not get two of each.
