@@ -330,3 +330,21 @@ project.
 is released separately and tagged separately (`vX.Y.Z`, `v2-X.Y.Z`). V2's
 reminders stay off (`REMINDERS_V2`) until the cutover decides which app sends
 them, so owners do not get two of each.
+
+## 2026-10-30 — After the cutover, V2 alone sends reminders and takes the owners' address: adopted
+
+**Context:** V1 stays live after the cutover
+([#245](https://github.com/marraz1/ChickensFarm/issues/245)). Both apps then
+hold the same users and reminder settings, and owners reach the app at
+`chickensfarm.vercel.app`, many through a home-screen app installed from it.
+
+**Decision:** At the cutover the address `chickensfarm.vercel.app` moves to V2,
+and V1 gets `chickensfarm-v1.vercel.app`. Only V2 sends reminders:
+`REMINDERS_V2=on`, `REMINDERS_V1=off` (the Reminders workflow's switches, #244).
+The steps are in `docs/v2-cutover.md`.
+
+**Consequences:** Installed apps and bookmarks open V2 with no action from
+owners, and nobody gets each reminder twice. V1 remains usable on its own
+address, but anything entered there after the cutover stays in V1; the two
+apps' data is never synced, and the V2 data copy is never run again after the
+cutover.
