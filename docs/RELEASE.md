@@ -30,6 +30,10 @@ to `main_app_V2`. The default branch matters: GitHub only runs scheduled
 workflows (`reminders.yml`, `status.yml`) and offers "Run workflow" from it, so
 it carries the workflows of both apps.
 
+Right after a rename of the source branch, run **Actions → CI → Run workflow** on
+it once: past CI runs are recorded under the old name, and PROD_deployment's
+preflight needs a completed run on the branch it releases from.
+
 Never push to `release` by hand. The workflow refuses to run if `release` has
 commits that `main_app_V1` does not, because merging over them would either conflict or
 silently revert someone's work.
@@ -39,7 +43,7 @@ silently revert someone's work.
 ## One-time setup
 
 1. **Vercel → Project → Settings → Git → Production Branch → `release`.**
-   Until this is changed, `main_app_V1` is still what goes live and the workflow will
+   Until this is changed, Vercel's original production branch (`main`) is still what goes live and the workflow will
    report that no deployment appeared.
 2. **Repository secret `VERCEL_TOKEN`** — create at
    <https://vercel.com/account/tokens>. Optional, but without it the workflow
@@ -170,7 +174,8 @@ live, so roll back in Vercel if users are affected.
 
 ### Build — "No deployment record appeared"
 
-Vercel's Production Branch is probably still `main_app_V1`. See One-time setup.
+Vercel's Production Branch is probably still the original `main` (Vercel does not
+follow a GitHub rename). See One-time setup.
 
 ### Build — the build failed
 

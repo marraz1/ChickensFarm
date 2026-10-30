@@ -18,6 +18,10 @@ on:
     branches: [develop, main, main_app_V1, release]
   push:
     branches: [develop, main, main_app_V1, release]
+  # By hand, e.g. right after main is renamed to main_app_V1: past runs are
+  # recorded under `main`, and PROD_deployment's preflight needs a completed
+  # run on main_app_V1 itself.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -116,8 +120,9 @@ jobs:
   preview:
     name: Preview build
     runs-on: ubuntu-latest
-    # Only on a PR. A push to main_app_V1 produces a production deployment, which the
-    # Status workflow already watches — doing it here too would just duplicate.
+    # Only on a PR. A push builds its branch's own deployment (production only
+    # for `release`), which the Status workflow already watches — doing it here
+    # too would just duplicate.
     if: github.event_name == 'pull_request'
     outputs:
       state: ${{ steps.wait.outputs.state }}
