@@ -148,5 +148,20 @@ describe("areaTiles", () => {
       "MEAT",
     );
     expect(acrossYears.months.map((m) => m.label)).toEqual(["Sausis 2026", "Gruodis 2025"]);
+
+    // A range spanning years whose last three months share one: no year.
+    const lateInRange = tileOf(
+      areaTiles(
+        farm({
+          INC: finance({
+            months: [month(2026, 9, 1), month(2026, 8, 1), month(2026, 7, 1), month(2025, 10, 1)],
+            spansYears: true,
+          }),
+        }),
+        NO_LOSSES,
+      ),
+      "INC",
+    );
+    expect(lateInRange.months.map((m) => m.label)).toEqual(["Spalis", "Rugsėjis", "Rugpjūtis"]);
   });
 });

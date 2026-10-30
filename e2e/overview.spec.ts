@@ -190,6 +190,14 @@ test("Sritys opens one area tile at a time", async ({ page }) => {
   await expect(tiles).toContainText("Didžiausios išlaidos");
   await expect(tiles).not.toContainText("Nuostoliai");
   await expect(tiles.getByRole("link")).toHaveCount(0);
+
+  // Opening a right-hand tile leaves no hole: Perinimas moves up beside
+  // Kiaušiniai and Mėsa, the odd one out, spans the row.
+  await tile("Perekšlės").click();
+  await expect(tile("Perekšlės")).toHaveAttribute("aria-expanded", "true");
+  const box = async (name: string) => (await tile(name).boundingBox())!;
+  expect((await box("Perinimas")).y).toBe((await box("Kiaušiniai")).y);
+  expect((await box("Mėsiniai paukščiai")).width).toBe((await box("Bendros išlaidos")).width);
 });
 
 test("Išlaida opens the general expense form", async ({ page }) => {

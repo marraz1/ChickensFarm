@@ -8,7 +8,8 @@ import { AREA_LOSS_COPY } from "@/lib/area-losses";
 import { AREA_CHART } from "@/lib/area-split";
 import { countNounLT, formatMonthLT, formatMonthYearLT } from "@/lib/format";
 import { farmAreaLabels, farmAreaOrder } from "@/lib/labels";
-import { areaSlugFor, areaTabHref } from "@/lib/v2-navigation";
+import { AREA_SLUGS, areaSlugFor, areaTabHref } from "@/lib/v2-navigation";
+import type { LossArea } from "@/lib/services/losses";
 
 /** The design shows up to three of each. */
 const TOP_CATEGORIES = 3;
@@ -24,7 +25,7 @@ export type AreaTile = {
   topCategories: { label: string; amount: number }[];
   /** "2 paukščiai"; null for Bendros, which loses no birds. */
   losses: string | null;
-  /** Newest first, the period's last three months at most. */
+  /** Newest first, the period's last three months at most; labelled with the year only when they span two. */
   months: { key: string; label: string; result: number }[];
   /** The area's own screens; null for Bendros, which has none. */
   links: { overview: string; finance: string } | null;
@@ -34,14 +35,18 @@ export type AreaTile = {
 
 export function areaTiles(
   areas: Record<FarmArea, AreaFinance>,
-  losses: Record<Exclude<FarmArea, "SHARED">, number>,
+  losses: Record<LossArea, number>,
 ): AreaTile[] {
   return farmAreaOrder.map((area) => {
     const finance = areas[area];
+    // Null for Bendros, which has no screens and loses no birds.
     const slug = areaSlugFor(area);
     const topCategories = finance.byCategory
       .slice(0, TOP_CATEGORIES)
       .map(({ label, amount }) => ({ label, amount }));
+    const months = finance.months.slice(0, MONTHS);
+    // The year only when the months shown span two of them.
+    const withYear = new Set(months.map((m) => m.year)).size > 1;
     return {
       area,
       name: area === "SHARED" ? "Bendros išlaidos" : farmAreaLabels[area],
@@ -50,11 +55,10 @@ export function areaTiles(
       expenses: finance.expenses,
       result: finance.result,
       topCategories,
-      losses:
-        area === "SHARED" || !slug ? null : countNounLT(losses[area], AREA_LOSS_COPY[slug].unit),
-      months: finance.months.slice(0, MONTHS).map((m) => ({
+      losses: slug ? countNounLT(losses[AREA_SLUGS[slug]], AREA_LOSS_COPY[slug].unit) : null,
+      months: months.map((m) => ({
         key: `${m.year}-${m.month}`,
-        label: finance.spansYears ? formatMonthYearLT(m.year, m.month) : formatMonthLT(m.month),
+        label: withYear ? formatMonthYearLT(m.year, m.month) : formatMonthLT(m.month),
         result: m.result,
       })),
       links: slug

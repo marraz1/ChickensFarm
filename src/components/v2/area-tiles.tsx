@@ -13,15 +13,20 @@ const resultColor = (amount: number) => (amount >= 0 ? "text-emerald-600" : "tex
 
 // The overview's "Sritys" (#203, V2-Overview): two tiles a row, Bendros across
 // both. Tapping a tile widens it and opens its details; one is open at a time.
+// With a tile open, three half-width tiles are left: the grid packs densely
+// (an opened right-hand tile drops to its own row and the next tile moves up
+// beside its partner) and the odd one out spans both, so no cell is left empty.
 export function AreaTiles({ tiles }: { tiles: AreaTile[] }) {
   const [open, setOpen] = useState<FarmArea | null>(null);
+  const halves = tiles.filter((t) => t.area !== open && t.area !== "SHARED");
+  const oddOneOut = halves.length % 2 === 1 ? halves[halves.length - 1].area : null;
 
   return (
     <section aria-labelledby="area-tiles-heading">
       <h2 id="area-tiles-heading" className="mb-2 text-sm text-muted-foreground">
         Sritys
       </h2>
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-flow-dense grid-cols-2 gap-2.5">
         {tiles.map((tile) => {
           const isOpen = open === tile.area;
           const panelId = `area-tile-${tile.area}`;
@@ -30,7 +35,7 @@ export function AreaTiles({ tiles }: { tiles: AreaTile[] }) {
               key={tile.area}
               className={cn(
                 "gap-0 overflow-hidden py-0",
-                (isOpen || tile.area === "SHARED") && "col-span-2",
+                (isOpen || tile.area === "SHARED" || tile.area === oddOneOut) && "col-span-2",
               )}
             >
               <button
