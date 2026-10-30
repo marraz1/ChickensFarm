@@ -305,8 +305,9 @@ jobs:
       # previews share the production database, so the spec skips there.
       E2E_USER_EMAIL: ${{ (startsWith(github.base_ref, 'v2/') || github.base_ref == 'main_app_V2') && secrets.E2E_USER_EMAIL || '' }}
       E2E_USER_PASSWORD: ${{ (startsWith(github.base_ref, 'v2/') || github.base_ref == 'main_app_V2') && secrets.E2E_USER_PASSWORD || '' }}
-      # V2 previews run with APP_STAGE=beta, so e2e/beta.spec.ts expects the banner there.
-      E2E_EXPECT_BETA: ${{ (startsWith(github.base_ref, 'v2/') || github.base_ref == 'main_app_V2') && '1' || '' }}
+      # V2's beta ended at the cutover (#183): e2e/beta.spec.ts now skips. Put
+      # this back (see docs/v2-cutover.md § Rollback) only if V2 returns to beta:
+      # E2E_EXPECT_BETA: ${{ (startsWith(github.base_ref, 'v2/') || github.base_ref == 'main_app_V2') && '1' || '' }}
     steps:
       - uses: actions/checkout@v5
 
