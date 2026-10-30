@@ -15,6 +15,7 @@ import {
 } from "@/lib/area-overview";
 import { getAreaFinance, getAreaFinances } from "@/lib/services/area-finance";
 import { openBroodsWhere } from "@/lib/services/mother-hens";
+import { getEggStock } from "@/lib/services/egg-sales";
 import type { AreaFinance } from "@/lib/area-finance";
 import type { EggsStatKey, MeatStatKey } from "@/lib/v2-navigation";
 
@@ -49,9 +50,7 @@ export async function getEggsOverview(
   const yearRange = { gte: year.from, lte: year.to };
 
   const [
-    collectedAll,
-    soldAll,
-    consumedAll,
+    eggStock,
     collectedMonth,
     collectedYear,
     consumedMonth,
@@ -59,9 +58,7 @@ export async function getEggsOverview(
     breeds,
     [balance, monthMoney],
   ] = await Promise.all([
-    prisma.eggCollection.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    prisma.eggSale.aggregate({ where: { farmId }, _sum: { quantity: true } }),
-    prisma.eggConsumption.aggregate({ where: { farmId }, _sum: { quantity: true } }),
+    getEggStock(farmId),
     prisma.eggCollection.aggregate({
       where: { farmId, collectionDate: monthRange },
       _sum: { quantity: true },
@@ -93,10 +90,7 @@ export async function getEggsOverview(
 
   return {
     year: year.year,
-    eggStock:
-      (collectedAll._sum.quantity ?? 0) -
-      (soldAll._sum.quantity ?? 0) -
-      (consumedAll._sum.quantity ?? 0),
+    eggStock,
     collectedThisMonth,
     collectedThisYear: collectedYear._sum.quantity ?? 0,
     flock: {

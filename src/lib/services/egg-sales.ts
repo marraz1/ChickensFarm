@@ -50,6 +50,20 @@ export async function deleteEggSale(farmId: string, id: string) {
   await prisma.eggSale.delete({ where: { id } });
 }
 
+/**
+ * Eggs on hand: all ever collected, minus sold and eaten. One definition for
+ * every "Kiaušinių likutis" (the overview's "Ūkis dabar" and the Kiaušiniai
+ * area), so the two never disagree.
+ */
+export async function getEggStock(farmId: string): Promise<number> {
+  const [collected, sold, eaten] = await Promise.all([
+    prisma.eggCollection.aggregate({ where: { farmId }, _sum: { quantity: true } }),
+    prisma.eggSale.aggregate({ where: { farmId }, _sum: { quantity: true } }),
+    prisma.eggConsumption.aggregate({ where: { farmId }, _sum: { quantity: true } }),
+  ]);
+  return (collected._sum.quantity ?? 0) - (sold._sum.quantity ?? 0) - (eaten._sum.quantity ?? 0);
+}
+
 export async function getEggStockReport(farmId: string, range?: { from: Date; to: Date }) {
   const periodFilter = range ? { gte: range.from, lte: range.to } : undefined;
 

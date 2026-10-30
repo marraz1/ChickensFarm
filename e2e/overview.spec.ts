@@ -200,6 +200,54 @@ test("Sritys opens one area tile at a time", async ({ page }) => {
   expect((await box("Mėsiniai paukščiai")).width).toBe((await box("Bendros išlaidos")).width);
 });
 
+test("Ūkis dabar links each count to its area", async ({ page }) => {
+  await page.goto("/");
+  const now = page.getByRole("region", { name: "Ūkis dabar" });
+  const links = now.getByRole("link");
+  await expect(links).toHaveCount(4);
+  for (const [name, href] of [
+    ["Kiaušinių likutis", "/areas/eggs"],
+    ["Paukščių iš viso", "/areas/eggs"],
+    ["Aktyvūs ciklai", "/areas/incubation"],
+    [`Nuostoliai · ${farmYear()} m.`, "/areas/eggs/losses"],
+  ]) {
+    await expect(now.getByRole("link", { name: new RegExp(`^${name}`) })).toHaveAttribute(
+      "href",
+      href,
+    );
+  }
+});
+
+test("Daugiau statistikos opens the period's categories and months", async ({ page }) => {
+  const date = quietDay();
+  await createExpense(page, "MEAT", date, 3);
+  await createExpense(page, "SHARED", date, 1);
+
+  await page.goto(`/?period=range&from=${date}&to=${date}`);
+  const stats = page.getByRole("region", { name: "Daugiau statistikos" });
+  // A native <details>: it opens without the page's script, so one tap does.
+  await expect(stats.locator("details")).not.toHaveAttribute("open");
+  await expect(stats.getByText("Išlaidos pagal kategoriją")).toBeHidden();
+  await stats.locator("summary").click();
+  await expect(stats.locator("details")).toHaveAttribute("open");
+
+  await expect(stats.getByText("Išlaidos pagal kategoriją")).toBeVisible();
+  // Both expenses are "Kita": one row with all of the spend.
+  await expect(stats).toContainText(/Kita\s*4,00\s€\s*100,0\s%/);
+  await expect(stats).toContainText("Pagal mėnesius · visas ūkis");
+  await expect(stats).toContainText("Pajamos 0,00 € · Išlaidos 4,00 €");
+  await expect(stats).toContainText("−4,00");
+});
+
+test("Daugiau statistikos says so when the period has no records", async ({ page }) => {
+  // No spec writes to 2000.
+  await page.goto("/?period=range&from=2000-02-29&to=2000-02-29");
+  const stats = page.getByRole("region", { name: "Daugiau statistikos" });
+  await stats.locator("summary").click();
+  await expect(stats.getByText("Šiuo laikotarpiu finansinių įrašų nėra.")).toBeVisible();
+  await expect(stats.getByText("Pagal mėnesius · visas ūkis")).toHaveCount(0);
+});
+
 test("Išlaida opens the general expense form", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Išlaida", exact: true }).click();
